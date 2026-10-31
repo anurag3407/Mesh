@@ -1,0 +1,43 @@
+import "server-only"
+
+export function requireEnv(name: string): string {
+  const value = process.env[name]
+  if (!value) throw new Error(`${name} is not set`)
+  return value
+}
+
+export function getSupabaseUrl(): string {
+  return requireEnv("NEXT_PUBLIC_SUPABASE_URL")
+}
+
+export function getSupabaseAnonKey(): string {
+  return requireEnv("NEXT_PUBLIC_SUPABASE_ANON_KEY")
+}
+
+export function getServiceRoleKey(): string {
+  return requireEnv("SUPABASE_SERVICE_ROLE_KEY")
+}
+
+export function getKek(): string {
+  return requireEnv("MESH_KEK")
+}
+
+export function getOrchestratorUrl(): string {
+  return (process.env.ORCHESTRATOR_URL ?? "http://localhost:4000").replace(/\/+$/, "")
+}
+
+export function getInternalSecret(): string {
+  return requireEnv("ORCHESTRATOR_INTERNAL_SECRET")
+}
+
+export function getCollabUrl(): string {
+  return (process.env.NEXT_PUBLIC_COLLAB_URL || "ws://localhost:4000/collab").replace(/\/+$/, "")
+}
+
+export function ssoEnabled(): boolean {
+  return process.env.NEXT_PUBLIC_SSO_ENABLED === "true"
+}
+
+export function githubAuthEnabled(): boolean {
+  return process.env.NEXT_PUBLIC_GITHUB_AUTH_ENABLED === "true"
+}

@@ -1,0 +1,256 @@
+@import "tailwindcss";
+@import "streamdown/styles.css";
+
+@theme {
+  --color-void: #070907;
+  --color-ink: #0b0e0c;
+  --color-panel: #101411;
+  --color-raised: #151b17;
+  --color-hover: #1a211c;
+  --color-line: #232b25;
+  --color-line-strong: #354037;
+  --color-text: #e9e5d8;
+  --color-muted: #9aa39b;
+  --color-faint: #7a857c;
+  --color-accent: #ff7a45;
+  --color-accent-soft: #2a1a12;
+  --color-ok: #8fbf9f;
+  --color-warn: #e2b36b;
+  --color-danger: #e37b74;
+  --font-sans: "IBM Plex Sans Variable", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, monospace;
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 10px;
+}
+
+:root {
+  color-scheme: dark;
+}
+
+* {
+  border-color: var(--color-line);
+}
+
+html,
+body {
+  background: var(--color-void);
+  color: var(--color-text);
+}
+
+body {
+  font-family: var(--font-sans);
+  font-feature-settings: "ss01" on;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+::selection {
+  background: var(--color-accent);
+  color: var(--color-void);
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+button,
+a,
+input,
+textarea,
+select {
+  -webkit-tap-highlight-color: transparent;
+}
+
+input,
+textarea,
+select {
+  color-scheme: dark;
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-line-strong) transparent;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--color-line-strong);
+  border: 3px solid var(--color-void);
+  border-radius: 999px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+@keyframes mesh-caret {
+  0%,
+  45% {
+    opacity: 1;
+  }
+  55%,
+  100% {
+    opacity: 0.15;
+  }
+}
+
+.streaming-caret::after {
+  content: "";
+  display: inline-block;
+  width: 0.5em;
+  height: 1em;
+  margin-left: 2px;
+  margin-bottom: -0.12em;
+  background: var(--color-accent);
+  animation: mesh-caret 1s steps(1) infinite;
+}
+
+.streamdown {
+  font-size: 0.9375rem;
+  line-height: 1.65;
+  color: var(--color-text);
+  max-width: 72ch;
+}
+
+.streamdown > *:first-child {
+  margin-top: 0;
+}
+.streamdown > *:last-child {
+  margin-bottom: 0;
+}
+
+.streamdown p,
+.streamdown ul,
+.streamdown ol,
+.streamdown blockquote,
+.streamdown table,
+.streamdown pre {
+  margin-block: 0.75em;
+}
+
+.streamdown h1,
+.streamdown h2,
+.streamdown h3,
+.streamdown h4 {
+  margin-block: 1.3em 0.5em;
+  line-height: 1.25;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.streamdown h1 {
+  font-size: 1.35em;
+}
+.streamdown h2 {
+  font-size: 1.2em;
+}
+.streamdown h3 {
+  font-size: 1.05em;
+}
+
+.streamdown ul {
+  list-style: disc;
+  padding-left: 1.25em;
+}
+.streamdown ol {
+  list-style: decimal;
+  padding-left: 1.25em;
+}
+.streamdown li {
+  margin-block: 0.2em;
+}
+
+.streamdown a {
+  color: var(--color-accent);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.streamdown blockquote {
+  border-left: 2px solid var(--color-line-strong);
+  padding-left: 0.9em;
+  color: var(--color-muted);
+}
+
+.streamdown code {
+  font-family: var(--font-mono);
+  font-size: 0.86em;
+  background: var(--color-raised);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-sm);
+  padding: 0.08em 0.32em;
+}
+
+.streamdown pre {
+  background: var(--color-panel) !important;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-md);
+  font-family: var(--font-mono);
+  font-size: 0.82rem;
+}
+
+.streamdown pre code {
+  background: transparent;
+  border: 0;
+  padding: 0;
+}
+
+.streamdown table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.86em;
+}
+.streamdown th,
+.streamdown td {
+  border: 1px solid var(--color-line);
+  padding: 0.45em 0.65em;
+  text-align: left;
+}
+.streamdown th {
+  background: var(--color-raised);
+  font-weight: 500;
+}
+
+.streamdown hr {
+  border-color: var(--color-line);
+  margin-block: 1.5em;
+}
+
+.streamdown img {
+  max-width: 100%;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-line);
+}
+
+.mono {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.hairline {
+  box-shadow: inset 0 -1px 0 var(--color-line);
+}
+
+dialog::backdrop {
+  background: rgb(3 5 4 / 0.72);
+}
+
+textarea::placeholder,
+input::placeholder {
+  color: var(--color-faint);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
+}

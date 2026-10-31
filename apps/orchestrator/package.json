@@ -1,0 +1,39 @@
+{
+  "name": "@mesh/orchestrator",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "dotenv -e ../../.env -- tsx watch src/index.ts",
+    "start": "dotenv -e ../../.env -- tsx src/index.ts",
+    "typecheck": "tsc",
+    "test": "vitest run",
+    "lint": "eslint src"
+  },
+  "dependencies": {
+    "@ai-sdk/mcp": "^2.0.88",
+    "@e2b/code-interpreter": "^2.9.0",
+    "@hocuspocus/server": "^4.8.0",
+    "@mesh/core": "workspace:*",
+    "@mesh/db": "workspace:*",
+    "@mesh/llm": "workspace:*",
+    "@supabase/supabase-js": "^2.118.0",
+    "ai": "^7.0.159",
+    "drizzle-orm": "^0.45.4",
+    "hono": "^4.13.14",
+    "pg": "^8.23.1",
+    "pg-boss": "^12.38.0",
+    "yjs": "^13.6.33",
+    "zod": "^4.6.7",
+    "ws": "^8.22.0"
+  },
+  "devDependencies": {
+    "@hono/node-server": "^2.1.5",
+    "@types/pg": "^8.23.1",
+    "@types/ws": "^8.18.2",
+    "dotenv-cli": "^11.1.0",
+    "tsx": "^4.23.15",
+    "vitest": "^5.0.5",
+    "@types/node": "^24.0.0"
+  }
+}
