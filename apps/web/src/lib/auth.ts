@@ -34,14 +34,20 @@ export async function getProfile(user: User): Promise<OrgAccess["user"]> {
   const supabase = await createSupabaseServerClient()
   const { data } = await supabase
     .from("profiles")
-    .select("display_name, avatar_url")
+    .select("display_name, avatar_url, preferences")
     .eq("id", user.id)
     .maybeSingle()
+  const preferences = (data?.preferences as {
+    notifications?: "all" | "mentions" | "off"
+    sound?: boolean
+  } | null) ?? {}
   return {
     id: user.id,
     email: user.email ?? null,
     displayName: data?.display_name || displayNameOf(user),
     avatarUrl: data?.avatar_url ?? null,
+    notifications: preferences.notifications ?? "mentions",
+    sound: preferences.sound !== false,
   }
 }
 
@@ -109,7 +115,7 @@ export async function getRoomAccess(slug: string, roomId: string): Promise<RoomA
   const { data: room } = await supabase
     .from("rooms")
     .select(
-      "id, org_id, name, kind, turn_mode, system_directive, turn_cap, rpm_limit, daily_budget_usd, moderator_agent_id, debate_order, created_at",
+      "id, org_id, name, kind, turn_mode, system_directive, turn_cap, rpm_limit, daily_budget_usd, moderator_agent_id, debate_order, timezone, agent_dm_user_id, agent_dm_agent_id, created_at",
     )
     .eq("id", roomId)
     .eq("org_id", org.org.id)
@@ -134,6 +140,9 @@ export async function getRoomAccess(slug: string, roomId: string): Promise<RoomA
     dailyBudgetUsd: room.daily_budget_usd === null ? null : Number(room.daily_budget_usd),
     moderatorAgentId: room.moderator_agent_id,
     debateOrder: room.debate_order ?? [],
+    timezone: room.timezone ?? "UTC",
+    agentDmUserId: room.agent_dm_user_id ?? null,
+    agentDmAgentId: room.agent_dm_agent_id ?? null,
     createdAt: room.created_at,
   }
   return {

@@ -3,6 +3,7 @@ import { closeDb, getPool } from "./db"
 import { getEnv } from "./env"
 import { createApp } from "./http"
 import { startJobs, stopJobs } from "./jobs"
+import { startMeetingScheduler, stopMeetingScheduler } from "./scheduler/meetings"
 import { startApprovalListener } from "./tools/approvals"
 import { startBotReplyListener } from "./bot-reply"
 import { abortRoomRuns, abortRun } from "./active-runs"
@@ -41,6 +42,7 @@ await control.query("LISTEN mesh_room_interrupt")
 await control.query("LISTEN mesh_stop_run")
 
 await startJobs()
+startMeetingScheduler()
 
 const app = createApp()
 const server = serve(
@@ -89,6 +91,7 @@ async function shutdown(signal: string) {
   shuttingDown = true
   console.log(`[mesh] shutting down (${signal})…`)
   try {
+    stopMeetingScheduler()
     await stopJobs()
     await destroyHocuspocus()
     control.release()

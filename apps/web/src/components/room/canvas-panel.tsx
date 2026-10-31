@@ -27,13 +27,19 @@ export function CanvasPanel({
   orgSlug,
   roomId,
   userName,
+  initialCanvasId = null,
 }: {
   canvases: CanvasView[]
   orgSlug: string
   roomId: string
   userName: string
+  initialCanvasId?: string | null
 }) {
-  const [selectedId, setSelectedId] = useState<string | null>(canvases[0]?.id ?? null)
+  const [selectedId, setSelectedId] = useState<string | null>(
+    (initialCanvasId && canvases.some((canvas) => canvas.id === initialCanvasId)
+      ? initialCanvasId
+      : canvases[0]?.id) ?? null,
+  )
   const [showCreate, setShowCreate] = useState(canvases.length === 0)
   const pendingSelection = useRef<string | null>(null)
   const [text, setText] = useState("")

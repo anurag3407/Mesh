@@ -1,0 +1,327 @@
+"use server"
+
+import { revalidatePath } from "next/cache"
+import { z } from "zod"
+import {
+  formatMinutes,
+  parseTimeToMinutes,
+} from "@mesh/core"
+import { requireUser } from "@/lib/auth"
+import { createAdminClient } from "@/lib/supabase/admin"
+import { queueRoomMessage } from "@/lib/orchestrator"
+import {
+  adminRoomAccess,
+  audit,
+  errorMessage,
+  fail,
+  field,
+  ok,
+  slugify,
+} from "@/lib/actions/shared"
+import type { ActionResult } from "@/lib/types"
+
+function validTimeZone(timeZone: string): boolean {
+  try {
+    new Intl.DateTimeFormat("en-US", { timeZone }).format(new Date())
+    return true
+  } catch {
+    return false
+  }
+}
+
+async function uniqueOrgSlug(base: string): Promise<string> {
+  const admin = createAdminClient()
+  const root = slugify(base) || "workspace"
+  for (let i = 0; i < 50; i++) {
+    const candidate = i === 0 ? root : `${root}-${i + 1}`
+    const { data } = await admin.from("orgs").select("id").eq("slug", candidate).maybeSingle()
+    if (!data) return candidate
+  }
+  return `${root}-${Date.now().toString(36)}`
+}
+
+export async function setupWorkspaceAction(
+  _prev: ActionResult | null,
+  formData: FormData,
+): Promise<ActionResult> {
+  const user = await requireUser("/onboarding")
+  const roomName = field(formData, "roomName")
+  const timezone = field(formData, "timezone") || "UTC"
+  if (roomName.length < 1 || roomName.length > 60) {
+    return fail("Room name must be 1 to 60 characters")
+  }
+  if (!validTimeZone(timezone)) return fail("Choose a valid time zone")
+
+  const admin = createAdminClient()
+  const { data: memberships } = await admin
+    .from("org_members")
+    .select("org_id")
+    .eq("user_id", user.id)
+    .limit(1)
+  if (memberships?.length) return fail("You already have a workspace")
+
+  const slug = await uniqueOrgSlug(roomName)
+  const { data: org, error: orgError } = await admin
+    .from("orgs")
+    .insert({ name: roomName, slug })
+    .select("id, slug")
+    .single()
+  if (orgError || !org) return fail(errorMessage(orgError) || "Could not create the workspace")
+
+  try {
+    const { error: memberError } = await admin
+      .from("org_members")
+      .insert({ org_id: org.id, user_id: user.id, role: "owner" })
+    if (memberError) throw new Error(memberError.message)
+
+    const { data: room, error: roomError } = await admin
+      .from("rooms")
+      .insert({
+        org_id: org.id,
+        name: roomName,
+        kind: "private",
+        turn_mode: "mentions",
+        turn_cap: 3,
+        timezone,
+        created_by: user.id,
+      })
+      .select("id")
+      .single()
+    if (roomError || !room) throw new Error(roomError?.message ?? "Could not create the room")
+
+    const { error: roomMemberError } = await admin.from("room_members").insert({
+      room_id: room.id,
+      user_id: user.id,
+      role: "admin",
+    })
+    if (roomMemberError) throw new Error(roomMemberError.message)
+
+    await admin.from("room_reads").upsert(
+      { user_id: user.id, room_id: room.id, last_read_at: new Date().toISOString() },
+      { onConflict: "user_id,room_id" },
+    )
+    await admin.from("room_schedules").upsert(
+      { room_id: room.id, timezone },
+      { onConflict: "room_id" },
+    )
+    await admin.from("canvases").insert({
+      room_id: room.id,
+      kind: "markdown",
+      title: "Room notes",
+      snapshot_text: `# ${roomName}\n\n`,
+      created_by: user.id,
+    })
+    await audit({
+      orgId: org.id,
+      actorId: user.id,
+      action: "workspace.onboarding_created",
+      target: org.slug,
+      metadata: { roomName, timezone },
+    })
+    revalidatePath("/", "layout")
+    return ok("Workspace ready", { orgSlug: org.slug, orgId: org.id, roomId: room.id })
+  } catch (error) {
+    await admin.from("orgs").delete().eq("id", org.id)
+    return fail(errorMessage(error))
+  }
+}
+
+export async function saveOnboardingPhotoAction(
+  _prev: ActionResult | null,
+  formData: FormData,
+): Promise<ActionResult> {
+  const user = await requireUser("/onboarding")
+  const photo = field(formData, "photo")
+  if (!photo) {
+    const admin = createAdminClient()
+    await admin.from("profiles").update({ avatar_url: null }).eq("id", user.id)
+    return ok("Photo removed")
+  }
+  if (!/^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/.test(photo)) {
+    return fail("Use a PNG, JPEG or WebP image")
+  }
+  if (photo.length > 300_000) return fail("That image is too large. Use a smaller photo.")
+  const admin = createAdminClient()
+  const { error } = await admin.from("profiles").update({ avatar_url: photo }).eq("id", user.id)
+  if (error) return fail(errorMessage(error))
+  revalidatePath("/", "layout")
+  return ok("Photo saved")
+}
+
+export async function saveNotificationsAction(
+  _prev: ActionResult | null,
+  formData: FormData,
+): Promise<ActionResult> {
+  const user = await requireUser("/onboarding")
+  const mode = field(formData, "mode")
+  if (!["all", "mentions", "off"].includes(mode)) return fail("Choose a notification option")
+  const sound = field(formData, "sound") === "on"
+  const admin = createAdminClient()
+  const { data: profile } = await admin
+    .from("profiles")
+    .select("preferences")
+    .eq("id", user.id)
+    .maybeSingle()
+  const preferences = {
+    ...((profile?.preferences as Record<string, unknown>) ?? {}),
+    notifications: mode,
+    sound,
+  }
+  const { error } = await admin
+    .from("profiles")
+    .update({ preferences })
+    .eq("id", user.id)
+  if (error) return fail(errorMessage(error))
+  return ok("Notification preference saved")
+}
+
+export async function saveRoomScheduleAction(
+  _prev: ActionResult | null,
+  formData: FormData,
+): Promise<ActionResult> {
+  const orgSlug = field(formData, "orgSlug")
+  const roomId = field(formData, "roomId")
+  const check = await adminRoomAccess(orgSlug, roomId)
+  if ("error" in check) return fail(check.error)
+  const timezone = field(formData, "timezone") || "UTC"
+  if (!validTimeZone(timezone)) return fail("Choose a valid time zone")
+  const morningStart = parseTimeToMinutes(field(formData, "morningStart") || "09:00")
+  const morningEnd = parseTimeToMinutes(field(formData, "morningEnd") || "09:30")
+  const eveningStart = parseTimeToMinutes(field(formData, "eveningStart") || "17:00")
+  const eveningEnd = parseTimeToMinutes(field(formData, "eveningEnd") || "17:30")
+  const checkinStart = parseTimeToMinutes(field(formData, "checkinStart") || "09:00")
+  const checkinEnd = parseTimeToMinutes(field(formData, "checkinEnd") || "17:30")
+  const interval = z.coerce.number().int().min(15).max(480).safeParse(field(formData, "checkinInterval") || "60")
+  const duration = z.coerce.number().int().min(5).max(60).safeParse(field(formData, "checkinDuration") || "10")
+  if (morningStart === null || morningEnd === null || eveningStart === null || eveningEnd === null) {
+    return fail("Use valid meeting times")
+  }
+  if (morningEnd <= morningStart || eveningEnd <= eveningStart) {
+    return fail("Each meeting must end after it starts")
+  }
+  if (checkinStart === null || checkinEnd === null) return fail("Use valid check-in times")
+  if (!interval.success || !duration.success) return fail("Choose a valid check-in interval and length")
+  const admin = createAdminClient()
+  const { error } = await admin.from("room_schedules").upsert(
+    {
+      room_id: roomId,
+      timezone,
+      morning_start_minutes: morningStart,
+      morning_end_minutes: morningEnd,
+      evening_start_minutes: eveningStart,
+      evening_end_minutes: eveningEnd,
+      checkins_enabled: field(formData, "checkinsEnabled") === "on",
+      checkin_interval_minutes: interval.data,
+      checkin_start_minutes: checkinStart,
+      checkin_end_minutes: checkinEnd,
+      checkin_duration_minutes: duration.data,
+      updated_at: new Date().toISOString(),
+    },
+    { onConflict: "room_id" },
+  )
+  if (error) return fail(errorMessage(error))
+  await admin.from("rooms").update({ timezone }).eq("id", roomId)
+  await audit({
+    orgId: check.access.org.id,
+    actorId: check.access.user.id,
+    action: "room.schedule_changed",
+    target: roomId,
+    metadata: {
+      morning: `${formatMinutes(morningStart)}-${formatMinutes(morningEnd)}`,
+      evening: `${formatMinutes(eveningStart)}-${formatMinutes(eveningEnd)}`,
+      checkins: field(formData, "checkinsEnabled") === "on",
+    },
+  })
+  revalidatePath(`/${orgSlug}`, "layout")
+  return ok("Schedule saved")
+}
+
+export async function saveRoomInstructionsAction(
+  _prev: ActionResult | null,
+  formData: FormData,
+): Promise<ActionResult> {
+  const orgSlug = field(formData, "orgSlug")
+  const roomId = field(formData, "roomId")
+  const check = await adminRoomAccess(orgSlug, roomId)
+  if ("error" in check) return fail(check.error)
+  const instructions = field(formData, "instructions")
+  if (instructions.length > 4_000) return fail("Keep room instructions under 4,000 characters")
+  const admin = createAdminClient()
+  const { error } = await admin
+    .from("rooms")
+    .update({ system_directive: instructions || null })
+    .eq("id", roomId)
+  if (error) return fail(errorMessage(error))
+  await audit({
+    orgId: check.access.org.id,
+    actorId: check.access.user.id,
+    action: "room.instructions_changed",
+    target: roomId,
+  })
+  revalidatePath(`/${orgSlug}`, "layout")
+  return ok("Room instructions saved")
+}
+
+export async function finishOnboardingAction(
+  orgSlug: string,
+  roomId: string,
+): Promise<ActionResult> {
+  const check = await adminRoomAccess(orgSlug, roomId)
+  if ("error" in check) return fail(check.error)
+  const admin = createAdminClient()
+  const { data: existing } = await admin
+    .from("messages")
+    .select("id")
+    .eq("room_id", roomId)
+    .contains("metadata", { onboarding: true })
+    .limit(1)
+  if (existing?.length) {
+    return ok("Room ready", { path: `/${orgSlug}/r/${roomId}` })
+  }
+  const { data: agents } = await admin
+    .from("room_agents")
+    .select("agent_id")
+    .eq("room_id", roomId)
+  const room = check.access.room
+  let messageId: string | null = null
+  if (agents?.length) {
+    const content = `@all_bots Welcome to ${room.name}. Introduce yourself in one sentence and say what you can help with.`
+    const { data: message } = await admin
+      .from("messages")
+      .insert({
+        room_id: roomId,
+        sender_type: "human",
+        sender_id: check.access.user.id,
+        content,
+        status: "complete",
+        mentions: ["all_bots"],
+        metadata: { onboarding: true },
+      })
+      .select("id")
+      .single()
+    messageId = message?.id ?? null
+    if (messageId) await queueRoomMessage(roomId, messageId)
+  } else {
+    await admin.from("messages").insert({
+      room_id: roomId,
+      sender_type: "system",
+      sender_id: null,
+      content: `Welcome to ${room.name}. Add an agent or invite someone to get started.`,
+      status: "complete",
+      metadata: { onboarding: true },
+    })
+  }
+  await admin.from("room_reads").upsert(
+    {
+      user_id: check.access.user.id,
+      room_id: roomId,
+      last_read_at: new Date().toISOString(),
+    },
+    { onConflict: "user_id,room_id" },
+  )
+  revalidatePath(`/${orgSlug}`, "layout")
+  return ok("Room ready", {
+    path: `/${orgSlug}/r/${roomId}`,
+    queued: Boolean(messageId),
+  })
+}

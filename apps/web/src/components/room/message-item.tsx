@@ -82,6 +82,7 @@ export function MessageItem({
           name={message.senderName}
           kind={message.senderType}
           size="sm"
+          src={message.senderAvatarUrl}
           className="mt-0.5"
         />
       </div>

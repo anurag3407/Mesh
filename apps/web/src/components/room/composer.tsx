@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useLayoutEffect, useRef, useState } from "react"
+import Link from "next/link"
 import { sendMessage } from "@/lib/actions/messages"
 import { enqueueOutbox, flushOutbox, readOutbox } from "@/lib/outbox"
 import { Button } from "@/components/ui/button"
@@ -260,6 +261,35 @@ export function Composer({
           className="block max-h-[220px] min-h-10 w-full resize-none bg-transparent px-3 pt-2.5 text-[13px] leading-relaxed text-text outline-none placeholder:text-faint"
         />
         <div className="flex flex-wrap items-center gap-2 px-2.5 pb-2">
+          <details className="relative">
+            <summary
+              className="grid h-6 w-6 cursor-pointer list-none place-items-center rounded-sm border border-line font-mono text-[13px] text-muted hover:border-line-strong hover:text-text"
+              aria-label="More actions"
+              title="More actions"
+            >
+              +
+            </summary>
+            <div className="absolute bottom-full left-0 z-10 mb-1 w-48 border border-line-strong bg-panel py-1 shadow-[0_12px_32px_rgba(0,0,0,0.45)]">
+              <Link
+                href={`/${orgSlug}/meetings`}
+                className="block px-3 py-1.5 text-[12px] text-muted hover:bg-raised hover:text-text"
+              >
+                Start a meeting
+              </Link>
+              <Link
+                href={`/${orgSlug}/tasks`}
+                className="block px-3 py-1.5 text-[12px] text-muted hover:bg-raised hover:text-text"
+              >
+                New task or request
+              </Link>
+              <Link
+                href={`/${orgSlug}/files`}
+                className="block px-3 py-1.5 text-[12px] text-muted hover:bg-raised hover:text-text"
+              >
+                Browse files
+              </Link>
+            </div>
+          </details>
           <span className="font-mono text-[10px] text-faint">
             <Kbd>@</Kbd> agent · <Kbd>Enter</Kbd> send · <Kbd>Shift</Kbd>+
             <Kbd>Enter</Kbd> newline

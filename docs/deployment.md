@@ -25,18 +25,23 @@ streams, LISTEN connections and the canvas WebSocket, so it needs a long-running
    pooler** connection string on port 5432 into `.env`.
    - Do not use the transaction pooler (6543) for `DATABASE_URL`: pg-boss, advisory locks
      and LISTEN/NOTIFY need session-pinned connections.
-3. Run `pnpm db:migrate`. It applies the Drizzle tables, then four idempotent SQL files:
+3. Run `pnpm db:migrate`. It applies the Drizzle tables, then five idempotent SQL files:
    - functions and auth profile trigger
    - RLS policies, safe views, grants
    - realtime publication entries and private channel authorization
    - the tool approval notification RPC
+   - meeting, schedule, task and per-user room-read policies
 4. Run `pnpm db:seed` and edit prices in the app.
 5. Auth settings:
    - Site URL: `https://<web-host>`
    - Redirect allow list: `https://<web-host>/auth/callback`,
      `http://localhost:3000/auth/callback`
-   - Configure SMTP for magic links.
-   - Optional GitHub OAuth, then set `NEXT_PUBLIC_GITHUB_AUTH_ENABLED=true`.
+   - Configure SMTP and include `{{ .Token }}` in the Confirm signup email template.
+     The sign-up and code screens read the six-digit token; a template with only
+     `{{ .ConfirmationURL }}` cannot complete them.
+   - Email/password is enabled by default. Optional Google OAuth, then set
+     `NEXT_PUBLIC_GOOGLE_AUTH_ENABLED=true`. Optional GitHub OAuth, then set
+     `NEXT_PUBLIC_GITHUB_AUTH_ENABLED=true`.
    - SAML SSO requires Supabase Pro; configure it in Supabase and set
      `NEXT_PUBLIC_SSO_ENABLED=true`.
 
@@ -64,11 +69,11 @@ Required:
 | `ORCHESTRATOR_INTERNAL_SECRET` | web, orchestrator | internal HTTP auth |
 | `ORCHESTRATOR_URL` | web | e.g. `https://mesh-orch.fly.dev` |
 | `NEXT_PUBLIC_COLLAB_URL` | web | e.g. `wss://mesh-orch.fly.dev/collab` |
-| `NEXT_PUBLIC_SITE_URL` | web | magic link and invite redirects |
+| `NEXT_PUBLIC_SITE_URL` | web | auth redirects and invite links |
 
 Optional: `DEV_OPENAI_COMPAT_*` (fallback model), `E2B_API_KEY`,
 `BRAVE_SEARCH_API_KEY`, `MESH_ALLOW_PRIVATE_WEBHOOKS`, `NEXT_PUBLIC_SSO_ENABLED`,
-`NEXT_PUBLIC_GITHUB_AUTH_ENABLED`.
+`NEXT_PUBLIC_GITHUB_AUTH_ENABLED`, `NEXT_PUBLIC_GOOGLE_AUTH_ENABLED`.
 
 Because `NEXT_PUBLIC_*` values are inlined at build time, rebuild the web app after
 changing them.
@@ -168,14 +173,32 @@ Playwright:
 - The global setup creates the org, two private rooms, two agents (dev fallback model) and
   two pending tool approvals. It deletes prior e2e rooms and agents first.
 - The orchestrator must have `DEV_OPENAI_COMPAT_*` set so the seeded agents can answer.
-- Sign-in uses admin-generated magic links. Add the app callback URL to Supabase's
-  redirect allow list.
+- Sign-in uses admin-generated magic links for the seeded e2e accounts. The product UI
+  also supports password, six-digit email code and Google. Add the app callback URL to
+  Supabase's redirect allow list.
 - Run `pnpm exec playwright install chromium` once, then `pnpm e2e`.
 
 If magic-link generation redirects with an implicit-flow fragment instead of a `code`,
 switch the Supabase project's auth flow to PKCE (the SSR client expects PKCE).
 
-## 7. Operations
+## 7. Meetings and check-ins
+
+The orchestrator scans room schedules once a minute under a Postgres advisory lock. It
+starts scheduled meetings whose start time has passed and whose end time is still in the
+future, ends meetings past `ends_at`, and starts the morning/evening slots and check-ins
+on weekdays. A started meeting posts one host message that mentions `@all_bots`; normal
+turn planning, turn caps and breakers apply after that.
+
+- Run a single orchestrator process, or keep the advisory lock and accept that only one
+  scanner is active at a time.
+- Meeting times are stored in the room's time zone. Changing the time zone changes future
+  slots, not existing meeting rows.
+- `room_schedules.last_checkin_at` prevents a check-in from firing twice within one
+  interval. Ending a meeting cancels its current run but does not reopen it.
+- The web scheduler and the web server actions write only through the admin client; the
+  `authenticated` role has read access to meetings, schedules, tasks and comments.
+
+## 8. Operations
 
 - **KEK stability:** do not rotate `MESH_KEK` without re-encrypting provider keys, agent
   webhook secrets, MCP headers and org tool configs. Losing it makes those secrets

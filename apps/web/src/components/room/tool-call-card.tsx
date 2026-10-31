@@ -13,10 +13,12 @@ export function ApprovalCard({
   call,
   orgSlug,
   canApprove,
+  onResolved,
 }: {
   call: ToolCallView
   orgSlug: string
   canApprove: boolean
+  onResolved?: () => void
 }) {
   const [pending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
@@ -30,6 +32,7 @@ export function ApprovalCard({
         decision,
       })
       if (!result.ok) setError(result.error ?? "Could not resolve the approval")
+      else onResolved?.()
     })
   }
 

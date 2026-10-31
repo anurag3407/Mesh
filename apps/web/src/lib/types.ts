@@ -24,7 +24,14 @@ export interface OrgSummary {
 export interface OrgAccess {
   org: { id: string; slug: string; name: string; ssoEnabled: boolean }
   role: OrgRole
-  user: { id: string; email: string | null; displayName: string; avatarUrl: string | null }
+  user: {
+    id: string
+    email: string | null
+    displayName: string
+    avatarUrl: string | null
+    notifications: "all" | "mentions" | "off"
+    sound: boolean
+  }
 }
 
 export interface RoomView {
@@ -39,6 +46,9 @@ export interface RoomView {
   dailyBudgetUsd: number | null
   moderatorAgentId: string | null
   debateOrder: string[]
+  timezone: string
+  agentDmUserId: string | null
+  agentDmAgentId: string | null
   createdAt: string
 }
 
@@ -85,6 +95,7 @@ export interface MessageView {
   createdAt: string
   senderName: string
   senderHandle: string | null
+  senderAvatarUrl: string | null
 }
 
 export interface ToolCallView {
@@ -211,6 +222,134 @@ export interface SessionView {
   queue: { agentId: string; role: string }[]
 }
 
+export interface RoomScheduleView {
+  roomId: string
+  timezone: string
+  morningStartMinutes: number
+  morningEndMinutes: number
+  eveningStartMinutes: number
+  eveningEndMinutes: number
+  checkinsEnabled: boolean
+  checkinIntervalMinutes: number
+  checkinStartMinutes: number
+  checkinEndMinutes: number
+  checkinDurationMinutes: number
+  lastCheckinAt: string | null
+}
+
+export interface MeetingView {
+  id: string
+  orgId: string
+  roomId: string
+  roomName: string
+  kind: "meeting" | "checkin"
+  title: string
+  agenda: string
+  startsAt: string
+  endsAt: string
+  status: "scheduled" | "active" | "ended" | "canceled"
+  createdBy: string | null
+  promptMessageId: string | null
+  metadata: Record<string, unknown>
+}
+
+export interface ChatListItem {
+  id: string
+  name: string
+  kind: RoomKind
+  turnMode: TurnMode
+  isBotDm: boolean
+  agentId: string | null
+  agentNames: string[]
+  lastMessage: string | null
+  lastSender: string | null
+  lastAt: string | null
+  unreadCount: number
+  mentionCount: number
+  pinned: boolean
+  mutedUntil: string | null
+  archived: boolean
+}
+
+export interface TaskCommentView {
+  id: string
+  taskId: string
+  authorType: string
+  authorId: string | null
+  authorName: string
+  content: string
+  createdAt: string
+}
+
+export interface TaskView {
+  id: string
+  number: number
+  orgId: string
+  roomId: string
+  roomName: string
+  kind: "task" | "request"
+  title: string
+  description: string
+  status: "open" | "in_progress" | "stuck" | "done"
+  assigneeUserId: string | null
+  assigneeName: string | null
+  assigneeAgentId: string | null
+  assigneeHandle: string | null
+  requestedByAgentId: string | null
+  requestedByHandle: string | null
+  requestedFromUserId: string | null
+  metadata: Record<string, unknown>
+  createdAt: string
+  updatedAt: string
+  comments: TaskCommentView[]
+}
+
+export interface InboxApprovalView {
+  toolCall: ToolCallView
+  roomName: string
+  agentHandle: string | null
+  agentName: string | null
+}
+
+export interface InboxRequestView {
+  task: TaskView
+}
+
+export interface InboxDoneView {
+  id: string
+  kind: "approval" | "request"
+  label: string
+  status: string
+  resolvedAt: string
+}
+
+export interface FileView {
+  id: string
+  roomId: string
+  roomName: string
+  kind: CanvasKind
+  title: string
+  language: string | null
+  preview: string
+  updatedAt: string
+}
+
+export interface BotChatMessage {
+  id: string
+  senderHandle: string
+  senderName: string
+  content: string
+  mentions: string[]
+  createdAt: string
+}
+
+export interface BotChatView {
+  roomId: string
+  roomName: string
+  messages: BotChatMessage[]
+  lastAt: string
+}
+
 export interface RoomPageData {
   room: RoomView
   roomRole: RoomRole | null
@@ -225,6 +364,8 @@ export interface RoomPageData {
   members: MemberView[]
   activeSession: SessionView | null
   threadCounts: Record<string, number>
+  meeting: MeetingView | null
+  roomSchedule: RoomScheduleView | null
 }
 
 export interface ActionResult {

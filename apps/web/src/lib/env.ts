@@ -41,3 +41,7 @@ export function ssoEnabled(): boolean {
 export function githubAuthEnabled(): boolean {
   return process.env.NEXT_PUBLIC_GITHUB_AUTH_ENABLED === "true"
 }
+
+export function googleAuthEnabled(): boolean {
+  return process.env.NEXT_PUBLIC_GOOGLE_AUTH_ENABLED === "true"
+}

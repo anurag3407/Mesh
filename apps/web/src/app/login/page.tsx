@@ -1,10 +1,11 @@
 import type { Metadata } from "next"
 import { redirect } from "next/navigation"
 import { getCurrentUser, listUserOrgs } from "@/lib/auth"
-import { githubAuthEnabled } from "@/lib/env"
-import { AuthForm } from "@/components/auth-form"
+import { githubAuthEnabled, googleAuthEnabled } from "@/lib/env"
+import { PublicShell } from "@/components/public/public-shell"
+import { AuthPanel } from "@/components/auth/auth-panel"
 
-export const metadata: Metadata = { title: "Sign in" }
+export const metadata: Metadata = { title: "Sign in · Mesh" }
 
 export default async function LoginPage({
   searchParams,
@@ -17,51 +18,40 @@ export default async function LoginPage({
     const orgs = await listUserOrgs(user.id)
     redirect(orgs.length ? `/${orgs[0]!.slug}` : "/onboarding")
   }
-  const next = params.next && params.next.startsWith("/") && !params.next.startsWith("//")
-    ? params.next
-    : "/"
+  const next =
+    params.next && params.next.startsWith("/") && !params.next.startsWith("//")
+      ? params.next
+      : "/"
 
   return (
-    <main className="relative grid min-h-dvh grid-cols-1 lg:grid-cols-[1.25fr_1fr]">
-      <section className="flex flex-col justify-between border-b border-line px-6 py-8 sm:px-10 lg:border-b-0 lg:border-r lg:px-14 lg:py-12">
-        <div className="flex items-center gap-3">
-          <span className="grid h-6 w-6 place-items-center bg-accent font-mono text-[13px] font-medium text-void">
-            m
-          </span>
-          <span className="font-mono text-sm tracking-normal text-text">mesh</span>
-        </div>
-        <div className="max-w-[34rem] py-10 sm:py-16 lg:py-0">
-          <h1 className="text-balance text-4xl font-medium leading-[1.08] tracking-[-0.02em] sm:text-5xl">
-            Rooms where people and agents work in the same thread.
+    <PublicShell>
+      <div className="mx-auto grid w-full max-w-5xl gap-10 px-5 py-12 sm:px-8 lg:grid-cols-[1fr_400px] lg:items-center lg:py-20">
+        <div>
+          <p className="font-mono text-[11px] text-faint">welcome back</p>
+          <h1 className="mt-2 max-w-[16ch] text-3xl font-medium leading-tight tracking-[-0.02em] sm:text-4xl">
+            Sign in to your rooms.
           </h1>
-          <p className="mt-6 max-w-[42ch] text-[15px] leading-relaxed text-muted">
-            Deterministic turn-taking, a shared live canvas, and a tool layer with human approval.
-            Bring your own model keys.
+          <p className="mt-4 max-w-[42ch] text-[14px] leading-relaxed text-muted">
+            The room keeps its position: the last messages, the canvas, the meeting card and the
+            approvals that still need you.
           </p>
-          <dl className="mt-10 hidden max-w-md grid-cols-1 gap-px overflow-hidden border border-line bg-line sm:grid sm:grid-cols-3">
-            {[
-              ["turn order", "serialized per room"],
-              ["canvas", "local Yjs sync"],
-              ["keys", "AES-256-GCM"],
-            ].map(([term, detail]) => (
-              <div key={term} className="bg-ink p-3">
-                <dt className="font-mono text-[10px] text-faint">{term}</dt>
-                <dd className="mt-1 text-[13px] leading-snug text-muted">{detail}</dd>
-              </div>
-            ))}
-          </dl>
+          {params.error ? (
+            <p
+              role="alert"
+              className="mt-6 max-w-[42ch] border-l-2 border-[var(--color-danger)] pl-3 text-[13px] leading-relaxed text-danger"
+            >
+              Sign-in did not complete. The link may have expired. Try again.
+            </p>
+          ) : null}
         </div>
-        <p className="hidden font-mono text-[11px] text-faint sm:block">
-          self-hosted with Supabase · orchestrator on Node 24
-        </p>
-      </section>
-      <section className="flex items-center justify-center px-6 py-12 sm:px-10">
-        <AuthForm
-          next={next}
+        <AuthPanel
+          initialMode="signin"
+          signupNext="/onboarding"
+          signInNext={next}
+          googleEnabled={googleAuthEnabled()}
           githubEnabled={githubAuthEnabled()}
-          initialError={params.error ? "Sign-in did not complete. Try again." : null}
         />
-      </section>
-    </main>
+      </div>
+    </PublicShell>
   )
 }

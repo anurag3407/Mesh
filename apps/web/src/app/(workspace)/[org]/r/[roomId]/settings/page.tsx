@@ -3,12 +3,14 @@ import Link from "next/link"
 import { redirect } from "next/navigation"
 import { requireRoomAccess } from "@/lib/auth"
 import { listOrgAgents, listRoomAgents } from "@/lib/queries"
+import { loadRoomSchedule } from "@/lib/queries-ia"
 import { addAgentToRoom, removeAgentFromRoom, updateRoomSettings } from "@/lib/actions/rooms"
 import { ActionForm } from "@/components/ui/action-form"
 import { Field, HelpText, Input, Select, Textarea } from "@/components/ui/field"
 import { EmptyState } from "@/components/ui/empty"
 import { Section } from "@/components/settings/section"
 import { AgentOrderEditor } from "@/components/rooms/agent-order-editor"
+import { RoomScheduleForm } from "@/components/rooms/room-schedule-form"
 import { TURN_MODE_LABELS } from "@/lib/format"
 
 export const metadata: Metadata = { title: "Room settings" }
@@ -22,9 +24,10 @@ export default async function RoomSettingsPage({
   const access = await requireRoomAccess(orgSlug, roomId)
   if (!access.canAdmin) redirect(`/${orgSlug}/r/${roomId}`)
 
-  const [roomAgents, orgAgents] = await Promise.all([
+  const [roomAgents, orgAgents, schedule] = await Promise.all([
     listRoomAgents(roomId),
     listOrgAgents(access.org.id),
+    loadRoomSchedule(roomId),
   ])
   const roomAgentIds = new Set(roomAgents.map(({ agent }) => agent.id))
   const availableAgents = orgAgents.filter((agent) => !roomAgentIds.has(agent.id))
@@ -149,6 +152,18 @@ export default async function RoomSettingsPage({
                 no further model call.
               </HelpText>
             </ActionForm>
+          </Section>
+
+          <Section
+            title="Meetings & check-ins"
+            description="Two weekday meetings and optional check-ins run in this room's time zone. A host message mentions every agent; turn order still applies."
+          >
+            <RoomScheduleForm
+              orgSlug={orgSlug}
+              roomId={roomId}
+              timezone={access.room.timezone}
+              schedule={schedule}
+            />
           </Section>
 
           <Section

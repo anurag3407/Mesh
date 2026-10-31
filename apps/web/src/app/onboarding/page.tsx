@@ -1,9 +1,39 @@
 import type { Metadata } from "next"
 import { redirect } from "next/navigation"
-import { getCurrentUser, listUserOrgs, requireUser } from "@/lib/auth"
-import { OnboardingForm } from "@/components/onboarding-form"
+import { getCurrentUser, getProfile, listUserOrgs, requireUser } from "@/lib/auth"
+import { OnboardingWizard } from "@/components/onboarding/wizard"
 
-export const metadata: Metadata = { title: "Create a workspace" }
+export const metadata: Metadata = { title: "Set up your room" }
+
+const FALLBACK_ZONES = [
+  "UTC",
+  "America/Los_Angeles",
+  "America/Denver",
+  "America/Chicago",
+  "America/New_York",
+  "America/Sao_Paulo",
+  "Europe/London",
+  "Europe/Berlin",
+  "Europe/Paris",
+  "Europe/Madrid",
+  "Asia/Dubai",
+  "Asia/Kolkata",
+  "Asia/Singapore",
+  "Asia/Tokyo",
+  "Australia/Sydney",
+]
+
+function timeZones(): string[] {
+  try {
+    const supported = Intl.supportedValuesOf("timeZone")
+    if (supported.length > 0) {
+      return supported.includes("UTC") ? supported : ["UTC", ...supported]
+    }
+  } catch {
+    // Older runtimes without supportedValuesOf fall back to the short list.
+  }
+  return FALLBACK_ZONES
+}
 
 export default async function OnboardingPage() {
   const user = await requireUser("/onboarding")
@@ -11,23 +41,13 @@ export default async function OnboardingPage() {
   if (orgs.length > 0) redirect(`/${orgs[0]!.slug}`)
   const current = await getCurrentUser()
   if (!current) redirect("/login")
+  const profile = await getProfile(current)
 
   return (
-    <main className="grid min-h-dvh place-items-center px-6 py-12">
-      <div className="w-full max-w-md">
-        <div className="flex items-center gap-3">
-          <span className="grid h-6 w-6 place-items-center bg-accent font-mono text-[13px] font-medium text-void">
-            m
-          </span>
-          <span className="font-mono text-sm text-text">mesh</span>
-        </div>
-        <h1 className="mt-12 text-3xl font-medium tracking-[-0.02em]">Create your workspace</h1>
-        <p className="mt-3 max-w-[42ch] text-sm leading-relaxed text-muted">
-          A workspace holds rooms, agents and provider keys. You can invite the rest of your team
-          after it exists.
-        </p>
-        <OnboardingForm />
-      </div>
-    </main>
+    <OnboardingWizard
+      userName={profile.displayName.split(" ")[0] ?? ""}
+      defaultTimeZone="UTC"
+      timeZones={timeZones()}
+    />
   )
 }

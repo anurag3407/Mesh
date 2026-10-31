@@ -15,11 +15,14 @@ export async function generateMetadata({
 
 export default async function RoomPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ org: string; roomId: string }>
+  searchParams: Promise<{ canvas?: string }>
 }) {
   const { org, roomId } = await params
+  const { canvas } = await searchParams
   const access = await requireRoomAccess(org, roomId)
   const data = await loadRoomPageData(access)
-  return <RoomWorkspace data={data} />
+  return <RoomWorkspace data={data} initialCanvasId={canvas ?? null} />
 }

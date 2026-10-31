@@ -30,6 +30,7 @@ export function ChatPanel({
   orgSlug,
   roomId,
   roomName,
+  roomKind = "public",
   user,
   messages,
   toolCalls,
@@ -44,6 +45,7 @@ export function ChatPanel({
   orgSlug: string
   roomId: string
   roomName: string
+  roomKind?: "public" | "private" | "dm"
   user: { id: string; displayName: string }
   messages: MessageView[]
   toolCalls: ToolCallView[]
@@ -193,7 +195,9 @@ export function ChatPanel({
           orgSlug={orgSlug}
           roomId={roomId}
           agents={roomAgents}
-          placeholder={`Message #${roomName}`}
+          placeholder={
+            roomKind === "dm" ? `Message ${roomName}` : `Message #${roomName}`
+          }
           onTyping={onTyping}
         />
       </div>

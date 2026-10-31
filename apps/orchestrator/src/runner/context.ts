@@ -6,8 +6,9 @@ import {
   profiles,
   roomAgents,
   rooms,
+  tasks,
 } from "@mesh/db"
-import { and, asc, desc, eq, inArray, isNull, or } from "drizzle-orm"
+import { and, asc, desc, eq, inArray, isNull, ne, or } from "drizzle-orm"
 import { getDb } from "../db"
 
 export type RoomRow = typeof rooms.$inferSelect
@@ -200,6 +201,28 @@ export function renderTranscript(messages: ContextMessage[]): string {
   return text
 }
 
+export async function loadTaskContext(roomId: string): Promise<string> {
+  const rows = await getDb()
+    .select({
+      number: tasks.number,
+      title: tasks.title,
+      status: tasks.status,
+      assigneeAgentId: tasks.assigneeAgentId,
+      kind: tasks.kind,
+    })
+    .from(tasks)
+    .where(and(eq(tasks.roomId, roomId), ne(tasks.status, "done")))
+    .orderBy(desc(tasks.updatedAt))
+    .limit(12)
+  if (rows.length === 0) return ""
+  return rows
+    .map(
+      (task) =>
+        `#${task.number} [${task.kind}] ${task.title} (${task.status}${task.assigneeAgentId ? ", assigned to an agent" : ""})`,
+    )
+    .join("\n")
+}
+
 export async function loadCanvasContext(roomId: string): Promise<string> {
   const rows = await getDb()
     .select({
@@ -252,11 +275,13 @@ export function buildSystemPrompt(args: {
 export function buildUserPrompt(args: {
   transcript: string
   canvases: string
+  tasks?: string
   agent: AgentRow
   extra?: string
 }): string {
   const parts: string[] = []
   if (args.canvases) parts.push(`Shared canvases:\n${args.canvases}`)
+  if (args.tasks) parts.push(`Open tasks in this room:\n${args.tasks}`)
   parts.push(`Conversation so far:\n${args.transcript || "(no messages yet)"}`)
   if (args.extra) parts.push(args.extra)
   parts.push(`Write your next message as @${args.agent.handle}.`)

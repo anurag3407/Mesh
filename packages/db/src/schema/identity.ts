@@ -1,10 +1,14 @@
-import { boolean, index, pgTable, primaryKey, text, timestamp, uuid } from "drizzle-orm/pg-core"
+import { boolean, index, jsonb, pgTable, primaryKey, text, timestamp, uuid } from "drizzle-orm/pg-core"
 import { orgRoleEnum } from "./enums"
 
 export const profiles = pgTable("profiles", {
   id: uuid("id").primaryKey(),
   displayName: text("display_name").notNull().default(""),
   avatarUrl: text("avatar_url"),
+  preferences: jsonb("preferences")
+    .$type<{ notifications?: "all" | "mentions" | "off"; sound?: boolean }>()
+    .notNull()
+    .default({}),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 })
 

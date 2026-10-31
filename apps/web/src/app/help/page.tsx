@@ -1,0 +1,130 @@
+import type { Metadata } from "next"
+import Link from "next/link"
+import { DocList, DocPage, DocSection } from "@/components/public/doc-page"
+
+export const metadata: Metadata = { title: "Help" }
+
+const linkClass = "text-text underline underline-offset-2"
+
+export default function HelpPage() {
+  return (
+    <DocPage
+      eyebrow="help"
+      title="How Mesh works"
+      lede="A short field guide to rooms, agents, stand-ups and approvals. Mesh is self-hosted, so the person who runs this deployment can answer questions we cannot."
+    >
+      <DocSection title="Quick start">
+        <DocList
+          items={[
+            "Create an account and confirm the six-digit code from your email.",
+            "Name your first room. A room holds one conversation, its agents and its shared canvas.",
+            "Add an agent in room settings, or use the bot gateway to connect your own service.",
+            "Say something, and mention an agent by its @handle to give it a turn.",
+            "Open the Inbox to approve tools, answer requests, and catch up on mentions.",
+          ]}
+        />
+        <p className="pt-2">
+          You can also{" "}
+          <Link href="/signup" className={linkClass}>
+            create an account
+          </Link>{" "}
+          or{" "}
+          <Link href="/login" className={linkClass}>
+            sign in
+          </Link>
+          .
+        </p>
+      </DocSection>
+
+      <DocSection title="Rooms, humans and agents">
+        <p>
+          Every message in a room has one sender: a person, an agent or the system. Turns are
+          serialized with a Postgres advisory lock, so two agents never write over each other.
+        </p>
+        <DocList
+          items={[
+            "@all_bots gives every agent in the room a turn; @handle calls one agent.",
+            "Turn modes change how the queue is built: mentions, debate or moderated.",
+            "A turn cap, an RPM limit, a daily budget and a repetition breaker can stop a runaway loop.",
+            "Agents stream their replies and can write to the room canvas with audited tool calls.",
+          ]}
+        />
+      </DocSection>
+
+      <DocSection title="Meetings and check-ins">
+        <p>
+          A room has a time zone and two weekday meetings. At the scheduled time the host posts a
+          prompt that mentions every agent, and the normal turn queue takes over. Check-ins run on a
+          fixed cadence between meetings and stop at the last start time. Nothing runs on weekends.
+        </p>
+        <p>
+          You can start a meeting immediately, restart today&apos;s meeting, or end the active one
+          from the Meetings page. Ending a meeting cancels its current run; it does not reopen.
+        </p>
+      </DocSection>
+
+      <DocSection title="Tasks, requests and the Inbox">
+        <DocList
+          items={[
+            "A task is work a person or agent owns. Status is open, in progress, stuck or done.",
+            "A request is a question an agent needs a human to answer. It lands in the Inbox.",
+            "Agents can create tasks and requests with their tools, subject to your approvals.",
+            "Mentions, new requests and pending approvals all show up in the Inbox badge.",
+          ]}
+        />
+      </DocSection>
+
+      <DocSection title="Approvals and agent tools">
+        <p>
+          A tool that changes state can require approval. When an agent asks, the call is frozen
+          until a room member approves or rejects it. Approving resumes the agent with the tool
+          result; rejecting lets it continue with a refusal instead. The full call and result stay
+          in the thread.
+        </p>
+        <p>
+          External bots use signed webhooks. Their replies are posted as agents, and they see the
+          same room context. API keys are shown once and stored as hashes.
+        </p>
+      </DocSection>
+
+      <DocSection title="Sign-in and account">
+        <DocList
+          items={[
+            "Email and password, a six-digit email code, and Google sign-in when the deployment enables it.",
+            "The code email must contain the token from your Supabase email template. If it does not arrive, check spam and try again.",
+            "Password reset sends a link that expires. Set a new password and you are signed out everywhere else.",
+            "You can change your display name, avatar and notification preference at any time.",
+          ]}
+        />
+      </DocSection>
+
+      <DocSection title="Troubleshooting">
+        <DocList
+          items={[
+            "An agent is not replying: check it is in the room, enabled, and mentioned. External bots must answer their webhook within the timeout.",
+            "A reply stopped early: a breaker may have halted it. Look for the system note in the thread and the run details.",
+            "The canvas is behind: reload once; edits reconcile through Yjs. Avoid two people editing the same code block at the same moment.",
+            "Email never arrives: this deployment must have SMTP or a mail provider configured. Ask the operator.",
+          ]}
+        />
+      </DocSection>
+
+      <p className="font-mono text-[10px] leading-relaxed text-faint">
+        Mesh is open source and self-hosted. The operator of this instance controls accounts,
+        providers, retention and email delivery. See{" "}
+        <Link href="/security" className={linkClass}>
+          security
+        </Link>
+        ,{" "}
+        <Link href="/privacy" className={linkClass}>
+          privacy
+        </Link>{" "}
+        and{" "}
+        <Link href="/terms" className={linkClass}>
+          terms
+        </Link>
+        .
+      </p>
+    </DocPage>
+  )
+}

@@ -1,7 +1,9 @@
 # Mesh
 
 A real-time collaboration workspace where human teams and AI agents share rooms, take
-deterministic turns, edit a live canvas and call tools under human approval.
+deterministic turns, edit a live canvas and call tools under human approval. Chats,
+weekday meetings, check-ins, tasks, requests, files and a shared Inbox all sit on the
+same room model.
 
 ## What is in the repo
 
@@ -42,23 +44,45 @@ pnpm dev
 The web app runs at http://localhost:3000 and the orchestrator at http://localhost:4000
 with canvas sync at ws://localhost:4000/collab.
 
-On first sign-in, create a workspace, add a provider key, create an agent, add the agent
-to a room, then mention it with `@handle`.
+On first sign-in, the seven-step setup creates your workspace and first room, a weekday
+meeting cadence, optional check-ins and room instructions. Then add a provider key, create
+an agent, add the agent to a room, and mention it with `@handle`.
+
+## Product surfaces
+
+- **Chats** — rooms with people and agents, direct chats with a single bot, pin, mute,
+  archive, unread and mention filters, plus a read-only view of agent-to-agent handoffs.
+- **Meetings** — two weekday meetings per room, optional check-ins, start-now and
+  scheduled meetings, wake/end controls and the last seven days of history.
+- **Tasks** — a task board plus requests an agent raises when it needs a human decision.
+  Tasks can be assigned to people or agents and carry comments.
+- **Files** — every room canvas (markdown, code, SVG, HTML) with search, filters and a
+  direct link to the canvas inside its room.
+- **Inbox** — pending tool approvals and open requests in one place, with resolved items
+  from the last week.
 
 ## Supabase setup
 
 1. Create a project, then put the project URL, anon key, service role key and the
    **session pooler** connection string in `.env`. The transaction pooler does not support
    LISTEN/NOTIFY, which pg-boss and approvals use.
-2. Run `pnpm db:migrate`. The migration creates 21 tables, RLS policies, safe views, the
+2. Run `pnpm db:migrate`. The migration creates 26 tables, RLS policies, safe views, the
    auth profile trigger, the realtime publication entries and private-channel policies.
 3. Run `pnpm db:seed` to add starter model prices. Edit them under Settings, Pricing.
 4. In Supabase Auth, set the Site URL to your app URL and add
    `<app>/auth/callback` to the redirect allow list.
-5. Magic links need SMTP configured in Supabase. GitHub login is optional: enable the
-   provider in Supabase and set `NEXT_PUBLIC_GITHUB_AUTH_ENABLED=true`.
-6. SAML SSO is a Supabase Pro feature. Configure it there, then set
+5. Email and password sign-up is on by default. The sign-up flow also asks for a
+   six-digit code: edit the Supabase **Confirm signup** email template so it includes
+   `{{ .Token }}` (the token, not only `{{ .ConfirmationURL }}`). SMTP must be configured
+   for the code email to arrive.
+6. Google login is optional: enable the provider in Supabase and set
+   `NEXT_PUBLIC_GOOGLE_AUTH_ENABLED=true`. GitHub login is optional in the same way with
+   `NEXT_PUBLIC_GITHUB_AUTH_ENABLED=true`.
+7. SAML SSO is a Supabase Pro feature. Configure it there, then set
    `NEXT_PUBLIC_SSO_ENABLED=true` to expose the org flag.
+
+The onboarding flow expects `{{ .Token }}` in the confirmation email. Without it users
+will receive a link they did not ask for and the six-digit screen cannot complete.
 
 ## Commands
 
@@ -67,7 +91,7 @@ pnpm dev             # web + orchestrator
 pnpm build           # web production build (webpack, because of Serwist)
 pnpm typecheck
 pnpm lint
-pnpm test            # 70 unit tests
+pnpm test            # 75 unit tests
 pnpm db:generate     # regenerate Drizzle SQL after schema changes
 pnpm db:migrate      # apply Drizzle migrations + custom SQL (idempotent)
 pnpm db:seed
@@ -110,6 +134,10 @@ See [docs/deployment.md](docs/deployment.md).
 
 ## Known limits
 
+- The meeting scheduler runs in the orchestrator process and uses a Postgres advisory
+  lock, so run one orchestrator instance or accept a single active scanner.
+- Browser notifications need the tab open and permission granted from the room header.
+  They are a local convenience, not a push service.
 - Hocuspocus runs in one orchestrator process. Horizontal canvas scaling needs the
   Hocuspocus Redis extension, which is not wired here.
 - The UI is dark-only by design for long editing sessions.

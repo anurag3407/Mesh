@@ -7,6 +7,8 @@ import { ChatPanel } from "@/components/room/chat-panel"
 import { CanvasPanel } from "@/components/room/canvas-panel"
 import { ThreadSheet } from "@/components/room/thread-sheet"
 import { useRoomRealtime } from "@/components/room/use-room-realtime"
+import { EnableAlerts, RoomActivity } from "@/components/room/room-activity"
+import { RoomMeetingBar } from "@/components/room/room-meeting-bar"
 import { AvatarStack, PresenceLine } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { SlidersIcon } from "@/components/ui/icons"
@@ -15,9 +17,15 @@ import type { RoomPageData } from "@/lib/types"
 
 type View = "chat" | "canvas"
 
-export function RoomWorkspace({ data }: { data: RoomPageData }) {
+export function RoomWorkspace({
+  data,
+  initialCanvasId = null,
+}: {
+  data: RoomPageData
+  initialCanvasId?: string | null
+}) {
   const [isDesktop, setIsDesktop] = useState(false)
-  const [view, setView] = useState<View>("chat")
+  const [view, setView] = useState<View>(initialCanvasId ? "canvas" : "chat")
   const [threadRootId, setThreadRootId] = useState<string | null>(null)
 
   useEffect(() => {
@@ -55,6 +63,7 @@ export function RoomWorkspace({ data }: { data: RoomPageData }) {
       orgSlug={data.org.slug}
       roomId={data.room.id}
       roomName={data.room.name}
+      roomKind={data.room.kind}
       user={{ id: data.user.id, displayName: data.user.displayName }}
       messages={realtime.messages}
       toolCalls={realtime.toolCalls}
@@ -74,6 +83,7 @@ export function RoomWorkspace({ data }: { data: RoomPageData }) {
       orgSlug={data.org.slug}
       roomId={data.room.id}
       userName={data.user.displayName}
+      initialCanvasId={initialCanvasId}
     />
   )
 
@@ -108,6 +118,7 @@ export function RoomWorkspace({ data }: { data: RoomPageData }) {
         </div>
 
         <div className="flex items-center gap-2">
+          <EnableAlerts enabled={data.user.notifications !== "off"} />
           {data.canAdmin ? (
             <Link
               href={`/${data.org.slug}/r/${data.room.id}/settings`}
@@ -132,6 +143,23 @@ export function RoomWorkspace({ data }: { data: RoomPageData }) {
           </div>
         </div>
       </header>
+
+      <RoomMeetingBar
+        orgSlug={data.org.slug}
+        meeting={data.meeting}
+        schedule={data.roomSchedule}
+      />
+
+      <RoomActivity
+        orgSlug={data.org.slug}
+        roomId={data.room.id}
+        roomName={data.room.name}
+        userId={data.user.id}
+        userName={data.user.displayName}
+        notifications={data.user.notifications}
+        sound={data.user.sound}
+        messages={realtime.messages}
+      />
 
       {isDesktop ? (
         <Group orientation="horizontal" id="room-split" className="min-h-0 flex-1">

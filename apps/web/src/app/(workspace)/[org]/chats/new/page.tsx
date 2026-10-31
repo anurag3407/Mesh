@@ -1,0 +1,23 @@
+import type { Metadata } from "next"
+import { requireOrgAccess } from "@/lib/auth"
+import { listMemberViews, listOrgAgents } from "@/lib/queries"
+import { NewChatView } from "@/components/ia/new-chat-view"
+
+export const metadata: Metadata = { title: "New chat" }
+
+export default async function NewChatPage({ params }: { params: Promise<{ org: string }> }) {
+  const { org: orgSlug } = await params
+  const access = await requireOrgAccess(orgSlug)
+  const [members, agents] = await Promise.all([
+    listMemberViews(access.org.id),
+    listOrgAgents(access.org.id),
+  ])
+  return (
+    <NewChatView
+      orgSlug={orgSlug}
+      members={members}
+      selfId={access.user.id}
+      agents={agents}
+    />
+  )
+}

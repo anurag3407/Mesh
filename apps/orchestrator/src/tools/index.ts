@@ -10,6 +10,7 @@ import { toAuditedTools, type ToolRuntime, type ToolSpec } from "./audited"
 import { githubTool } from "./builtins/github"
 import { postgresInspectorTool } from "./builtins/postgres"
 import { sandboxTool } from "./builtins/sandbox"
+import { taskTools } from "./builtins/tasks"
 import { webSearchTool } from "./builtins/web-search"
 
 export interface BuildToolsArgs {
@@ -79,6 +80,7 @@ export async function buildTools(args: BuildToolsArgs): Promise<BuiltTools> {
     webSearchTool(),
     githubTool(args.orgId),
     postgresInspectorTool(args.orgId),
+    ...taskTools({ roomId: args.roomId, orgId: args.orgId, agentId: args.agent.id }),
   ]
   const tools = toAuditedTools(specs, args.runtime)
 

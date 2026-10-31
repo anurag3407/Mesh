@@ -5,14 +5,17 @@ export function Avatar({
   name,
   kind,
   size = "md",
+  src,
   className,
 }: {
   name: string
   kind: "human" | "agent" | "system"
-  size?: "sm" | "md"
+  size?: "sm" | "md" | "lg"
+  src?: string | null
   className?: string
 }) {
-  const dimension = size === "sm" ? "h-6 w-6 text-[9px]" : "h-7 w-7 text-[10px]"
+  const dimension =
+    size === "sm" ? "h-6 w-6 text-[9px]" : size === "lg" ? "h-10 w-10 text-[13px]" : "h-7 w-7 text-[10px]"
   if (kind === "system") {
     return (
       <span
@@ -45,12 +48,16 @@ export function Avatar({
     <span
       aria-label={name}
       className={cn(
-        "grid shrink-0 place-items-center rounded-full border border-line-strong bg-raised font-mono font-medium text-text",
+        "grid shrink-0 place-items-center overflow-hidden rounded-full border border-line-strong bg-raised font-mono font-medium text-text",
         dimension,
         className,
       )}
     >
-      {initials(name)}
+      {src ? (
+        <img src={src} alt="" aria-hidden="true" className="h-full w-full object-cover" />
+      ) : (
+        initials(name)
+      )}
     </span>
   )
 }

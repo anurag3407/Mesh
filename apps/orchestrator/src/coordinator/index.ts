@@ -348,8 +348,12 @@ export async function processRoomMessage(
       return
     }
 
-    let queue: PlannedTurn[] =
-      room.turnMode === "mentions"
+    const dmAgent = room.kind === "dm" && room.agentDmAgentId
+      ? roomAgentRows.find(({ agent }) => agent.id === room.agentDmAgentId)?.agent
+      : undefined
+    let queue: PlannedTurn[] = dmAgent
+      ? [{ agentId: dmAgent.id, role: "responder" }]
+      : room.turnMode === "mentions"
         ? planMentionsTurn({ text: trigger.content, roomAgents: agentRefs })
         : room.turnMode === "debate"
           ? planDebateTurns({

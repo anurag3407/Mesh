@@ -54,3 +54,12 @@ export const builtinToolEnum = pgEnum("builtin_tool", [
   "github_bridge",
   "postgres_inspector",
 ])
+export const meetingKindEnum = pgEnum("meeting_kind", ["meeting", "checkin"])
+export const meetingStatusEnum = pgEnum("meeting_status", [
+  "scheduled",
+  "active",
+  "ended",
+  "canceled",
+])
+export const taskKindEnum = pgEnum("task_kind", ["task", "request"])
+export const taskStatusEnum = pgEnum("task_status", ["open", "in_progress", "stuck", "done"])

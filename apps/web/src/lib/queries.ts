@@ -47,7 +47,7 @@ export async function listRooms(orgId: string): Promise<RoomListItem[]> {
 export async function loadRoomPageData(access: RoomAccess): Promise<RoomPageData> {
   const supabase = await createSupabaseServerClient()
   const roomId = access.room.id
-  const [messagesRes, toolsRes, roomAgentsRes, canvasesRes, membersRes, sessionRes, threadRowsRes] =
+  const [messagesRes, toolsRes, roomAgentsRes, canvasesRes, membersRes, sessionRes, threadRowsRes, activeMeetingRes, nextMeetingRes, scheduleRes] =
     await Promise.all([
       supabase
         .from("messages")
@@ -96,6 +96,22 @@ export async function loadRoomPageData(access: RoomAccess): Promise<RoomPageData
         .eq("room_id", roomId)
         .not("thread_root_id", "is", null)
         .limit(1_000),
+      supabase
+        .from("meetings")
+        .select("*")
+        .eq("room_id", roomId)
+        .eq("status", "active")
+        .order("starts_at", { ascending: false })
+        .limit(1),
+      supabase
+        .from("meetings")
+        .select("*")
+        .eq("room_id", roomId)
+        .eq("status", "scheduled")
+        .gte("ends_at", new Date().toISOString())
+        .order("starts_at", { ascending: true })
+        .limit(1),
+      supabase.from("room_schedules").select("*").eq("room_id", roomId).maybeSingle(),
     ])
 
   const rawMessages = ((messagesRes.data ?? []) as {
@@ -228,6 +244,7 @@ export async function loadRoomPageData(access: RoomAccess): Promise<RoomPageData
           ? "system"
           : agent?.displayName ?? human?.displayName ?? extraHuman?.displayName ?? "unknown",
       senderHandle: agent?.handle ?? null,
+      senderAvatarUrl: agent ? null : (human?.avatarUrl ?? extraHuman?.avatarUrl ?? null),
     }
   })
 
@@ -289,6 +306,44 @@ export async function loadRoomPageData(access: RoomAccess): Promise<RoomPageData
       }
     : null
 
+  const activeMeetingRow = (activeMeetingRes.data ?? [])[0]
+  const nextMeetingRow = (nextMeetingRes.data ?? [])[0]
+  const meetingRow = activeMeetingRow ?? nextMeetingRow
+  const meeting = meetingRow
+    ? {
+        id: meetingRow.id,
+        orgId: meetingRow.org_id,
+        roomId: meetingRow.room_id,
+        roomName: access.room.name,
+        kind: meetingRow.kind as "meeting" | "checkin",
+        title: meetingRow.title,
+        agenda: meetingRow.agenda ?? "",
+        startsAt: meetingRow.starts_at,
+        endsAt: meetingRow.ends_at,
+        status: meetingRow.status as "scheduled" | "active" | "ended" | "canceled",
+        createdBy: meetingRow.created_by ?? null,
+        promptMessageId: meetingRow.prompt_message_id ?? null,
+        metadata: meetingRow.metadata ?? {},
+      }
+    : null
+  const scheduleRow = scheduleRes.data
+  const roomSchedule = scheduleRow
+    ? {
+        roomId: scheduleRow.room_id,
+        timezone: scheduleRow.timezone,
+        morningStartMinutes: scheduleRow.morning_start_minutes,
+        morningEndMinutes: scheduleRow.morning_end_minutes,
+        eveningStartMinutes: scheduleRow.evening_start_minutes,
+        eveningEndMinutes: scheduleRow.evening_end_minutes,
+        checkinsEnabled: scheduleRow.checkins_enabled,
+        checkinIntervalMinutes: scheduleRow.checkin_interval_minutes,
+        checkinStartMinutes: scheduleRow.checkin_start_minutes,
+        checkinEndMinutes: scheduleRow.checkin_end_minutes,
+        checkinDurationMinutes: scheduleRow.checkin_duration_minutes,
+        lastCheckinAt: scheduleRow.last_checkin_at ?? null,
+      }
+    : null
+
   const threadCounts: Record<string, number> = {}
   for (const row of (threadRowsRes.data ?? []) as { thread_root_id: string | null }[]) {
     if (!row.thread_root_id) continue
@@ -309,6 +364,8 @@ export async function loadRoomPageData(access: RoomAccess): Promise<RoomPageData
     members,
     activeSession,
     threadCounts,
+    meeting,
+    roomSchedule,
   }
 }
 

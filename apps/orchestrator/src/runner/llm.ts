@@ -14,6 +14,7 @@ import {
   buildUserPrompt,
   loadCanvasContext,
   loadConversation,
+  loadTaskContext,
   renderTranscript,
 } from "./context"
 import { streamAgentText } from "./stream-agent"
@@ -96,9 +97,17 @@ export async function runLlmTurn(args: RunLlmTurnArgs): Promise<TurnResult> {
     threadRootId: args.threadRootId,
   })
   const transcript = renderTranscript(conversation)
-  const canvasContext = await loadCanvasContext(room.id)
+  const [canvasContext, taskContext] = await Promise.all([
+    loadCanvasContext(room.id),
+    loadTaskContext(room.id),
+  ])
   const system = buildSystemPrompt({ room, agent, role: args.role })
-  const prompt = buildUserPrompt({ transcript, canvases: canvasContext, agent })
+  const prompt = buildUserPrompt({
+    transcript,
+    canvases: canvasContext,
+    tasks: taskContext,
+    agent,
+  })
 
   const [run] = await db
     .insert(agentRuns)

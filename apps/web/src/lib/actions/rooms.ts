@@ -80,6 +80,14 @@ export async function createRoom(
     await admin.from("rooms").delete().eq("id", room.id)
     return fail("Could not add room members")
   }
+  await admin.from("room_schedules").insert({ room_id: room.id, timezone: "UTC" })
+  await admin.from("room_reads").insert(
+    memberRows.map((member) => ({
+      room_id: room.id,
+      user_id: member.user_id,
+      last_read_at: new Date().toISOString(),
+    })),
+  )
   await audit({
     orgId: access.org.id,
     actorId: user.id,
