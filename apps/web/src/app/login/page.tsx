@@ -25,7 +25,7 @@ export default async function LoginPage({
     <PublicShell>
       <div className="mx-auto grid w-full max-w-5xl gap-10 px-5 py-12 sm:px-8 lg:grid-cols-[1fr_400px] lg:items-center lg:py-20">
         <div>
-          <p className="font-mono text-[11px] text-faint">welcome back</p>
+          <p className="font-mono text-[12px] text-faint">welcome back</p>
           <h1 className="mt-2 max-w-[16ch] text-3xl font-medium leading-tight tracking-[-0.02em] sm:text-4xl">
             Sign in to your rooms.
           </h1>

@@ -35,8 +35,43 @@ export async function sendMessage(input: {
   return {
     ok: true,
     data: { messageId: inserted.id },
-    warning: queued.ok ? undefined : "Message saved, but the agent queue is unreachable.",
+    warning: queued.ok ? undefined : "Message saved, but agents could not be reached, so they will not reply to it.",
   }
+}
+
+/** Runs a failed turn again from the human message that started it. */
+export async function retryMessageAction(input: {
+  orgSlug: string
+  roomId: string
+  messageId: string
+}): Promise<ActionResult> {
+  const access = await getRoomAccess(input.orgSlug, input.roomId)
+  if (!access) return fail("Room not found")
+  const supabase = await createSupabaseServerClient()
+  const { data: failed } = await supabase
+    .from("messages")
+    .select("id, thread_root_id, created_at")
+    .eq("id", input.messageId)
+    .eq("room_id", input.roomId)
+    .maybeSingle()
+  if (!failed) return fail("Message not found")
+  let trigger = supabase
+    .from("messages")
+    .select("id")
+    .eq("room_id", input.roomId)
+    .eq("sender_type", "human")
+    .lte("created_at", failed.created_at)
+  trigger = failed.thread_root_id
+    ? trigger.eq("thread_root_id", failed.thread_root_id)
+    : trigger.is("thread_root_id", null)
+  const { data: source } = await trigger
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle()
+  if (!source) return fail("There is no earlier message to retry from")
+  const queued = await queueRoomMessage(input.roomId, source.id)
+  if (!queued.ok) return fail("The agent service could not be reached. Try again in a moment.")
+  return ok("Retrying")
 }
 
 export async function stopGeneration(input: {
@@ -56,7 +91,7 @@ export async function stopGeneration(input: {
   if (!run) return fail("Run not found in this room")
   const result = await stopRunInOrchestrator(input.runId)
   if (!result.ok) {
-    return fail("The orchestrator could not be reached to stop this run.")
+    return fail("The agent service could not be reached, so the agent is still running.")
   }
   return ok("Stopping")
 }

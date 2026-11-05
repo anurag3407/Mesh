@@ -5,10 +5,10 @@ import { usePathname } from "next/navigation"
 import { cn } from "@/lib/format"
 
 const links = [
-  { segment: "keys", label: "provider keys" },
-  { segment: "tools", label: "tools & MCP" },
-  { segment: "bots", label: "bots" },
-  { segment: "pricing", label: "pricing" },
+  { segment: "keys", label: "Provider keys" },
+  { segment: "tools", label: "Tools & MCP" },
+  { segment: "bots", label: "External agents" },
+  { segment: "pricing", label: "Pricing" },
 ]
 
 export function SettingsNav({ orgSlug }: { orgSlug: string }) {
@@ -27,7 +27,7 @@ export function SettingsNav({ orgSlug }: { orgSlug: string }) {
             href={href}
             aria-current={active ? "page" : undefined}
             className={cn(
-              "border-b-2 pb-1 font-mono text-[11px] transition-colors",
+              "border-b-2 pb-1 font-mono text-[12px] transition-colors",
               active
                 ? "border-accent text-text"
                 : "border-transparent text-muted hover:text-text",
@@ -39,9 +39,9 @@ export function SettingsNav({ orgSlug }: { orgSlug: string }) {
       })}
       <Link
         href={`/${orgSlug}/admin`}
-        className="border-b-2 border-transparent pb-1 font-mono text-[11px] text-muted hover:text-text"
+        className="border-b-2 border-transparent pb-1 font-mono text-[12px] text-muted hover:text-text"
       >
-        members & audit
+        Workspace & members
       </Link>
     </nav>
   )

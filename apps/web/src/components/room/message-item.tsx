@@ -5,6 +5,7 @@ import { CopyButton } from "@/components/copy-button"
 import { Markdown } from "@/components/markdown"
 import { InlineAlert } from "@/components/ui/empty"
 import { ReplyIcon } from "@/components/ui/icons"
+import { FailureActions } from "@/components/room/message-actions"
 import { ToolCallsList } from "@/components/room/tool-call-card"
 import { clockTime, cn, fullTime } from "@/lib/format"
 import type { MessageView, ToolCallView } from "@/lib/types"
@@ -18,6 +19,7 @@ export function MessageItem({
   onOpenThread,
   inThread = false,
   avatarUrl = null,
+  showRetry = false,
 }: {
   message: MessageView
   toolCalls: ToolCallView[]
@@ -27,6 +29,7 @@ export function MessageItem({
   onOpenThread?: (message: MessageView) => void
   inThread?: boolean
   avatarUrl?: string | null
+  showRetry?: boolean
 }) {
   if (message.senderType === "system") {
     return (
@@ -40,17 +43,28 @@ export function MessageItem({
         data-status={message.status}
       >
         <div className="flex flex-wrap items-baseline gap-2">
-          <span className="font-mono text-[10px] text-accent">system</span>
-          <span className="font-mono text-[10px] text-faint" title={fullTime(message.createdAt)}>
+          <span className="font-mono text-[11px] text-accent">mesh</span>
+          <span className="font-mono text-[11px] text-faint" title={fullTime(message.createdAt)}>
             {clockTime(message.createdAt)}
           </span>
           {message.status === "halted" ? (
-            <span className="font-mono text-[10px] text-accent">halted</span>
+            <span className="font-mono text-[11px] text-accent">halted</span>
           ) : null}
         </div>
         <div className="mt-1 text-[13px] leading-relaxed text-muted">
           <Markdown content={message.content} />
         </div>
+        {message.status === "halted" ? (
+          <FailureActions
+            orgSlug={orgSlug}
+            roomId={message.roomId}
+            messageId={message.id}
+            text={message.content}
+            reason={typeof message.metadata.reason === "string" ? message.metadata.reason : null}
+            canAdmin={canAdmin}
+            showRetry={showRetry}
+          />
+        ) : null}
       </div>
     )
   }
@@ -92,24 +106,24 @@ export function MessageItem({
         <header className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
           <span className="text-[13px] font-medium text-text">{message.senderName}</span>
           {isAgent && message.senderHandle ? (
-            <span className="font-mono text-[10px] text-muted">@{message.senderHandle}</span>
+            <span className="font-mono text-[11px] text-muted">@{message.senderHandle}</span>
           ) : null}
           {inThread ? (
-            <span className="font-mono text-[9px] text-faint">thread reply</span>
+            <span className="font-mono text-[11px] text-faint">thread reply</span>
           ) : null}
           <time
             dateTime={message.createdAt}
             title={fullTime(message.createdAt)}
-            className="font-mono text-[10px] text-faint"
+            className="font-mono text-[11px] text-faint"
           >
             {clockTime(message.createdAt)}
           </time>
           {streaming ? (
-            <span className="font-mono text-[9px] text-accent">live</span>
+            <span className="font-mono text-[11px] text-accent">live</span>
           ) : message.status === "halted" ? (
-            <span className="font-mono text-[9px] text-warn">stopped</span>
+            <span className="font-mono text-[11px] text-warn">stopped</span>
           ) : message.status === "error" ? (
-            <span className="font-mono text-[9px] text-danger">error</span>
+            <span className="font-mono text-[11px] text-danger">error</span>
           ) : null}
           <span className="ml-auto flex items-center gap-3 opacity-100 transition-opacity md:opacity-0 md:focus-within:opacity-100 md:group-hover:opacity-100">
             <CopyButton text={message.content} />
@@ -117,7 +131,7 @@ export function MessageItem({
               <button
                 type="button"
                 onClick={() => onOpenThread(message)}
-                className="inline-flex items-center gap-1 font-mono text-[10px] text-faint hover:text-text"
+                className="inline-flex min-h-8 items-center gap-1 font-mono text-[11px] text-faint hover:text-text"
               >
                 <ReplyIcon width={12} height={12} /> reply
               </button>
@@ -131,22 +145,31 @@ export function MessageItem({
             {streaming ? <span className="streaming-caret" aria-hidden="true" /> : null}
           </div>
         ) : streaming ? (
-          <p className="mt-1.5 font-mono text-[11px] text-faint">waiting for the first token…</p>
+          <p className="mt-1.5 font-mono text-[12px] text-faint">thinking…</p>
         ) : null}
 
         {error ? (
           <div className="mt-2">
             <InlineAlert tone="danger">{error}</InlineAlert>
+            <FailureActions
+              orgSlug={orgSlug}
+              roomId={message.roomId}
+              messageId={message.id}
+              text={error}
+              reason={null}
+              canAdmin={canAdmin}
+              showRetry={showRetry}
+            />
           </div>
         ) : null}
         {warnings.length ? (
           <details className="mt-2">
-            <summary className="cursor-pointer font-mono text-[10px] text-warn">
+            <summary className="cursor-pointer font-mono text-[11px] text-warn">
               {warnings.length} tool {warnings.length === 1 ? "warning" : "warnings"}
             </summary>
             <ul className="mt-1 space-y-1 border-l border-line pl-3">
               {warnings.map((warning, index) => (
-                <li key={index} className="font-mono text-[11px] leading-relaxed text-muted">
+                <li key={index} className="font-mono text-[12px] leading-relaxed text-muted">
                   {warning}
                 </li>
               ))}
@@ -154,13 +177,18 @@ export function MessageItem({
           </details>
         ) : null}
 
-        <ToolCallsList calls={relatedCalls} orgSlug={orgSlug} canApprove={canAdmin} />
+        <ToolCallsList
+          calls={relatedCalls}
+          orgSlug={orgSlug}
+          canApprove={canAdmin}
+          agentName={isAgent ? message.senderName : null}
+        />
 
         {!inThread && onOpenThread && threadReplyCount !== undefined && threadReplyCount > 0 ? (
           <button
             type="button"
             onClick={() => onOpenThread(message)}
-            className="mt-2 inline-flex items-center gap-1.5 rounded-sm border border-line px-2 py-1 font-mono text-[10px] text-muted hover:border-line-strong hover:text-text"
+            className="mt-2 inline-flex items-center gap-1.5 rounded-sm border border-line px-2 py-1 font-mono text-[11px] text-muted hover:border-line-strong hover:text-text"
           >
             <ReplyIcon width={12} height={12} />
             {threadReplyCount} {threadReplyCount === 1 ? "reply" : "replies"}

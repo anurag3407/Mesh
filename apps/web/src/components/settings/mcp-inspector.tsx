@@ -60,7 +60,7 @@ export function McpInspector({ orgSlug, serverId }: { orgSlug: string; serverId:
           {loading ? "listing…" : "list tools"}
         </Button>
         {tools.length ? (
-          <span className="font-mono text-[10px] text-faint">{tools.length} tools</span>
+          <span className="font-mono text-[11px] text-faint">{tools.length} tools</span>
         ) : null}
       </div>
       {error ? <InlineAlert tone="danger">{error}</InlineAlert> : null}
@@ -87,7 +87,7 @@ export function McpInspector({ orgSlug, serverId }: { orgSlug: string; serverId:
               id={`args-${serverId}`}
               value={args}
               onChange={(event) => setArgs(event.target.value)}
-              className="min-h-20 font-mono text-[11px]"
+              className="min-h-20 font-mono text-[12px]"
             />
           </Field>
           <Button size="sm" onClick={invoke} disabled={invoking}>
@@ -96,10 +96,10 @@ export function McpInspector({ orgSlug, serverId }: { orgSlug: string; serverId:
           {result ? (
             <div>
               <div className="mb-1 flex items-center justify-between">
-                <span className="font-mono text-[10px] text-faint">result</span>
+                <span className="font-mono text-[11px] text-faint">result</span>
                 <CopyButton text={result} />
               </div>
-              <pre className="max-h-64 overflow-auto rounded-sm border border-line bg-ink p-2 font-mono text-[11px] leading-relaxed text-muted">
+              <pre className="max-h-64 overflow-auto rounded-sm border border-line bg-ink p-2 font-mono text-[12px] leading-relaxed text-muted">
                 {result}
               </pre>
             </div>

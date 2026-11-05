@@ -39,13 +39,13 @@ export function TestKeyButton({
           aria-label="Model to test"
         />
       ) : null}
-      <Button size="sm" variant="outline" className="h-7" disabled={pending} onClick={test}>
-        {pending ? "testing…" : "test"}
+      <Button size="sm" variant="outline" className="md:h-7" disabled={pending} onClick={test}>
+        {pending ? "Testing…" : "Test"}
       </Button>
       {result ? (
         <span
           role="status"
-          className={result.ok ? "max-w-xs text-[11px] text-ok" : "max-w-xs text-[11px] text-danger"}
+          className={result.ok ? "max-w-xs text-[12px] text-ok" : "max-w-xs text-[12px] text-danger"}
         >
           {result.ok ? result.message : result.error}
         </span>
@@ -77,31 +77,31 @@ export function DeleteKeyButton({ orgSlug, keyId }: { orgSlug: string; keyId: st
     <div className="flex flex-wrap items-center gap-2">
       {confirming ? (
         <>
-          <Button size="sm" variant="danger" className="h-7" disabled={pending} onClick={remove}>
-            {pending ? "deleting…" : "confirm delete"}
+          <Button size="sm" variant="danger" className="md:h-7" disabled={pending} onClick={remove}>
+            {pending ? "Deleting…" : "Confirm delete"}
           </Button>
           <Button
             size="sm"
             variant="ghost"
-            className="h-7"
+            className="md:h-7"
             onClick={() => setConfirming(false)}
             disabled={pending}
           >
-            cancel
+            Cancel
           </Button>
         </>
       ) : (
         <Button
           size="sm"
           variant="ghost"
-          className="h-7 text-danger"
+          className="text-danger md:h-7"
           onClick={() => setConfirming(true)}
         >
-          delete
+          Delete
         </Button>
       )}
       {error ? (
-        <span role="alert" className="text-[11px] text-danger">
+        <span role="alert" className="text-[12px] text-danger">
           {error}
         </span>
       ) : null}

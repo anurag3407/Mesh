@@ -11,7 +11,7 @@ export default async function ResetPasswordPage() {
   return (
     <PublicShell>
       <div className="mx-auto w-full max-w-md px-5 py-16 sm:px-8">
-        <p className="font-mono text-[11px] text-faint">account recovery</p>
+        <p className="font-mono text-[12px] text-faint">account recovery</p>
         <h1 className="mt-2 text-2xl font-medium tracking-[-0.02em]">Choose a new password</h1>
         {user ? (
           <>
@@ -31,7 +31,7 @@ export default async function ResetPasswordPage() {
             </p>
             <Link
               href="/forgot-password"
-              className="mt-4 inline-block font-mono text-[11px] text-accent underline underline-offset-4"
+              className="mt-4 inline-block font-mono text-[12px] text-accent underline underline-offset-4"
             >
               request a new link
             </Link>

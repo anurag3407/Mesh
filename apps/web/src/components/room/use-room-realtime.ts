@@ -2,6 +2,7 @@
 
 import type { RealtimeChannel } from "@supabase/supabase-js"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { useRouter } from "next/navigation"
 import { createSupabaseBrowserClient } from "@/lib/supabase/client"
 import {
   messageFromRow,
@@ -22,6 +23,10 @@ import type {
 } from "@/lib/types"
 
 type Connection = "connecting" | "connected" | "error" | "offline"
+
+export const MESSAGE_PAGE_SIZE = 80
+const OLDER_PAGE_SIZE = 50
+const JUMP_WINDOW = 1_000
 
 interface PresenceMeta {
   userId: string
@@ -47,6 +52,7 @@ export function useRoomRealtime(args: {
   initialToolCalls: ToolCallView[]
   initialSession: SessionView | null
   initialThreadCounts: Record<string, number>
+  focusMessageId?: string | null
   roomAgents: RoomAgentView[]
   members: MemberView[]
 }) {
@@ -68,6 +74,10 @@ export function useRoomRealtime(args: {
     args.initialThreadCounts,
   )
   const [connection, setConnection] = useState<Connection>("connecting")
+  const [hasOlder, setHasOlder] = useState(args.initialMessages.length >= MESSAGE_PAGE_SIZE)
+  const [loadingOlder, setLoadingOlder] = useState(false)
+  const router = useRouter()
+  const refreshTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const supabaseRef = useRef(createSupabaseBrowserClient())
   const channelRef = useRef<RealtimeChannel | null>(null)
@@ -151,6 +161,81 @@ export function useRoomRealtime(args: {
     },
     [mergeMessage],
   )
+
+  const scheduleRefresh = useCallback(() => {
+    if (refreshTimer.current) clearTimeout(refreshTimer.current)
+    refreshTimer.current = setTimeout(() => router.refresh(), 500)
+  }, [router])
+
+  const mergeToolRows = useCallback(
+    async (messageIds: string[]) => {
+      if (!messageIds.length) return
+      const { data } = await supabaseRef.current
+        .from("tool_calls")
+        .select("*")
+        .in("message_id", messageIds)
+      for (const row of (data ?? []) as RawToolCallRow[]) mergeToolCall(toolCallFromRow(row))
+    },
+    [mergeToolCall],
+  )
+
+  const messagesRef = useRef(messages)
+  messagesRef.current = messages
+
+  const loadOlder = useCallback(async () => {
+    const oldest = messagesRef.current.find((message) => message.threadRootId === null)
+    if (!oldest) return
+    setLoadingOlder(true)
+    try {
+      const { data } = await supabaseRef.current
+        .from("messages")
+        .select("*")
+        .eq("room_id", roomIdRef.current)
+        .is("thread_root_id", null)
+        .lt("created_at", oldest.createdAt)
+        .order("created_at", { ascending: false })
+        .limit(OLDER_PAGE_SIZE)
+      const rows = (data ?? []) as RawMessageRow[]
+      mergeHistory(rows)
+      await mergeToolRows(rows.map((row) => row.id))
+      setHasOlder(rows.length >= OLDER_PAGE_SIZE)
+    } finally {
+      setLoadingOlder(false)
+    }
+  }, [mergeHistory, mergeToolRows])
+
+  // A link from search can point at a message older than the loaded window.
+  useEffect(() => {
+    const target = args.focusMessageId
+    if (!target || messagesRef.current.some((message) => message.id === target)) return
+    let cancelled = false
+    void (async () => {
+      const supabase = supabaseRef.current
+      const { data: row } = await supabase
+        .from("messages")
+        .select("created_at")
+        .eq("id", target)
+        .eq("room_id", roomIdRef.current)
+        .maybeSingle()
+      if (!row || cancelled) return
+      const { data } = await supabase
+        .from("messages")
+        .select("*")
+        .eq("room_id", roomIdRef.current)
+        .is("thread_root_id", null)
+        .gte("created_at", row.created_at)
+        .order("created_at", { ascending: true })
+        .limit(JUMP_WINDOW)
+      if (cancelled) return
+      const rows = (data ?? []) as RawMessageRow[]
+      mergeHistory(rows)
+      await mergeToolRows(rows.map((item) => item.id))
+      setHasOlder(true)
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [args.focusMessageId, mergeHistory, mergeToolRows])
 
   useEffect(() => {
     const supabase = supabaseRef.current
@@ -303,6 +388,19 @@ export function useRoomRealtime(args: {
           mergeToolCall(toolCallFromRow(payload.new as RawToolCallRow))
         },
       )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "canvases", filter: `room_id=eq.${args.roomId}` },
+        (payload) => {
+          // Content edits arrive through the canvas sync; only the list of canvases refreshes here.
+          if (payload.eventType !== "UPDATE") scheduleRefresh()
+        },
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "meetings", filter: `room_id=eq.${args.roomId}` },
+        () => scheduleRefresh(),
+      )
       .on("presence", { event: "sync" }, applyPresence)
       .on("presence", { event: "join" }, applyPresence)
       .on("presence", { event: "leave" }, applyPresence)
@@ -325,7 +423,12 @@ export function useRoomRealtime(args: {
     })
 
     const onOffline = () => setConnection("offline")
-    const onOnline = () => setConnection("connecting")
+    const onOnline = () => {
+      // A short network drop can leave the channel joined, in which case no new SUBSCRIBED
+      // event arrives and the room would look disconnected forever.
+      const joined = (channelRef.current as unknown as { state?: string } | null)?.state === "joined"
+      setConnection(joined ? "connected" : "connecting")
+    }
     window.addEventListener("offline", onOffline)
     window.addEventListener("online", onOnline)
 
@@ -334,11 +437,12 @@ export function useRoomRealtime(args: {
       window.removeEventListener("offline", onOffline)
       window.removeEventListener("online", onOnline)
       if (typingTimer.current) clearTimeout(typingTimer.current)
+      if (refreshTimer.current) clearTimeout(refreshTimer.current)
       const active = channelRef.current
       channelRef.current = null
       if (active) void supabase.removeChannel(active)
     }
-  }, [args.roomId, args.user.id, mergeMessage, mergeToolCall, refreshMessage])
+  }, [args.roomId, args.user.id, mergeMessage, mergeToolCall, refreshMessage, scheduleRefresh])
 
   useEffect(() => {
     if (connection === "connected" || connection === "offline") return
@@ -350,7 +454,7 @@ export function useRoomRealtime(args: {
           .select("*")
           .eq("room_id", roomIdRef.current)
           .order("created_at", { ascending: false })
-          .limit(80),
+          .limit(MESSAGE_PAGE_SIZE),
         supabase
           .from("tool_calls")
           .select("*")
@@ -399,5 +503,8 @@ export function useRoomRealtime(args: {
     connection,
     trackTyping,
     mergeHistory,
+    hasOlder,
+    loadingOlder,
+    loadOlder,
   }
 }

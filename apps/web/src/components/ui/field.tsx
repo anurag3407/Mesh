@@ -7,7 +7,7 @@ import type {
 import { cn } from "@/lib/format"
 
 const controlClass =
-  "w-full rounded-sm border border-line bg-panel px-3 text-text outline-none transition-colors placeholder:text-faint focus:border-accent disabled:opacity-50"
+  "w-full rounded-sm border border-[var(--color-control)] bg-panel px-3 text-text outline-none transition-colors placeholder:text-faint focus:border-accent disabled:opacity-50"
 
 export function Label({
   htmlFor,
@@ -20,8 +20,8 @@ export function Label({
 }) {
   return (
     <label htmlFor={htmlFor} className="mb-1.5 flex items-baseline justify-between gap-3">
-      <span className="font-mono text-[11px] text-muted">{children}</span>
-      {hint ? <span className="font-mono text-[10px] text-faint">{hint}</span> : null}
+      <span className="font-mono text-[12px] text-muted">{children}</span>
+      {hint ? <span className="font-mono text-[11px] text-faint">{hint}</span> : null}
     </label>
   )
 }

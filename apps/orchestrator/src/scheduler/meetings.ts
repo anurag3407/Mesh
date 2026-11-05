@@ -76,7 +76,7 @@ async function postMeetingPrompt(args: {
       ? `Check-in: ${args.title}.`
       : `Meeting started: ${args.title}.`
   const agenda = args.agenda.trim() ? `\n\nAgenda: ${args.agenda.trim()}` : ""
-  const content = `${lead}${agenda}\n\nBots: report what you have done, what you are doing next, and anything you need from the humans.`
+  const content = `${lead}${agenda}\n\nAgents: report what you have done, what you are doing next, and anything you need from the humans.`
   const [message] = await db
     .insert(messages)
     .values({

@@ -21,6 +21,7 @@ import { Field, HelpText, Input, Select, Textarea } from "@/components/ui/field"
 import { EmptyState } from "@/components/ui/empty"
 import { Section } from "@/components/settings/section"
 import { AgentOrderEditor } from "@/components/rooms/agent-order-editor"
+import { DeleteRoomButton } from "@/components/rooms/delete-room-button"
 import { RoomScheduleForm } from "@/components/rooms/room-schedule-form"
 import { TURN_MODE_LABELS } from "@/lib/format"
 
@@ -59,7 +60,7 @@ export default async function RoomSettingsPage({
   return (
     <div className="h-full overflow-y-auto">
       <div className="mx-auto max-w-4xl px-5 py-8 sm:px-8">
-        <p className="font-mono text-[11px] text-faint">
+        <p className="font-mono text-[12px] text-faint">
           <Link href={`/${orgSlug}/r/${roomId}`} className="hover:text-text">
             #{access.room.name}
           </Link>{" "}
@@ -67,23 +68,23 @@ export default async function RoomSettingsPage({
         </p>
         <h1 className="mt-1 text-2xl font-medium tracking-[-0.02em]">Room settings</h1>
         <p className="mt-2 max-w-2xl text-[13px] leading-relaxed text-muted">
-          Turn mode, limits, the room directive and which agents may be called in. Admins of the
-          room or the organization can change these.
+          How agents behave here, their limits, and who is in the room. Room and workspace admins
+          can change these.
         </p>
 
         <div className="mt-6 space-y-8">
           <Section
-            title="Turn behavior"
-            description="Mention mode follows @handles. Debate runs producer, critics, summarizer. Moderated lets a moderator model pick who speaks next, or return control to humans."
+            title="How agents reply"
+            description="Choose when agents speak, and set limits so a conversation cannot run away or overspend."
           >
             <ActionForm action={updateRoomSettings} submitLabel="Save room settings">
               <input type="hidden" name="orgSlug" value={orgSlug} />
               <input type="hidden" name="roomId" value={roomId} />
-              <div className="grid gap-3 sm:grid-cols-[1fr_170px]">
+              <div className="grid gap-3 sm:grid-cols-[1fr_260px]">
                 <Field label="name" htmlFor="room-name">
                   <Input id="room-name" name="name" defaultValue={access.room.name} required />
                 </Field>
-                <Field label="turn mode" htmlFor="turn-mode">
+                <Field label="agents reply" htmlFor="turn-mode">
                   <Select id="turn-mode" name="turnMode" defaultValue={access.room.turnMode}>
                     {Object.entries(TURN_MODE_LABELS).map(([value, label]) => (
                       <option key={value} value={value}>
@@ -95,7 +96,7 @@ export default async function RoomSettingsPage({
               </div>
 
               <div className="grid gap-3 sm:grid-cols-3">
-                <Field label="turn cap" htmlFor="turn-cap" hint="1 to 10">
+                <Field label="agent replies per message" htmlFor="turn-cap" hint="1 to 10">
                   <Input
                     id="turn-cap"
                     name="turnCap"
@@ -106,7 +107,7 @@ export default async function RoomSettingsPage({
                     className="font-mono"
                   />
                 </Field>
-                <Field label="rpm limit" htmlFor="rpm" hint="blank = unlimited">
+                <Field label="agent runs per minute" htmlFor="rpm" hint="blank = no limit">
                   <Input
                     id="rpm"
                     name="rpmLimit"
@@ -116,20 +117,20 @@ export default async function RoomSettingsPage({
                     className="font-mono"
                   />
                 </Field>
-                <Field label="daily budget USD" htmlFor="budget" hint="blank = unlimited">
+                <Field label="daily budget (USD)" htmlFor="budget" hint="blank = no limit">
                   <Input
                     id="budget"
                     name="dailyBudgetUsd"
                     type="number"
                     min={0}
-                    step="0.000001"
+                    step="0.01"
                     defaultValue={access.room.dailyBudgetUsd ?? ""}
                     className="font-mono"
                   />
                 </Field>
               </div>
 
-              <Field label="system directive" htmlFor="directive" hint="applies to every agent">
+              <Field label="room instructions" htmlFor="directive" hint="every agent here follows these">
                 <Textarea
                   id="directive"
                   name="systemDirective"
@@ -142,7 +143,7 @@ export default async function RoomSettingsPage({
               <Field
                 label="moderator"
                 htmlFor="moderator"
-                hint="required for moderated mode"
+                hint="needed for moderated rooms"
               >
                 <Select
                   id="moderator"
@@ -158,14 +159,13 @@ export default async function RoomSettingsPage({
                 </Select>
               </Field>
 
-              <Field label="debate order">
+              <Field label="speaking order in debates">
                 <AgentOrderEditor agents={roomAgentOptions} initialOrder={initialOrder} />
               </Field>
 
               <HelpText>
-                The hard cap is checked before every agent turn. RPM counts agent runs in the last
-                minute. Budget uses the pricing table. A halted turn posts a system message and makes
-                no further model call.
+                When a limit is reached, agents stop and a note appears in the chat. Costs are estimated
+                from the prices in Settings.
               </HelpText>
             </ActionForm>
           </Section>
@@ -173,7 +173,7 @@ export default async function RoomSettingsPage({
           {access.room.kind !== "dm" ? (
             <Section
               title="Meetings & check-ins"
-              description="Two weekday meetings and optional check-ins run in this room's time zone. A host message mentions every agent; turn order still applies."
+              description="Two stand-ups run each weekday, plus optional check-ins, in this room's time zone. Every agent in the room replies, using your API credits."
             >
               <RoomScheduleForm
                 orgSlug={orgSlug}
@@ -186,7 +186,7 @@ export default async function RoomSettingsPage({
 
           <Section
             title="People in this room"
-            description="A private room is readable only by its members. Org roles do not grant room access; add teammates here, then they see the room in Chats."
+            description="Only members can read a private room, even workspace admins. Add teammates here and the room appears in their Chats. To invite someone new, use Workspace & members."
           >
             <ul className="divide-y divide-line border-y border-line">
               {roomMembers.map((member) => (
@@ -195,13 +195,15 @@ export default async function RoomSettingsPage({
                     {memberNames.get(member.userId) ?? "Someone"}
                     {member.userId === access.user.id ? " (you)" : ""}
                   </span>
-                  <span className="font-mono text-[10px] text-faint">{member.role}</span>
+                  <span className="font-mono text-[11px] text-faint">{member.role}</span>
                   {member.userId !== access.user.id ? (
                     <div className="ml-auto">
                       <ActionForm
                         action={removeRoomMember}
-                        submitLabel="remove"
+                        submitLabel="Remove"
                         submitVariant="danger"
+                        pendingLabel="Removing…"
+                        confirmLabel="Confirm remove"
                       >
                         <input type="hidden" name="orgSlug" value={orgSlug} />
                         <input type="hidden" name="roomId" value={roomId} />
@@ -239,27 +241,34 @@ export default async function RoomSettingsPage({
             </div>
           </Section>
 
+          <div id="room-agents" className="scroll-mt-6">
           <Section
             title="Agents in this room"
-            description="Order here is the default debate order. Removing an agent leaves its past messages intact."
+            description="Removing an agent keeps its past messages."
           >
             {roomAgents.length === 0 ? (
               <EmptyState
                 title="No agents in the room"
-                body="Add one below. Without agents the room is human-only chat; mentions do nothing."
+                body="Add one below. Until then, this room is just for people."
               />
             ) : (
               <ul className="divide-y divide-line border-y border-line">
                 {roomAgents.map(({ agent, position }) => (
                   <li key={agent.id} className="flex flex-wrap items-center gap-2 py-2.5">
-                    <span className="w-5 font-mono text-[10px] text-faint">{position + 1}</span>
+                    <span className="w-5 font-mono text-[11px] text-faint">{position + 1}</span>
                     <span className="font-mono text-[12px] text-text">@{agent.handle}</span>
                     <span className="text-[12px] text-muted">{agent.displayName}</span>
-                    <span className="font-mono text-[10px] text-faint">
-                      {agent.kind} · {agent.model ?? (agent.kind === "external" ? "webhook" : "dev model")}
+                    <span className="font-mono text-[11px] text-faint">
+                      {agent.kind === "external" ? "external" : (agent.model ?? "server default")}
                     </span>
                     <div className="ml-auto">
-                      <ActionForm action={removeAgentFromRoom} submitLabel="remove" submitVariant="danger">
+                      <ActionForm
+                        action={removeAgentFromRoom}
+                        submitLabel="Remove"
+                        submitVariant="danger"
+                        pendingLabel="Removing…"
+                        confirmLabel="Confirm remove"
+                      >
                         <input type="hidden" name="orgSlug" value={orgSlug} />
                         <input type="hidden" name="roomId" value={roomId} />
                         <input type="hidden" name="agentId" value={agent.id} />
@@ -273,8 +282,15 @@ export default async function RoomSettingsPage({
             <div className="mt-5 border-t border-line pt-5">
               {availableAgents.length === 0 ? (
                 <p className="text-[13px] text-muted">
-                  Every agent in this workspace is already in the room. Create another from the
-                  agents page if you need one.
+                  {orgAgents.length === 0
+                    ? "This workspace has no agents yet. "
+                    : "Every agent in this workspace is already in the room. "}
+                  <Link
+                    href={`/${orgSlug}/agents?room=${roomId}#create-agent`}
+                    className="text-accent underline underline-offset-4"
+                  >
+                    Create an agent
+                  </Link>
                 </p>
               ) : (
                 <ActionForm action={addAgentToRoom} submitLabel="Add agent">
@@ -297,6 +313,14 @@ export default async function RoomSettingsPage({
                 </ActionForm>
               )}
             </div>
+          </Section>
+          </div>
+
+          <Section
+            title="Delete this room"
+            description="This permanently deletes the room's messages, threads, canvases, tasks and meetings. It cannot be undone."
+          >
+            <DeleteRoomButton orgSlug={orgSlug} roomId={roomId} roomName={access.room.name} />
           </Section>
         </div>
       </div>

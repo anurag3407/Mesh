@@ -11,6 +11,7 @@ import {
 import { PROVIDERS, redactSecrets } from "@mesh/core"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { getKek } from "@/lib/env"
+import { defaultModel } from "@/lib/model-options"
 import {
   adminOrgAccess,
   audit,
@@ -24,13 +25,6 @@ import {
 import type { ActionResult } from "@/lib/types"
 
 const providerSchema = z.enum(PROVIDERS)
-const DEFAULT_TEST_MODEL: Record<string, string> = {
-  openai: "gpt-4o-mini",
-  anthropic: "claude-3-5-haiku-latest",
-  google: "gemini-2.5-flash",
-  groq: "llama-3.3-70b-versatile",
-  cerebras: "llama-3.3-70b",
-}
 
 export async function saveProviderKey(
   _prev: ActionResult | null,
@@ -52,18 +46,22 @@ export async function saveProviderKey(
   if (baseUrl && !/^https?:\/\//.test(baseUrl)) return fail("Base URL must start with http(s)://")
   const encrypted = encryptSecret(apiKey, getKek())
   const admin = createAdminClient()
-  const { error } = await admin.from("provider_keys").insert({
-    org_id: check.access.org.id,
-    owner_user_id: check.access.user.id,
-    provider: provider.data,
-    base_url: baseUrl,
-    label,
-    ciphertext: encrypted.ciphertext,
-    iv: encrypted.iv,
-    tag: encrypted.tag,
-    last4: last4(apiKey),
-  })
-  if (error) return fail(errorMessage(error))
+  const { data: saved, error } = await admin
+    .from("provider_keys")
+    .insert({
+      org_id: check.access.org.id,
+      owner_user_id: check.access.user.id,
+      provider: provider.data,
+      base_url: baseUrl,
+      label,
+      ciphertext: encrypted.ciphertext,
+      iv: encrypted.iv,
+      tag: encrypted.tag,
+      last4: last4(apiKey),
+    })
+    .select("id")
+    .single()
+  if (error || !saved) return fail(errorMessage(error))
   await audit({
     orgId: check.access.org.id,
     actorId: check.access.user.id,
@@ -72,7 +70,7 @@ export async function saveProviderKey(
     metadata: { provider: provider.data, last4: last4(apiKey) },
   })
   revalidateOrg(orgSlug)
-  return ok("Key saved")
+  return ok("Key saved", { keyId: saved.id })
 }
 
 export async function deleteProviderKey(input: {
@@ -117,7 +115,7 @@ export async function testProviderKey(
   if (!key || key.org_id !== check.access.org.id) return fail("Key not found")
   const model =
     modelOverride?.trim() ||
-    DEFAULT_TEST_MODEL[key.provider] ||
+    defaultModel(key.provider) ||
     process.env.DEV_OPENAI_COMPAT_MODEL ||
     ""
   if (!model) return fail("Enter a model name to test custom endpoints")

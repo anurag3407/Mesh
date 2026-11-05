@@ -528,3 +528,61 @@ export async function loadRoomSchedule(roomId: string): Promise<RoomScheduleView
 }
 
 export type { RoomRow }
+
+export interface MessageSearchResult {
+  id: string
+  roomId: string
+  roomName: string
+  threadRootId: string | null
+  senderName: string
+  content: string
+  createdAt: string
+}
+
+const SEARCH_LIMIT = 50
+
+/** Case-insensitive search over the rooms this user can read, enforced by Row Level Security. */
+export async function searchMessages(
+  access: OrgAccess,
+  query: string,
+): Promise<MessageSearchResult[]> {
+  const supabase = await createSupabaseServerClient()
+  const rooms = await readableRooms(access.org.id)
+  if (!rooms.length) return []
+  const roomNames = new Map(rooms.map((room) => [room.id, room.name]))
+  const pattern = `%${query.replace(/[\\%_]/g, (match) => `\\${match}`)}%`
+  const { data } = await supabase
+    .from("messages")
+    .select("id, room_id, thread_root_id, sender_type, sender_id, content, created_at")
+    .in("room_id", rooms.map((room) => room.id))
+    .neq("sender_type", "system")
+    .ilike("content", pattern)
+    .order("created_at", { ascending: false })
+    .limit(SEARCH_LIMIT)
+  const rows = (data ?? []) as {
+    id: string
+    room_id: string
+    thread_root_id: string | null
+    sender_type: string
+    sender_id: string | null
+    content: string
+    created_at: string
+  }[]
+  const [members, agents] = await Promise.all([
+    listMemberViews(access.org.id),
+    listOrgAgents(access.org.id),
+  ])
+  const names = new Map<string, string>([
+    ...members.map((member) => [member.userId, member.displayName] as [string, string]),
+    ...agents.map((agent) => [agent.id, agent.displayName] as [string, string]),
+  ])
+  return rows.map((row) => ({
+    id: row.id,
+    roomId: row.room_id,
+    roomName: roomNames.get(row.room_id) ?? "room",
+    threadRootId: row.thread_root_id,
+    senderName: (row.sender_id && names.get(row.sender_id)) || "Unknown",
+    content: row.content,
+    createdAt: row.created_at,
+  }))
+}

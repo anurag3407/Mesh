@@ -48,7 +48,7 @@ export async function listRooms(orgId: string): Promise<RoomListItem[]> {
 export async function loadRoomPageData(access: RoomAccess): Promise<RoomPageData> {
   const supabase = await createSupabaseServerClient()
   const roomId = access.room.id
-  const [messagesRes, toolsRes, roomAgentsRes, canvasesRes, membersRes, sessionRes, threadRowsRes, activeMeetingRes, nextMeetingRes, scheduleRes] =
+  const [messagesRes, toolsRes, roomAgentsRes, canvasesRes, membersRes, sessionRes, threadRowsRes, activeMeetingRes, nextMeetingRes, scheduleRes, readRes, roomMembersRes] =
     await Promise.all([
       supabase
         .from("messages")
@@ -113,6 +113,13 @@ export async function loadRoomPageData(access: RoomAccess): Promise<RoomPageData
         .order("starts_at", { ascending: true })
         .limit(1),
       supabase.from("room_schedules").select("*").eq("room_id", roomId).maybeSingle(),
+      supabase
+        .from("room_reads")
+        .select("last_read_at")
+        .eq("room_id", roomId)
+        .eq("user_id", access.user.id)
+        .maybeSingle(),
+      supabase.from("room_members").select("user_id").eq("room_id", roomId),
     ])
 
   const rawMessages = ((messagesRes.data ?? []) as {
@@ -375,6 +382,8 @@ export async function loadRoomPageData(access: RoomAccess): Promise<RoomPageData
     threadCounts,
     meeting,
     roomSchedule,
+    lastReadAt: (readRes.data as { last_read_at: string } | null)?.last_read_at ?? null,
+    roomMemberIds: ((roomMembersRes.data ?? []) as { user_id: string }[]).map((row) => row.user_id),
   }
 }
 

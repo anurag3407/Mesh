@@ -38,7 +38,7 @@ export function OAuthButtons({
     <div className="space-y-2">
       <div className="flex items-center gap-3" aria-hidden="true">
         <span className="h-px flex-1 bg-line" />
-        <span className="font-mono text-[10px] text-faint">or</span>
+        <span className="font-mono text-[11px] text-faint">or</span>
         <span className="h-px flex-1 bg-line" />
       </div>
       <div className="grid gap-2">
@@ -70,7 +70,7 @@ export function OAuthButtons({
           {error}
         </p>
       ) : null}
-      <p className="text-center font-mono text-[9px] leading-relaxed text-faint">
+      <p className="text-center font-mono text-[11px] leading-relaxed text-faint">
         Continuing with a provider means you agree to the{" "}
         <Link href="/terms" className="underline underline-offset-2 hover:text-text">
           Terms

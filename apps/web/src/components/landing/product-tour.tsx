@@ -38,7 +38,7 @@ const steps = [
     key: "files",
     label: "Files",
     title: "The room's documents stay shared",
-    body: "Every canvas is a Yjs document with version history. Agents write and patch the same text humans edit, and dangerous writes still wait for a human decision.",
+    body: "Every canvas is a live document with version history. Agents write and patch the same text humans edit, and dangerous writes still wait for a human decision.",
   },
 ] as const
 
@@ -46,7 +46,7 @@ function Frame({ children, title }: { children: React.ReactNode; title: string }
   return (
     <div className="overflow-hidden rounded-md border border-line bg-ink">
       <div className="flex items-center justify-between border-b border-line bg-panel px-3 py-2">
-        <span className="font-mono text-[10px] text-faint">{title}</span>
+        <span className="font-mono text-[11px] text-faint">{title}</span>
         <span className="flex gap-1" aria-hidden="true">
           <span className="h-1.5 w-1.5 bg-line-strong" />
           <span className="h-1.5 w-1.5 bg-line-strong" />
@@ -62,26 +62,26 @@ function MockSignup() {
   return (
     <Frame title="create account">
       <div className="mx-auto max-w-[260px] space-y-2">
-        <div className="h-8 rounded-sm border border-line bg-panel px-2 text-[11px] leading-8 text-faint">
+        <div className="h-8 rounded-sm border border-line bg-panel px-2 text-[12px] leading-8 text-faint">
           your name
         </div>
-        <div className="h-8 rounded-sm border border-line bg-panel px-2 text-[11px] leading-8 text-faint">
+        <div className="h-8 rounded-sm border border-line bg-panel px-2 text-[12px] leading-8 text-faint">
           you@company.com
         </div>
-        <div className="h-8 rounded-sm border border-line bg-panel px-2 font-mono text-[11px] leading-8 text-faint">
+        <div className="h-8 rounded-sm border border-line bg-panel px-2 font-mono text-[12px] leading-8 text-faint">
           ••••••••
         </div>
         <div className="flex gap-1.5">
           {Array.from({ length: 6 }).map((_, index) => (
             <span
               key={index}
-              className="grid h-8 flex-1 place-items-center rounded-sm border border-line bg-panel font-mono text-[11px] text-muted"
+              className="grid h-8 flex-1 place-items-center rounded-sm border border-line bg-panel font-mono text-[12px] text-muted"
             >
               {index < 3 ? String(index + 4) : ""}
             </span>
           ))}
         </div>
-        <div className="h-8 rounded-sm bg-accent text-center font-mono text-[10px] leading-8 text-void">
+        <div className="h-8 rounded-sm bg-accent text-center font-mono text-[11px] leading-8 text-void">
           verify and continue
         </div>
       </div>
@@ -101,20 +101,20 @@ function MockSetup() {
             />
           ))}
         </div>
-        <p className="font-mono text-[10px] text-faint">step 3 of 7</p>
+        <p className="font-mono text-[11px] text-faint">step 3 of 7</p>
         <p className="text-[13px] text-text">Your room</p>
-        <div className="h-8 rounded-sm border border-line bg-panel px-2 text-[11px] leading-8 text-muted">
+        <div className="h-8 rounded-sm border border-line bg-panel px-2 text-[12px] leading-8 text-muted">
           Juniper Flowers
         </div>
         <div className="grid grid-cols-2 gap-2">
-          <div className="h-7 rounded-sm border border-line bg-panel px-2 text-[10px] leading-7 text-faint">
+          <div className="h-7 rounded-sm border border-line bg-panel px-2 text-[11px] leading-7 text-faint">
             09:00 - 09:30
           </div>
-          <div className="h-7 rounded-sm border border-line bg-panel px-2 text-[10px] leading-7 text-faint">
+          <div className="h-7 rounded-sm border border-line bg-panel px-2 text-[11px] leading-7 text-faint">
             17:00 - 17:30
           </div>
         </div>
-        <div className="h-8 rounded-sm bg-accent text-center font-mono text-[10px] leading-8 text-void">
+        <div className="h-8 rounded-sm bg-accent text-center font-mono text-[11px] leading-8 text-void">
           continue
         </div>
       </div>
@@ -127,8 +127,8 @@ function MockChats() {
     <Frame title="group chat">
       <div className="space-y-2">
         <div className="rounded-sm border border-line bg-panel px-2 py-1.5">
-          <p className="font-mono text-[9px] text-accent">today&apos;s meeting · opens 17:00</p>
-          <p className="mt-0.5 text-[11px] text-muted">Share progress, blockers, next steps.</p>
+          <p className="font-mono text-[11px] text-accent">today&apos;s meeting · opens 17:00</p>
+          <p className="mt-0.5 text-[12px] text-muted">Share progress, blockers, next steps.</p>
         </div>
         {[
           ["@ada", "The migration is staged. I need a rollback check."],
@@ -137,16 +137,16 @@ function MockChats() {
           ["@ada", "Shipped. The canary is clean."],
         ].map(([who, text]) => (
           <div key={text} className="flex gap-2">
-            <span className="mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-sm border border-line bg-panel font-mono text-[8px] text-muted">
+            <span className="mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-sm border border-line bg-panel font-mono text-[11px] text-muted">
               {who === "you" ? "y" : "@"}
             </span>
-            <p className="text-[11px] leading-relaxed text-muted">
-              <span className="font-mono text-[9px] text-text">{who}</span> {text}
+            <p className="text-[12px] leading-relaxed text-muted">
+              <span className="font-mono text-[11px] text-text">{who}</span> {text}
             </p>
           </div>
         ))}
         <div className="flex items-center gap-2 border-t border-line pt-2">
-          <span className="font-mono text-[10px] text-faint">@ message</span>
+          <span className="font-mono text-[11px] text-faint">@ message</span>
           <span className="ml-auto h-5 w-5 rounded-sm bg-accent" aria-hidden="true" />
         </div>
       </div>
@@ -160,7 +160,7 @@ function MockMeetings() {
       <div className="space-y-2">
         <div className="flex items-baseline justify-between">
           <p className="text-[12px] text-text">Today</p>
-          <span className="font-mono text-[9px] text-accent">live</span>
+          <span className="font-mono text-[11px] text-accent">live</span>
         </div>
         {[
           ["Morning meeting", "09:00 - 09:30", "ended"],
@@ -172,17 +172,17 @@ function MockMeetings() {
             className="flex items-center justify-between rounded-sm border border-line bg-panel px-2 py-1.5"
           >
             <div>
-              <p className="text-[11px] text-muted">{title}</p>
-              <p className="font-mono text-[9px] text-faint">{time}</p>
+              <p className="text-[12px] text-muted">{title}</p>
+              <p className="font-mono text-[11px] text-faint">{time}</p>
             </div>
-            <span className="font-mono text-[9px] text-faint">{status}</span>
+            <span className="font-mono text-[11px] text-faint">{status}</span>
           </div>
         ))}
         <div className="flex gap-2">
-          <span className="rounded-sm bg-accent px-2 py-1 font-mono text-[9px] text-void">
+          <span className="rounded-sm bg-accent px-2 py-1 font-mono text-[11px] text-void">
             start now
           </span>
-          <span className="rounded-sm border border-line px-2 py-1 font-mono text-[9px] text-muted">
+          <span className="rounded-sm border border-line px-2 py-1 font-mono text-[11px] text-muted">
             wake bots
           </span>
         </div>
@@ -203,11 +203,11 @@ function MockTasks() {
       <div className="grid grid-cols-4 gap-1.5">
         {columns.map(([label, cards]) => (
           <div key={label as string} className="space-y-1.5">
-            <p className="font-mono text-[8px] text-faint">{label}</p>
+            <p className="font-mono text-[11px] text-faint">{label}</p>
             {(cards as string[]).map((card) => (
               <div key={card} className="rounded-sm border border-line bg-panel p-1.5">
-                <p className="text-[9px] leading-snug text-muted">{card}</p>
-                <p className="mt-1 font-mono text-[8px] text-faint">#</p>
+                <p className="text-[11px] leading-snug text-muted">{card}</p>
+                <p className="mt-1 font-mono text-[11px] text-faint">#</p>
               </div>
             ))}
           </div>
@@ -230,11 +230,11 @@ function MockFiles() {
             key={title}
             className="flex items-center justify-between rounded-sm border border-line bg-panel px-2 py-1.5"
           >
-            <p className="text-[11px] text-muted">{title}</p>
-            <p className="font-mono text-[8px] text-faint">{meta}</p>
+            <p className="text-[12px] text-muted">{title}</p>
+            <p className="font-mono text-[11px] text-faint">{meta}</p>
           </div>
         ))}
-        <div className="rounded-sm border border-line bg-void p-2 font-mono text-[9px] leading-relaxed text-muted">
+        <div className="rounded-sm border border-line bg-void p-2 font-mono text-[11px] leading-relaxed text-muted">
           # Room notes{"\n"}freeze, verify, ship.
         </div>
       </div>
@@ -282,7 +282,7 @@ export function ProductTour() {
             aria-controls={`tour-${item.key}`}
             onClick={() => setActive(item.key)}
             className={cn(
-              "rounded-sm px-2.5 py-1.5 font-mono text-[11px] transition-colors",
+              "rounded-sm px-2.5 py-1.5 font-mono text-[12px] transition-colors",
               item.key === active
                 ? "bg-raised text-text"
                 : "text-faint hover:bg-raised hover:text-text",
@@ -298,7 +298,7 @@ export function ProductTour() {
         className="grid gap-6 p-5 sm:grid-cols-[1fr_320px] sm:p-6"
       >
         <div className="self-center">
-          <p className="font-mono text-[10px] text-accent">
+          <p className="font-mono text-[11px] text-accent">
             {String(index + 1).padStart(2, "0")} / {String(steps.length).padStart(2, "0")}
           </p>
           <h3 className="mt-2 text-xl font-medium tracking-[-0.01em]">{step.title}</h3>
@@ -308,7 +308,7 @@ export function ProductTour() {
               <button
                 type="button"
                 onClick={() => setActive(steps[index - 1]!.key)}
-                className="rounded-sm border border-line px-2 py-1 font-mono text-[10px] text-muted hover:text-text"
+                className="rounded-sm border border-line px-2 py-1 font-mono text-[11px] text-muted hover:text-text"
               >
                 back
               </button>
@@ -317,7 +317,7 @@ export function ProductTour() {
               <button
                 type="button"
                 onClick={() => setActive(steps[index + 1]!.key)}
-                className="rounded-sm border border-line px-2 py-1 font-mono text-[10px] text-text hover:bg-raised"
+                className="rounded-sm border border-line px-2 py-1 font-mono text-[11px] text-text hover:bg-raised"
               >
                 next
               </button>

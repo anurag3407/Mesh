@@ -204,6 +204,20 @@ turn planning, turn caps and breakers apply after that.
 - The web scheduler and the web server actions write only through the admin client; the
   `authenticated` role has read access to meetings, schedules, tasks and comments.
 
+## Alerts when no tab is open (optional)
+
+Mesh shows in-app alerts without any setup. To also alert people when the app is closed, for
+approvals and agent requests, add VAPID keys:
+
+```bash
+npx web-push generate-vapid-keys
+```
+
+Set `NEXT_PUBLIC_VAPID_PUBLIC_KEY` on the web app and the orchestrator, and `VAPID_PRIVATE_KEY`
+and `VAPID_SUBJECT` (a `mailto:` or `https:` address) on the orchestrator. Each person turns
+alerts on with "Enable alerts". Push needs HTTPS and the production build, because the service
+worker is disabled in development.
+
 ## 8. Operations
 
 - **KEK stability:** do not rotate `MESH_KEK` without re-encrypting provider keys, agent

@@ -1,81 +1,45 @@
 "use client"
 
-import { useEffect, useRef, useState, useTransition } from "react"
+import { useEffect, useMemo, useRef, useState, useTransition } from "react"
 import { useRouter } from "next/navigation"
-import {
-  finishOnboardingAction,
-  saveNotificationsAction,
-  saveOnboardingPhotoAction,
-  saveRoomScheduleAction,
-  saveRoomInstructionsAction,
-  setupWorkspaceAction,
-} from "@/lib/actions/onboarding"
+import { createAgent } from "@/lib/actions/agents"
+import { deleteProviderKey, saveProviderKey, testProviderKey } from "@/lib/actions/keys"
+import { finishOnboardingAction, setupWorkspaceAction } from "@/lib/actions/onboarding"
+import { addAgentToRoom } from "@/lib/actions/rooms"
 import { Button } from "@/components/ui/button"
 import { Field, HelpText, Input, Select, Textarea } from "@/components/ui/field"
 import { InlineAlert } from "@/components/ui/empty"
-import { cn } from "@/lib/format"
-import { readAvatarFile } from "@/lib/image-avatar"
-import type { ActionResult } from "@/lib/types"
+import { handleFromName } from "@/lib/agent-handle"
+import { cn, PROVIDER_LABELS } from "@/lib/format"
+import { defaultModel, MODEL_SUGGESTIONS } from "@/lib/model-options"
 
-const STEP_TITLES = [
-  "Name your room",
-  "Add a photo",
-  "Notifications",
-  "Daily meetings",
-  "Check-ins",
-  "Room instructions",
-  "Ready",
-] as const
+const STEP_TITLES = ["Name your workspace", "Connect an AI model", "Create your first agent"] as const
 
-const NOTIFICATION_OPTIONS = [
+const TEMPLATES = [
   {
-    value: "all",
-    label: "Everything",
-    detail: "Every new message, including agent replies.",
+    key: "assistant",
+    label: "Team assistant",
+    name: "Assistant",
+    prompt:
+      "You are a helpful teammate. Answer clearly and briefly. Ask a question when the request is unclear.",
   },
   {
-    value: "mentions",
-    label: "Only what needs me",
-    detail: "Messages that mention you. Requests still wait in the Inbox.",
+    key: "reviewer",
+    label: "Reviewer",
+    name: "Reviewer",
+    prompt:
+      "You review plans and drafts. Point out risks, gaps and unclear decisions, and suggest a concrete fix for each one.",
   },
-  { value: "off", label: "Nothing", detail: "Keep the inbox quiet. You can still browse." },
+  {
+    key: "writer",
+    label: "Writer",
+    name: "Writer",
+    prompt:
+      "You turn rough notes into clear writing. Keep the author's meaning, use plain language, and keep it short.",
+  },
 ] as const
 
-type NotificationMode = (typeof NOTIFICATION_OPTIONS)[number]["value"]
-
-const INTERVALS = [
-  { value: "30", label: "every 30 minutes" },
-  { value: "60", label: "every hour" },
-  { value: "90", label: "every 90 minutes" },
-  { value: "120", label: "every 2 hours" },
-  { value: "180", label: "every 3 hours" },
-]
-
-const DURATIONS = [
-  { value: "5", label: "5 minutes" },
-  { value: "10", label: "10 minutes" },
-  { value: "15", label: "15 minutes" },
-  { value: "20", label: "20 minutes" },
-  { value: "30", label: "30 minutes" },
-]
-
-function summarizeTime(value: string): string {
-  const [hours, minutes] = value.split(":").map(Number)
-  if (hours === undefined || minutes === undefined || Number.isNaN(hours) || Number.isNaN(minutes)) {
-    return value
-  }
-  const suffix = hours >= 12 ? "pm" : "am"
-  const display = hours % 12 === 0 ? 12 : hours % 12
-  return `${display}:${String(minutes).padStart(2, "0")}${suffix}`
-}
-
-function StepRail({
-  step,
-  completed,
-}: {
-  step: number
-  completed: boolean
-}) {
+function StepRail({ step }: { step: number }) {
   return (
     <ol className="space-y-px">
       {STEP_TITLES.map((title, index) => {
@@ -85,7 +49,7 @@ function StepRail({
             key={title}
             aria-current={index === step ? "step" : undefined}
             className={cn(
-              "flex items-center gap-3 border-l-2 py-2 pl-3 font-mono text-[11px] transition-colors",
+              "flex items-center gap-3 border-l-2 py-2 pl-3 font-mono text-[12px] transition-colors",
               state === "current"
                 ? "border-accent text-text"
                 : state === "done"
@@ -95,7 +59,7 @@ function StepRail({
           >
             <span
               className={cn(
-                "grid h-5 w-5 shrink-0 place-items-center rounded-full border text-[10px]",
+                "grid h-5 w-5 shrink-0 place-items-center rounded-full border text-[11px]",
                 state === "current"
                   ? "border-accent text-accent"
                   : state === "done"
@@ -109,16 +73,6 @@ function StepRail({
           </li>
         )
       })}
-      {completed ? (
-        <li className="border-l-2 border-accent py-2 pl-3 font-mono text-[11px] text-accent">
-          <span className="flex items-center gap-3">
-            <span className="grid h-5 w-5 place-items-center rounded-full border border-accent text-[10px]">
-              ✓
-            </span>
-            Room ready
-          </span>
-        </li>
-      ) : null}
     </ol>
   )
 }
@@ -127,819 +81,471 @@ export function OnboardingWizard({
   userName,
   defaultTimeZone,
   timeZones,
+  hasServerModel,
+  initialWorkspace = null,
 }: {
   userName: string
   defaultTimeZone: string
   timeZones: string[]
+  hasServerModel: boolean
+  initialWorkspace?: { slug: string; roomId: string } | null
 }) {
   const router = useRouter()
-  const [step, setStep] = useState(0)
-  const [completed, setCompleted] = useState(false)
-  const [workspace, setWorkspace] = useState<{ slug: string; roomId: string } | null>(null)
-  const [roomName, setRoomName] = useState("")
+  const [step, setStep] = useState(initialWorkspace ? 1 : 0)
+  const [workspace, setWorkspace] = useState(initialWorkspace)
+  const [workspaceName, setWorkspaceName] = useState("")
+  const [roomName, setRoomName] = useState("General")
   const [timezone, setTimezone] = useState(defaultTimeZone)
-  const [photo, setPhoto] = useState<string | null>(null)
-  const [photoTouched, setPhotoTouched] = useState(false)
-  const [notificationMode, setNotificationMode] = useState<NotificationMode>("all")
-  const [sound, setSound] = useState(true)
-  const [morningStart, setMorningStart] = useState("09:00")
-  const [morningEnd, setMorningEnd] = useState("09:30")
-  const [eveningStart, setEveningStart] = useState("17:00")
-  const [eveningEnd, setEveningEnd] = useState("17:30")
-  const [checkinsEnabled, setCheckinsEnabled] = useState(false)
-  const [checkinStart, setCheckinStart] = useState("09:00")
-  const [checkinEnd, setCheckinEnd] = useState("17:30")
-  const [checkinInterval, setCheckinInterval] = useState("60")
-  const [checkinDuration, setCheckinDuration] = useState("10")
-  const [instructions, setInstructions] = useState("")
+
+  const [provider, setProvider] = useState("openai")
+  const [apiKey, setApiKey] = useState("")
+  const [baseUrl, setBaseUrl] = useState("")
+  const [model, setModel] = useState(defaultModel("openai"))
+  const [connectedKeyId, setConnectedKeyId] = useState<string | null>(null)
+  const [useServerModel, setUseServerModel] = useState(false)
+
+  const [template, setTemplate] = useState<(typeof TEMPLATES)[number]["key"]>("assistant")
+  const [agentName, setAgentName] = useState<string>(TEMPLATES[0].name)
+  const [agentPrompt, setAgentPrompt] = useState<string>(TEMPLATES[0].prompt)
+  const [createdAgentId, setCreatedAgentId] = useState<string | null>(null)
+
   const [error, setError] = useState<string | null>(null)
   const [pending, startTransition] = useTransition()
-  const fileInput = useRef<HTMLInputElement>(null)
+  const [status, setStatus] = useState<string | null>(null)
+  const headingRef = useRef<HTMLHeadingElement>(null)
   const timezoneTouched = useRef(false)
+
+  const suggestions = useMemo(() => MODEL_SUGGESTIONS[provider] ?? [], [provider])
+  const handle = handleFromName(agentName)
 
   useEffect(() => {
     if (timezoneTouched.current) return
     const local = Intl.DateTimeFormat().resolvedOptions().timeZone
     if (local && timeZones.includes(local)) setTimezone(local)
-    // Only auto-detect on the first paint; later choices win.
   }, [timeZones])
 
-  const showError = (result: ActionResult) => {
-    if (!result.ok) {
-      setError(result.error ?? "Something went wrong")
-      return false
-    }
-    setError(null)
-    return true
+  useEffect(() => {
+    if (step > 0) headingRef.current?.focus()
+  }, [step])
+
+  function goToRoom(slug: string, path?: string) {
+    router.push(path ?? `/${slug}`)
   }
 
-  function next() {
+  function createWorkspace() {
     setError(null)
     startTransition(async () => {
-      if (step === 0) {
-        if (!workspace) {
-          const form = new FormData()
-          form.set("roomName", roomName)
-          form.set("timezone", timezone)
-          const result = await setupWorkspaceAction(null, form)
-          if (!showError(result)) return
-          const slug = typeof result.data?.orgSlug === "string" ? result.data.orgSlug : ""
-          const roomId = typeof result.data?.roomId === "string" ? result.data.roomId : ""
-          if (!slug || !roomId) {
-            setError("The workspace was created but could not be opened. Reload to continue.")
-            return
-          }
-          setWorkspace({ slug, roomId })
-        }
+      if (workspace) {
         setStep(1)
         return
       }
-      if (!workspace) {
-        setError("Start again from the first step")
-        setStep(0)
+      const form = new FormData()
+      form.set("workspaceName", workspaceName)
+      form.set("roomName", roomName)
+      form.set("timezone", timezone)
+      const result = await setupWorkspaceAction(null, form)
+      if (!result.ok) {
+        setError(result.error ?? "Could not create the workspace")
         return
       }
-      if (step === 1) {
-        if (photo || photoTouched) {
-          const form = new FormData()
-          form.set("photo", photo ?? "")
-          const result = await saveOnboardingPhotoAction(null, form)
-          if (!showError(result)) return
-        }
-        setStep(2)
+      const slug = typeof result.data?.orgSlug === "string" ? result.data.orgSlug : ""
+      const roomId = typeof result.data?.roomId === "string" ? result.data.roomId : ""
+      if (!slug || !roomId) {
+        setError("The workspace was created but could not be opened. Reload to continue.")
         return
       }
-      if (step === 2) {
-        const form = new FormData()
-        form.set("mode", notificationMode)
-        form.set("sound", sound ? "on" : "off")
-        const result = await saveNotificationsAction(null, form)
-        if (!showError(result)) return
-        setStep(3)
-        return
-      }
-      if (step === 3 || step === 4) {
-        if (morningEnd <= morningStart || eveningEnd <= eveningStart) {
-          setError("Each meeting has to end after it starts")
-          return
-        }
-        if (checkinsEnabled && checkinEnd <= checkinStart) {
-          setError("Check-ins have to end after they start")
-          return
-        }
-        const form = new FormData()
-        form.set("orgSlug", workspace.slug)
-        form.set("roomId", workspace.roomId)
-        form.set("timezone", timezone)
-        form.set("morningStart", morningStart)
-        form.set("morningEnd", morningEnd)
-        form.set("eveningStart", eveningStart)
-        form.set("eveningEnd", eveningEnd)
-        form.set("checkinStart", checkinStart)
-        form.set("checkinEnd", checkinEnd)
-        form.set("checkinInterval", checkinInterval)
-        form.set("checkinDuration", checkinDuration)
-        if (checkinsEnabled) form.set("checkinsEnabled", "on")
-        const result = await saveRoomScheduleAction(null, form)
-        if (!showError(result)) return
-        setStep(step === 3 ? 4 : 5)
-        return
-      }
-      if (step === 5) {
-        if (instructions.length > 4_000) {
-          setError("Keep room instructions under 4,000 characters")
-          return
-        }
-        const form = new FormData()
-        form.set("orgSlug", workspace.slug)
-        form.set("roomId", workspace.roomId)
-        form.set("instructions", instructions)
-        const result = await saveRoomInstructionsAction(null, form)
-        if (!showError(result)) return
-        setStep(6)
-        return
-      }
-      if (step === 6) {
-        const result = await finishOnboardingAction(workspace.slug, workspace.roomId)
-        if (!showError(result)) return
-        setCompleted(true)
-        const path = typeof result.data?.path === "string" ? result.data.path : `/${workspace.slug}`
-        router.push(path)
-        router.refresh()
-      }
+      setWorkspace({ slug, roomId })
+      setStep(1)
     })
   }
 
-  function back() {
-    if (step === 0 || pending) return
+  function connectModel() {
+    if (!workspace) return
     setError(null)
-    setStep(step - 1)
-  }
-
-  async function onPhotoChange(event: React.ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0]
-    if (!file) return
-    try {
-      setError(null)
-      const result = await readAvatarFile(file)
-      setPhoto(result)
-      setPhotoTouched(true)
-    } catch (error) {
-      setError(error instanceof Error ? error.message : "That image could not be read")
+    if (connectedKeyId) {
+      setStep(2)
+      return
     }
+    startTransition(async () => {
+      setStatus("Saving your key…")
+      const form = new FormData()
+      form.set("orgSlug", workspace.slug)
+      form.set("provider", provider)
+      form.set("label", `${PROVIDER_LABELS[provider] ?? provider} key`)
+      form.set("apiKey", apiKey)
+      form.set("baseUrl", baseUrl)
+      const saved = await saveProviderKey(null, form)
+      const keyId = typeof saved.data?.keyId === "string" ? saved.data.keyId : null
+      if (!saved.ok || !keyId) {
+        setStatus(null)
+        setError(saved.error ?? "Could not save the key")
+        return
+      }
+      setStatus("Testing it with the model…")
+      const tested = await testProviderKey(workspace.slug, keyId, model)
+      setStatus(null)
+      if (!tested.ok) {
+        // A key that does not work should not linger and get picked by mistake.
+        await deleteProviderKey({ orgSlug: workspace.slug, keyId })
+        setError(`That did not work: ${tested.error ?? "the provider rejected the request"}`)
+        return
+      }
+      setConnectedKeyId(keyId)
+      setApiKey("")
+      setStep(2)
+    })
   }
 
-  const steps = [
-    <StepName
-      key="name"
-      roomName={roomName}
-      onRoomName={setRoomName}
-      timezone={timezone}
-      onTimezone={(value) => {
-        timezoneTouched.current = true
-        setTimezone(value)
-      }}
-      timeZones={timeZones}
-      workspace={workspace}
-    />,
-    <StepPhoto
-      key="photo"
-      photo={photo}
-      onPick={() => fileInput.current?.click()}
-      onRemove={() => {
-        setPhoto(null)
-        setPhotoTouched(true)
-        if (fileInput.current) fileInput.current.value = ""
-      }}
-    />,
-    <StepNotifications
-      key="notifications"
-      mode={notificationMode}
-      onMode={setNotificationMode}
-      sound={sound}
-      onSound={setSound}
-    />,
-    <StepMeetings
-      key="meetings"
-      morningStart={morningStart}
-      morningEnd={morningEnd}
-      eveningStart={eveningStart}
-      eveningEnd={eveningEnd}
-      onMorningStart={setMorningStart}
-      onMorningEnd={setMorningEnd}
-      onEveningStart={setEveningStart}
-      onEveningEnd={setEveningEnd}
-      timezone={timezone}
-    />,
-    <StepCheckins
-      key="checkins"
-      enabled={checkinsEnabled}
-      onEnabled={setCheckinsEnabled}
-      start={checkinStart}
-      end={checkinEnd}
-      interval={checkinInterval}
-      duration={checkinDuration}
-      onStart={setCheckinStart}
-      onEnd={setCheckinEnd}
-      onInterval={setCheckinInterval}
-      onDuration={setCheckinDuration}
-    />,
-    <StepInstructions
-      key="instructions"
-      value={instructions}
-      onChange={setInstructions}
-      roomName={roomName}
-    />,
-    <StepReady
-      key="ready"
-      userName={userName}
-      roomName={roomName}
-      timezone={timezone}
-      notificationMode={notificationMode}
-      morning={`${summarizeTime(morningStart)} to ${summarizeTime(morningEnd)}`}
-      evening={`${summarizeTime(eveningStart)} to ${summarizeTime(eveningEnd)}`}
-      checkins={checkinsEnabled}
-      instructions={instructions}
-    />,
-  ]
+  function createFirstAgent() {
+    if (!workspace) return
+    setError(null)
+    startTransition(async () => {
+      let agentId = createdAgentId
+      if (!agentId) {
+        const form = new FormData()
+        form.set("orgSlug", workspace.slug)
+        form.set("kind", "llm")
+        form.set("displayName", agentName)
+        form.set("handle", handle)
+        form.set("systemPrompt", agentPrompt)
+        form.set("params", "{}")
+        if (connectedKeyId) {
+          form.set("providerKeyId", connectedKeyId)
+          form.set("model", model)
+        }
+        const created = await createAgent(null, form)
+        agentId = typeof created.data?.agentId === "string" ? created.data.agentId : null
+        if (!created.ok || !agentId) {
+          setError(created.error ?? "Could not create the agent")
+          return
+        }
+        setCreatedAgentId(agentId)
+      }
+      const link = new FormData()
+      link.set("orgSlug", workspace.slug)
+      link.set("roomId", workspace.roomId)
+      link.set("agentId", agentId)
+      const added = await addAgentToRoom(null, link)
+      if (!added.ok && !added.error?.includes("already in this room")) {
+        setError(added.error ?? "Could not add the agent to the room")
+        return
+      }
+      await finish()
+    })
+  }
+
+  async function finish() {
+    if (!workspace) return
+    const result = await finishOnboardingAction(workspace.slug, workspace.roomId)
+    if (!result.ok) {
+      setError(result.error ?? "Could not open the room")
+      return
+    }
+    goToRoom(workspace.slug, typeof result.data?.path === "string" ? result.data.path : undefined)
+  }
+
+  function skipToRoom() {
+    setError(null)
+    startTransition(() => finish())
+  }
+
+  const canContinue =
+    step === 0
+      ? Boolean(workspace) || (workspaceName.trim().length >= 2 && roomName.trim().length >= 1)
+      : step === 1
+        ? Boolean(connectedKeyId) ||
+          useServerModel ||
+          (apiKey.trim().length >= 8 && model.trim().length > 0)
+        : agentName.trim().length >= 1 && handle.length >= 1
+
+  function next() {
+    if (step === 0) createWorkspace()
+    else if (step === 1) {
+      if (useServerModel) {
+        setError(null)
+        setStep(2)
+      } else connectModel()
+    } else createFirstAgent()
+  }
 
   return (
     <div className="grid min-h-dvh lg:grid-cols-[19rem_1fr]">
-      <aside className="flex flex-col border-b border-line px-6 py-7 lg:border-b-0 lg:border-r lg:px-8 lg:py-10">
+      <aside className="flex flex-col border-b border-line px-6 pb-5 pt-[max(1.25rem,env(safe-area-inset-top))] lg:border-b-0 lg:border-r lg:px-8 lg:py-10">
         <div className="flex items-center gap-2.5">
           <span className="grid h-6 w-6 place-items-center bg-accent font-mono text-[13px] font-medium text-void">
             m
           </span>
           <span className="font-mono text-sm text-text">mesh</span>
+          <span className="ml-auto font-mono text-[11px] text-faint lg:hidden">
+            step {step + 1} of {STEP_TITLES.length}
+          </span>
         </div>
-        <div className="mt-10">
-          <p className="font-mono text-[10px] text-faint">setup · {Math.min(step + 1, 7)} of 7</p>
-          <h2 className="mt-2 text-[17px] font-medium tracking-[-0.01em]">Set up your room</h2>
-          <p className="mt-2 max-w-[30ch] text-[12px] leading-relaxed text-muted">
-            A room is where you, your team and your agents work in one thread.
+        <div className="mt-10 hidden lg:block">
+          <p className="font-mono text-[11px] text-faint">
+            step {step + 1} of {STEP_TITLES.length}
           </p>
+          <h2 className="mt-2 text-[17px] font-medium tracking-[-0.01em]">
+            {userName ? `Welcome, ${userName}` : "Welcome"}
+          </h2>
+          <p className="mt-2 max-w-[30ch] text-[12px] leading-relaxed text-muted">
+            A couple of minutes from now, an agent will reply to you in your first room.
+          </p>
+          <div className="mt-8">
+            <StepRail step={step} />
+          </div>
         </div>
-        <div className="mt-8">
-          <StepRail step={step} completed={completed} />
-        </div>
-        <p className="mt-auto hidden pt-10 font-mono text-[10px] leading-relaxed text-faint lg:block">
-          Everything here can be changed later in room settings.
-        </p>
       </aside>
 
-      <main className="flex flex-col px-6 py-8 sm:px-10 lg:px-14 lg:py-12">
+      <main id="main-content" className="flex flex-col px-6 py-8 sm:px-10 lg:px-14 lg:py-12">
         <div className="mx-auto w-full max-w-xl">
-          <p className="font-mono text-[10px] text-faint">step {Math.min(step + 1, 7)}</p>
-          <h1 className="mt-2 text-2xl font-medium tracking-[-0.02em] sm:text-3xl">
+          <h1
+            ref={headingRef}
+            tabIndex={-1}
+            className="text-2xl font-medium tracking-[-0.02em] outline-none sm:text-3xl"
+          >
             {STEP_TITLES[step]}
           </h1>
-          <div className="mt-7">{steps[step]}</div>
-          {error ? (
-            <div className="mt-5">
-              <InlineAlert tone="danger">{error}</InlineAlert>
-            </div>
-          ) : null}
+
+          <div className="mt-7">
+            {step === 0 ? (
+              <div className="space-y-5">
+                <Field label="workspace name" htmlFor="workspace-name" hint="your team or company">
+                  <Input
+                    id="workspace-name"
+                    value={workspaceName}
+                    onChange={(event) => setWorkspaceName(event.target.value)}
+                    maxLength={60}
+                    placeholder="Acme design team"
+                    disabled={Boolean(workspace)}
+                    autoFocus
+                  />
+                </Field>
+                <Field label="first room" htmlFor="room-name" hint="where you and your agents talk">
+                  <Input
+                    id="room-name"
+                    value={roomName}
+                    onChange={(event) => setRoomName(event.target.value)}
+                    maxLength={60}
+                    disabled={Boolean(workspace)}
+                  />
+                </Field>
+                <details className="rounded-sm border border-line bg-panel/50 px-3 py-2">
+                  <summary className="cursor-pointer py-1 text-[12px] text-muted hover:text-text">
+                    Time zone: {timezone.replaceAll("_", " ")}
+                  </summary>
+                  <div className="mt-2 pb-1">
+                    <Field label="time zone" htmlFor="room-timezone">
+                      <Select
+                        id="room-timezone"
+                        value={timezone}
+                        disabled={Boolean(workspace)}
+                        onChange={(event) => {
+                          timezoneTouched.current = true
+                          setTimezone(event.target.value)
+                        }}
+                      >
+                        {timeZones.map((zone) => (
+                          <option key={zone} value={zone}>
+                            {zone.replaceAll("_", " ")}
+                          </option>
+                        ))}
+                        {timeZones.includes(timezone) ? null : (
+                          <option value={timezone}>{timezone}</option>
+                        )}
+                      </Select>
+                    </Field>
+                  </div>
+                </details>
+              </div>
+            ) : null}
+
+            {step === 1 ? (
+              connectedKeyId ? (
+                <InlineAlert tone="success">
+                  Connected to {PROVIDER_LABELS[provider] ?? provider} using {model}.
+                </InlineAlert>
+              ) : (
+                <div className="space-y-5">
+                  <p className="max-w-[52ch] text-[13px] leading-relaxed text-muted">
+                    Agents need an AI model to reply. Paste an API key from your provider. It is
+                    encrypted, and we test it before moving on.
+                  </p>
+                  {hasServerModel ? (
+                    <label className="flex items-start gap-2.5 rounded-sm border border-line bg-panel p-3 text-[13px] leading-relaxed text-text">
+                      <input
+                        type="checkbox"
+                        checked={useServerModel}
+                        onChange={(event) => setUseServerModel(event.target.checked)}
+                        className="mt-1 h-3.5 w-3.5 shrink-0 accent-[var(--color-accent)]"
+                      />
+                      <span>Use this server&apos;s shared model instead of my own key</span>
+                    </label>
+                  ) : null}
+                  {useServerModel ? null : (
+                    <>
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        <Field label="provider" htmlFor="onboarding-provider">
+                          <Select
+                            id="onboarding-provider"
+                            value={provider}
+                            onChange={(event) => {
+                              setProvider(event.target.value)
+                              setModel(defaultModel(event.target.value))
+                            }}
+                          >
+                            {Object.entries(PROVIDER_LABELS).map(([value, label]) => (
+                              <option key={value} value={value}>
+                                {label}
+                              </option>
+                            ))}
+                          </Select>
+                        </Field>
+                        <Field label="model" htmlFor="onboarding-model">
+                          <Input
+                            id="onboarding-model"
+                            list="onboarding-model-options"
+                            value={model}
+                            onChange={(event) => setModel(event.target.value)}
+                            placeholder="Pick or type a model id"
+                          />
+                          <datalist id="onboarding-model-options">
+                            {suggestions.map((option) => (
+                              <option key={option} value={option} />
+                            ))}
+                          </datalist>
+                        </Field>
+                      </div>
+                      <Field label="API key" htmlFor="onboarding-key">
+                        <Input
+                          id="onboarding-key"
+                          type="password"
+                          autoComplete="off"
+                          value={apiKey}
+                          onChange={(event) => setApiKey(event.target.value)}
+                          placeholder="Paste your key"
+                        />
+                      </Field>
+                      {provider === "openai-compatible" ? (
+                        <Field label="base URL" htmlFor="onboarding-base-url">
+                          <Input
+                            id="onboarding-base-url"
+                            value={baseUrl}
+                            onChange={(event) => setBaseUrl(event.target.value)}
+                            placeholder="http://localhost:11434/v1"
+                          />
+                        </Field>
+                      ) : null}
+                    </>
+                  )}
+                </div>
+              )
+            ) : null}
+
+            {step === 2 ? (
+              <div className="space-y-5">
+                <fieldset>
+                  <legend className="mb-1.5 font-mono text-[12px] text-muted">start from</legend>
+                  <div className="grid gap-2 sm:grid-cols-3">
+                    {TEMPLATES.map((option) => (
+                      <button
+                        key={option.key}
+                        type="button"
+                        aria-pressed={template === option.key}
+                        onClick={() => {
+                          setTemplate(option.key)
+                          setAgentName(option.name)
+                          setAgentPrompt(option.prompt)
+                        }}
+                        className={cn(
+                          "rounded-sm border px-3 py-3 text-left text-[13px] transition-colors md:py-2.5",
+                          template === option.key
+                            ? "border-accent bg-raised text-text"
+                            : "border-line bg-panel text-muted hover:bg-raised",
+                        )}
+                      >
+                        {option.label}
+                      </button>
+                    ))}
+                  </div>
+                </fieldset>
+                <Field
+                  label="name"
+                  htmlFor="onboarding-agent-name"
+                  hint={handle ? `mention it as @${handle}` : undefined}
+                >
+                  <Input
+                    id="onboarding-agent-name"
+                    value={agentName}
+                    onChange={(event) => setAgentName(event.target.value)}
+                    maxLength={60}
+                    disabled={Boolean(createdAgentId)}
+                  />
+                </Field>
+                <Field label="what is it for?" htmlFor="onboarding-agent-prompt">
+                  <Textarea
+                    id="onboarding-agent-prompt"
+                    value={agentPrompt}
+                    onChange={(event) => setAgentPrompt(event.target.value)}
+                    rows={4}
+                    disabled={Boolean(createdAgentId)}
+                  />
+                </Field>
+                <HelpText>
+                  Your room also runs two short stand-ups each weekday, at 9:00 and 17:00 in your
+                  time zone. Agents in the room reply to them using your API credits. You can change
+                  the times in room settings.
+                </HelpText>
+              </div>
+            ) : null}
+
+            {error ? (
+              <div className="mt-5">
+                <InlineAlert tone="danger">{error}</InlineAlert>
+              </div>
+            ) : null}
+            {status ? (
+              <p role="status" className="mt-5 font-mono text-[12px] text-muted">
+                {status}
+              </p>
+            ) : null}
+          </div>
         </div>
 
         <div className="mx-auto mt-auto w-full max-w-xl pt-10">
-          <div className="flex items-center gap-3 border-t border-line pt-5">
-            <Button
-              variant="ghost"
-              size="md"
-              onClick={back}
-              disabled={step === 0 || pending}
-              className={cn(step === 0 && "invisible")}
-            >
-              Back
-            </Button>
-            <span className="ml-auto" />
-            <Button variant="primary" size="lg" onClick={next} disabled={pending}>
-              {pending
-                ? "Saving…"
-                : step === 0
-                  ? workspace
-                    ? "Continue"
-                    : "Create room"
-                  : step === 6
-                    ? "Open room"
-                    : "Continue"}
-            </Button>
-          </div>
-        </div>
-        <input
-          ref={fileInput}
-          type="file"
-          accept="image/png,image/jpeg,image/webp"
-          className="sr-only"
-          onChange={onPhotoChange}
-          tabIndex={-1}
-        />
-      </main>
-    </div>
-  )
-}
-
-function StepName({
-  roomName,
-  onRoomName,
-  timezone,
-  onTimezone,
-  timeZones,
-  workspace,
-}: {
-  roomName: string
-  onRoomName: (value: string) => void
-  timezone: string
-  onTimezone: (value: string) => void
-  timeZones: string[]
-  workspace: { slug: string; roomId: string } | null
-}) {
-  return (
-    <div className="space-y-5">
-      <p className="max-w-[52ch] text-[13px] leading-relaxed text-muted">
-        This creates a workspace for you and a first room inside it. Team members and agents can be
-        added afterwards.
-      </p>
-      <Field label="room name" htmlFor="room-name" hint="1–60 characters">
-        <Input
-          id="room-name"
-          value={roomName}
-          onChange={(event) => onRoomName(event.target.value)}
-          maxLength={60}
-          placeholder="Design partners"
-          disabled={Boolean(workspace)}
-          autoFocus
-        />
-      </Field>
-      <Field label="time zone" htmlFor="room-timezone" hint="used for meetings">
-        <Select
-          id="room-timezone"
-          value={timezone}
-          onChange={(event) => onTimezone(event.target.value)}
-          disabled={Boolean(workspace)}
-        >
-          {timeZones.map((zone) => (
-            <option key={zone} value={zone}>
-              {zone.replaceAll("_", " ")}
-            </option>
-          ))}
-          {timeZones.includes(timezone) ? null : <option value={timezone}>{timezone}</option>}
-        </Select>
-        <HelpText>
-          Daily meetings and check-ins fire in this zone, even when nobody has the app open.
-        </HelpText>
-      </Field>
-      {workspace ? (
-        <InlineAlert tone="success">
-          Workspace created at /{workspace.slug}. Keep going to make the room yours.
-        </InlineAlert>
-      ) : null}
-    </div>
-  )
-}
-
-function StepPhoto({
-  photo,
-  onPick,
-  onRemove,
-}: {
-  photo: string | null
-  onPick: () => void
-  onRemove: () => void
-}) {
-  return (
-    <div className="space-y-6">
-      <p className="max-w-[52ch] text-[13px] leading-relaxed text-muted">
-        This is your profile photo, not the room&apos;s. It appears on messages you send and in the
-        workspace footer. Optional.
-      </p>
-      <div className="flex items-center gap-5">
-        <div className="grid h-20 w-20 shrink-0 place-items-center overflow-hidden rounded-full border border-line bg-panel">
-          {photo ? (
-            <img src={photo} alt="Room photo preview" className="h-full w-full object-cover" />
-          ) : (
-            <span className="font-mono text-[11px] text-faint">no photo</span>
-          )}
-        </div>
-        <div className="flex flex-col gap-2">
-          <div className="flex flex-wrap gap-2">
-            <Button variant="outline" size="sm" onClick={onPick}>
-              {photo ? "Replace photo" : "Choose photo"}
-            </Button>
-            {photo ? (
-              <Button variant="quiet" size="sm" onClick={onRemove}>
-                Remove
+          <div className="flex flex-wrap items-center gap-3 border-t border-line pb-[env(safe-area-inset-bottom)] pt-5">
+            {step > 0 && !(step === 1 && initialWorkspace) ? (
+              <Button
+                variant="ghost"
+                size="md"
+                onClick={() => {
+                  setError(null)
+                  setStep(step - 1)
+                }}
+                disabled={pending}
+              >
+                Back
               </Button>
             ) : null}
+            <span className="ml-auto" />
+            {step > 0 ? (
+              <Button variant="quiet" size="md" onClick={skipToRoom} disabled={pending}>
+                Skip for now
+              </Button>
+            ) : null}
+            <Button variant="primary" size="lg" onClick={next} disabled={pending || !canContinue}>
+              {pending
+                ? (status ?? "Saving…")
+                : step === 0
+                  ? "Continue"
+                  : step === 1
+                    ? connectedKeyId || useServerModel
+                      ? "Continue"
+                      : "Connect and continue"
+                    : "Create agent and open room"}
+            </Button>
           </div>
-          <p className="font-mono text-[10px] text-faint">PNG, JPEG or WebP · under 200 KB</p>
         </div>
-      </div>
-      <div className="rounded-sm border border-line bg-panel p-4">
-        <p className="text-[12px] leading-relaxed text-muted">
-          Prefer keeping your own face out of it? A small illustration or a color tile works just as
-          well. You can also skip this and change it later from your profile.
-        </p>
-      </div>
-    </div>
-  )
-}
-
-function StepNotifications({
-  mode,
-  onMode,
-  sound,
-  onSound,
-}: {
-  mode: NotificationMode
-  onMode: (mode: NotificationMode) => void
-  sound: boolean
-  onSound: (value: boolean) => void
-}) {
-  return (
-    <div className="space-y-6">
-      <p className="max-w-[52ch] text-[13px] leading-relaxed text-muted">
-        Decide what should pull your attention. Anything you mute still lands in the Inbox.
-      </p>
-      <div className="divide-y divide-line border border-line">
-        {NOTIFICATION_OPTIONS.map((option) => {
-          const active = mode === option.value
-          return (
-            <button
-              key={option.value}
-              type="button"
-              onClick={() => onMode(option.value)}
-              className={cn(
-                "flex w-full items-start gap-3 px-4 py-3.5 text-left transition-colors",
-                active ? "bg-raised" : "bg-panel hover:bg-raised/60",
-              )}
-              aria-pressed={active}
-            >
-              <span
-                className={cn(
-                  "mt-0.5 grid h-4 w-4 shrink-0 place-items-center rounded-full border",
-                  active ? "border-accent" : "border-line-strong",
-                )}
-              >
-                {active ? <span className="h-2 w-2 rounded-full bg-accent" /> : null}
-              </span>
-              <span>
-                <span className="block text-[13px] text-text">{option.label}</span>
-                <span className="mt-0.5 block text-[12px] leading-relaxed text-muted">
-                  {option.detail}
-                </span>
-              </span>
-            </button>
-          )
-        })}
-      </div>
-      <label className="flex items-start gap-2.5 text-[12px] leading-relaxed text-muted">
-        <input
-          type="checkbox"
-          checked={sound}
-          onChange={(event) => onSound(event.target.checked)}
-          className="mt-0.5 h-3.5 w-3.5 shrink-0 accent-[var(--color-accent)]"
-        />
-        <span>Play a soft sound for new messages while the tab is open. Browser settings win.</span>
-      </label>
-    </div>
-  )
-}
-
-function TimeRange({
-  idPrefix,
-  label,
-  start,
-  end,
-  onStart,
-  onEnd,
-}: {
-  idPrefix: string
-  label: string
-  start: string
-  end: string
-  onStart: (value: string) => void
-  onEnd: (value: string) => void
-}) {
-  return (
-    <div className="grid gap-3 sm:grid-cols-[1fr_auto_1fr] sm:items-end">
-      <Field label={`${label} starts`} htmlFor={`${idPrefix}-start`}>
-        <Input
-          id={`${idPrefix}-start`}
-          type="time"
-          value={start}
-          onChange={(event) => onStart(event.target.value)}
-        />
-      </Field>
-      <span className="hidden pb-2.5 font-mono text-[10px] text-faint sm:block">to</span>
-      <Field label={`${label} ends`} htmlFor={`${idPrefix}-end`}>
-        <Input
-          id={`${idPrefix}-end`}
-          type="time"
-          value={end}
-          onChange={(event) => onEnd(event.target.value)}
-        />
-      </Field>
-    </div>
-  )
-}
-
-function StepMeetings({
-  morningStart,
-  morningEnd,
-  eveningStart,
-  eveningEnd,
-  onMorningStart,
-  onMorningEnd,
-  onEveningStart,
-  onEveningEnd,
-  timezone,
-}: {
-  morningStart: string
-  morningEnd: string
-  eveningStart: string
-  eveningEnd: string
-  onMorningStart: (value: string) => void
-  onMorningEnd: (value: string) => void
-  onEveningStart: (value: string) => void
-  onEveningEnd: (value: string) => void
-  timezone: string
-}) {
-  return (
-    <div className="space-y-6">
-      <p className="max-w-[52ch] text-[13px] leading-relaxed text-muted">
-        Two short stand-ups run each weekday. Agents get a turn to speak, so everyone starts and
-        ends the day with the same picture. Times are in {timezone.replaceAll("_", " ")}.
-      </p>
-      <div className="space-y-5 border border-line bg-panel p-4">
-        <TimeRange
-          idPrefix="morning"
-          label="Morning meeting"
-          start={morningStart}
-          end={morningEnd}
-          onStart={onMorningStart}
-          onEnd={onMorningEnd}
-        />
-        <div className="rounded-sm bg-raised px-3 py-2">
-          <p className="text-[12px] leading-relaxed text-muted">
-            A host message pings every agent in the room. Bots answer in turn order, not all at once.
-          </p>
-        </div>
-      </div>
-      <div className="space-y-5 border border-line bg-panel p-4">
-        <TimeRange
-          idPrefix="evening"
-          label="Evening meeting"
-          start={eveningStart}
-          end={eveningEnd}
-          onStart={onEveningStart}
-          onEnd={onEveningEnd}
-        />
-        <div className="rounded-sm bg-raised px-3 py-2">
-          <p className="text-[12px] leading-relaxed text-muted">
-            Use the evening round for handoff: what shipped, what is blocked, what happens tomorrow.
-          </p>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-function Toggle({
-  checked,
-  onChange,
-  label,
-  detail,
-}: {
-  checked: boolean
-  onChange: (value: boolean) => void
-  label: string
-  detail: string
-}) {
-  return (
-    <button
-      type="button"
-      onClick={() => onChange(!checked)}
-      aria-pressed={checked}
-      className="flex w-full items-center gap-4 border border-line bg-panel px-4 py-3.5 text-left transition-colors hover:bg-raised/60"
-    >
-      <span
-        className={cn(
-          "relative h-5 w-9 shrink-0 rounded-full border transition-colors",
-          checked ? "border-accent bg-accent" : "border-line-strong bg-raised",
-        )}
-      >
-        <span
-          className={cn(
-            "absolute top-0.5 h-3.5 w-3.5 rounded-full transition-all",
-            checked ? "left-[18px] bg-void" : "left-0.5 bg-muted",
-          )}
-        />
-      </span>
-      <span>
-        <span className="block text-[13px] text-text">{label}</span>
-        <span className="mt-0.5 block text-[12px] leading-relaxed text-muted">{detail}</span>
-      </span>
-    </button>
-  )
-}
-
-function StepCheckins({
-  enabled,
-  onEnabled,
-  start,
-  end,
-  interval,
-  duration,
-  onStart,
-  onEnd,
-  onInterval,
-  onDuration,
-}: {
-  enabled: boolean
-  onEnabled: (value: boolean) => void
-  start: string
-  end: string
-  interval: string
-  duration: string
-  onStart: (value: string) => void
-  onEnd: (value: string) => void
-  onInterval: (value: string) => void
-  onDuration: (value: string) => void
-}) {
-  return (
-    <div className="space-y-6">
-      <p className="max-w-[52ch] text-[13px] leading-relaxed text-muted">
-        Check-ins are short agent-led rounds between meetings. Turn them off if two stand-ups a day
-        is enough.
-      </p>
-      <Toggle
-        checked={enabled}
-        onChange={onEnabled}
-        label="Run check-ins on weekdays"
-        detail="A host asks for a quick status round on a fixed cadence."
-      />
-      <div className={cn("space-y-5 transition-opacity", enabled ? "opacity-100" : "opacity-45")}>
-        <div className="grid gap-3 sm:grid-cols-2">
-          <Field label="first check-in" htmlFor="checkin-start">
-            <Input
-              id="checkin-start"
-              type="time"
-              value={start}
-              onChange={(event) => onStart(event.target.value)}
-              disabled={!enabled}
-            />
-          </Field>
-          <Field label="last check-in" htmlFor="checkin-end">
-            <Input
-              id="checkin-end"
-              type="time"
-              value={end}
-              onChange={(event) => onEnd(event.target.value)}
-              disabled={!enabled}
-            />
-          </Field>
-        </div>
-        <div className="grid gap-3 sm:grid-cols-2">
-          <Field label="cadence" htmlFor="checkin-interval">
-            <Select
-              id="checkin-interval"
-              value={interval}
-              onChange={(event) => onInterval(event.target.value)}
-              disabled={!enabled}
-            >
-              {INTERVALS.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </Select>
-          </Field>
-          <Field label="each one runs for" htmlFor="checkin-duration">
-            <Select
-              id="checkin-duration"
-              value={duration}
-              onChange={(event) => onDuration(event.target.value)}
-              disabled={!enabled}
-            >
-              {DURATIONS.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </Select>
-          </Field>
-        </div>
-        <HelpText>
-          Check-ins stop at the last start time. Nothing runs on weekends, and an ended meeting
-          never reopens.
-        </HelpText>
-      </div>
-    </div>
-  )
-}
-
-function StepInstructions({
-  value,
-  onChange,
-  roomName,
-}: {
-  value: string
-  onChange: (value: string) => void
-  roomName: string
-}) {
-  return (
-    <div className="space-y-5">
-      <p className="max-w-[52ch] text-[13px] leading-relaxed text-muted">
-        Standing instructions for every agent in {roomName || "this room"}. Write it like a brief to
-        a new teammate, not a prompt.
-      </p>
-      <Field
-        label="room instructions"
-        htmlFor="instructions"
-        hint={`${value.length}/4,000`}
-      >
-        <Textarea
-          id="instructions"
-          value={value}
-          onChange={(event) => onChange(event.target.value)}
-          maxLength={4_000}
-          rows={7}
-          placeholder={"Example: We ship on Thursdays. Keep replies under 120 words. Cite the file or thread you are working from. Ask before changing shared canvases."}
-        />
-      </Field>
-      <div className="grid gap-px overflow-hidden border border-line bg-line sm:grid-cols-2">
-        {[
-          ["tone", "Say how direct replies should be."],
-          ["boundaries", "Name files or systems agents must not touch."],
-          ["rituals", "Describe how stand-ups and check-ins should report."],
-          ["handoff", "Say what a good end-of-day note contains."],
-        ].map(([term, detail]) => (
-          <div key={term} className="bg-panel p-3">
-            <p className="font-mono text-[10px] text-faint">{term}</p>
-            <p className="mt-1 text-[12px] leading-snug text-muted">{detail}</p>
-          </div>
-        ))}
-      </div>
-      <HelpText>Optional. You can edit this any time in room settings.</HelpText>
-    </div>
-  )
-}
-
-function SummaryRow({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex items-baseline justify-between gap-4 py-2">
-      <dt className="font-mono text-[10px] uppercase tracking-wide text-faint">{label}</dt>
-      <dd className="max-w-[60%] text-right text-[12px] leading-relaxed text-muted">{value}</dd>
-    </div>
-  )
-}
-
-function StepReady({
-  userName,
-  roomName,
-  timezone,
-  notificationMode,
-  morning,
-  evening,
-  checkins,
-  instructions,
-}: {
-  userName: string
-  roomName: string
-  timezone: string
-  notificationMode: NotificationMode
-  morning: string
-  evening: string
-  checkins: boolean
-  instructions: string
-}) {
-  const notifications =
-    NOTIFICATION_OPTIONS.find((option) => option.value === notificationMode)?.label ?? "Everything"
-  return (
-    <div className="space-y-6">
-      <p className="max-w-[52ch] text-[13px] leading-relaxed text-muted">
-        {userName ? `${userName}, ` : ""}the room is set up. Opening it will post a welcome note. If
-        agents are added, they get one turn to introduce themselves.
-      </p>
-      <dl className="divide-y divide-line border-y border-line">
-        <SummaryRow label="room" value={roomName} />
-        <SummaryRow label="time zone" value={timezone.replaceAll("_", " ")} />
-        <SummaryRow label="morning" value={`${morning}, weekdays`} />
-        <SummaryRow label="evening" value={`${evening}, weekdays`} />
-        <SummaryRow label="check-ins" value={checkins ? "On between meetings" : "Off"} />
-        <SummaryRow label="notifications" value={notifications} />
-        <SummaryRow
-          label="instructions"
-          value={instructions ? `${instructions.length} characters saved` : "Not set"}
-        />
-      </dl>
-      <div className="border-l-2 border-accent pl-3">
-        <p className="text-[12px] leading-relaxed text-muted">
-          No agents yet. Once you add one, mention it in the room or let the stand-up host call on
-          it. Every tool that changes something waits for a human approval unless you allow it.
-        </p>
-      </div>
+      </main>
     </div>
   )
 }

@@ -2,44 +2,64 @@ import type { Metadata } from "next"
 import Link from "next/link"
 import { redirect } from "next/navigation"
 import { isOrgAdmin, requireOrgAccess } from "@/lib/auth"
-import { listAuditLogs, listMemberViews } from "@/lib/queries"
-import { inviteMember, updateSso } from "@/lib/actions/orgs"
+import { listAuditLogs, listMemberViews, listRooms } from "@/lib/queries"
+import { inviteMember, renameWorkspaceAction, updateSso } from "@/lib/actions/orgs"
 import { ssoEnabled } from "@/lib/env"
 import { ActionForm } from "@/components/ui/action-form"
 import { Field, Input, Select } from "@/components/ui/field"
 import { EmptyState, InlineAlert } from "@/components/ui/empty"
 import { Section } from "@/components/settings/section"
 import { MemberRoleForm } from "@/components/admin/member-role-form"
+import { RemoveMemberButton } from "@/components/admin/remove-member-button"
 import { fullTime, pretty } from "@/lib/format"
 
-export const metadata: Metadata = { title: "Members & audit" }
+export const metadata: Metadata = { title: "Workspace & members" }
 
 export default async function AdminPage({ params }: { params: Promise<{ org: string }> }) {
   const { org: orgSlug } = await params
   const access = await requireOrgAccess(orgSlug)
   if (!isOrgAdmin(access.role)) redirect(`/${orgSlug}`)
-  const [members, logs] = await Promise.all([
+  const [members, logs, rooms] = await Promise.all([
     listMemberViews(access.org.id),
     listAuditLogs(access.org.id),
+    listRooms(access.org.id),
   ])
   const isOwner = access.role === "owner"
+  const invitableRooms = rooms.filter((room) => room.kind !== "dm")
 
   return (
     <div className="h-full overflow-y-auto">
       <div className="mx-auto max-w-4xl px-5 py-8 sm:px-8">
-        <p className="font-mono text-[11px] text-faint">
+        <p className="font-mono text-[12px] text-faint">
           <Link href={`/${orgSlug}`} className="hover:text-text">
             workspace
           </Link>{" "}
           / admin
         </p>
-        <h1 className="mt-1 text-2xl font-medium tracking-[-0.02em]">Members & audit</h1>
+        <h1 className="mt-1 text-2xl font-medium tracking-[-0.02em]">Workspace & members</h1>
         <p className="mt-2 max-w-2xl text-[13px] leading-relaxed text-muted">
-          Organization roles gate settings, keys, tool approvals and agent management. Room roles are
-          set per room. Every sensitive change writes an audit row.
+          Workspace admins manage settings, API keys and agents, and can approve agent actions.
+          Sensitive changes are recorded in the audit log below.
         </p>
 
         <div className="mt-6 space-y-8">
+          <Section title="Workspace" description="The name everyone in this workspace sees.">
+            <ActionForm action={renameWorkspaceAction} submitLabel="Save name">
+              <input type="hidden" name="orgSlug" value={orgSlug} />
+              <Field label="workspace name" htmlFor="workspace-name">
+                <Input
+                  id="workspace-name"
+                  name="name"
+                  required
+                  minLength={2}
+                  maxLength={60}
+                  defaultValue={access.org.name}
+                  className="max-w-md"
+                />
+              </Field>
+            </ActionForm>
+          </Section>
+
           <Section
             title="Members"
             description={`${members.length} ${members.length === 1 ? "person" : "people"} in this workspace.`}
@@ -50,19 +70,26 @@ export default async function AdminPage({ params }: { params: Promise<{ org: str
                   <span className="min-w-0 flex-1 truncate text-[13px] text-text">
                     {member.displayName}
                   </span>
-                  <span className="font-mono text-[10px] text-faint">{member.role}</span>
+                  <span className="font-mono text-[11px] text-faint">{member.role}</span>
                   <MemberRoleForm
                     orgSlug={orgSlug}
                     userId={member.userId}
                     role={member.role}
                     allowOwner={isOwner}
                   />
+                  {member.userId !== access.user.id ? (
+                    <RemoveMemberButton
+                      orgSlug={orgSlug}
+                      userId={member.userId}
+                      name={member.displayName}
+                    />
+                  ) : null}
                 </li>
               ))}
             </ul>
 
             <div className="mt-5 border-t border-line pt-5">
-              <ActionForm action={inviteMember} submitLabel="Invite">
+              <ActionForm action={inviteMember} submitLabel="Invite" pendingLabel="Inviting…" resetOnSuccess>
                 <input type="hidden" name="orgSlug" value={orgSlug} />
                 <div className="grid gap-3 sm:grid-cols-[1fr_150px]">
                   <Field label="email" htmlFor="invite-email">
@@ -76,9 +103,39 @@ export default async function AdminPage({ params }: { params: Promise<{ org: str
                     </Select>
                   </Field>
                 </div>
+                {invitableRooms.length ? (
+                  <fieldset>
+                    <legend className="mb-1.5 font-mono text-[12px] text-muted">
+                      add to rooms
+                    </legend>
+                    <div className="max-h-44 space-y-1 overflow-y-auto border border-line bg-panel p-2">
+                      {invitableRooms.map((room) => (
+                        <label
+                          key={room.id}
+                          className="flex min-h-9 items-center justify-between gap-2 text-[12px] text-muted md:min-h-0"
+                        >
+                          <span className="truncate">
+                            {room.name}
+                            {room.kind === "public" ? " (anyone in the workspace can read it)" : ""}
+                          </span>
+                          <input
+                            type="checkbox"
+                            name="roomIds"
+                            value={room.id}
+                            defaultChecked={invitableRooms.length === 1}
+                            className="h-3.5 w-3.5 shrink-0 accent-[var(--color-accent)]"
+                          />
+                        </label>
+                      ))}
+                    </div>
+                    <p className="mt-1.5 text-[12px] leading-relaxed text-faint">
+                      Pick at least one, or they will join with no private rooms to see.
+                    </p>
+                  </fieldset>
+                ) : null}
                 <p className="text-[12px] leading-relaxed text-faint">
-                  If the address is new to Supabase, they receive an invite email. Existing users are
-                  added directly.
+                  New people get an invitation email. People who already have an account are added
+                  right away.
                 </p>
               </ActionForm>
             </div>
@@ -86,12 +143,12 @@ export default async function AdminPage({ params }: { params: Promise<{ org: str
 
           <Section
             title="SAML SSO"
-            description="Supabase SAML requires a Pro plan and the org's SSO connection configured in Supabase. The flag here only records intent; it does not bypass Supabase Auth."
+            description="Single sign-on must first be set up by whoever runs this server."
           >
             {!ssoEnabled() ? (
               <InlineAlert tone="warning">
-                SSO is disabled for this deployment. Set NEXT_PUBLIC_SSO_ENABLED=true after
-                configuring SAML in Supabase to expose the toggle.
+                Single sign-on is not available on this server yet. Ask your server administrator to
+                set it up.
               </InlineAlert>
             ) : (
               <ActionForm action={updateSso} submitLabel="Save SSO flag">
@@ -117,13 +174,13 @@ export default async function AdminPage({ params }: { params: Promise<{ org: str
             {logs.length === 0 ? (
               <EmptyState
                 title="No audit entries yet"
-                body="Entries appear as soon as an admin changes a key, role, room setting or tool approval."
+                body="Entries appear when an admin changes a key, a role or a room setting, or decides on an agent action."
               />
             ) : (
               <div className="overflow-x-auto border-y border-line">
                 <table className="w-full border-collapse text-left">
                   <thead>
-                    <tr className="border-b border-line font-mono text-[10px] text-faint">
+                    <tr className="border-b border-line font-mono text-[11px] text-faint">
                       <th className="py-2 pr-3 font-normal">time</th>
                       <th className="py-2 pr-3 font-normal">action</th>
                       <th className="py-2 pr-3 font-normal">target</th>
@@ -134,18 +191,18 @@ export default async function AdminPage({ params }: { params: Promise<{ org: str
                   <tbody className="divide-y divide-line">
                     {logs.map((log) => (
                       <tr key={log.id} className="align-top">
-                        <td className="whitespace-nowrap py-2 pr-3 font-mono text-[10px] text-faint">
+                        <td className="whitespace-nowrap py-2 pr-3 font-mono text-[11px] text-faint">
                           {fullTime(log.createdAt)}
                         </td>
-                        <td className="py-2 pr-3 font-mono text-[11px] text-text">{log.action}</td>
-                        <td className="max-w-[180px] truncate py-2 pr-3 font-mono text-[10px] text-muted">
+                        <td className="py-2 pr-3 font-mono text-[12px] text-text">{log.action}</td>
+                        <td className="max-w-[180px] truncate py-2 pr-3 font-mono text-[11px] text-muted">
                           {log.target ?? "-"}
                         </td>
-                        <td className="py-2 pr-3 font-mono text-[10px] text-faint">
+                        <td className="py-2 pr-3 font-mono text-[11px] text-faint">
                           {log.actorType}
                           {log.actorId ? `:${log.actorId.slice(0, 8)}` : ""}
                         </td>
-                        <td className="max-w-[260px] py-2 font-mono text-[10px] leading-relaxed text-faint">
+                        <td className="max-w-[260px] py-2 font-mono text-[11px] leading-relaxed text-faint">
                           <details>
                             <summary className="cursor-pointer hover:text-text">view</summary>
                             <pre className="mt-1 whitespace-pre-wrap break-all">

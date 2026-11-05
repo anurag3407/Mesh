@@ -10,6 +10,7 @@ import {
 } from "@/lib/actions/meetings"
 import { formatMinutes } from "@mesh/core"
 import { Button } from "@/components/ui/button"
+import { ConfirmButton } from "@/components/ui/confirm-button"
 import { InlineAlert } from "@/components/ui/empty"
 import { cn } from "@/lib/format"
 import type { MeetingView, RoomScheduleView } from "@/lib/types"
@@ -47,10 +48,14 @@ export function RoomMeetingBar({
     })
   }
 
+  // Only a live meeting earns a row on a phone; a schedule is not worth the chat's space.
+  const hideOnPhone = meeting?.status !== "active"
+
   return (
     <div
       className={cn(
-        "flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-line px-4 py-1.5",
+        "flex-wrap items-center gap-x-3 gap-y-1 border-b border-line px-4 py-1.5",
+        hideOnPhone ? "hidden md:flex" : "flex",
         meeting?.status === "active" ? "bg-accent-soft" : "bg-panel",
       )}
       aria-label="Room meeting"
@@ -64,12 +69,12 @@ export function RoomMeetingBar({
             )}
             aria-hidden="true"
           />
-          <span className="font-mono text-[10px] text-muted">
+          <span className="font-mono text-[11px] text-muted">
             {meeting.status === "active" ? "live · " : "scheduled · "}
-            {meeting.kind}
+            {meeting.kind === "checkin" ? "check-in" : meeting.kind}
           </span>
           <span className="truncate text-[12px] text-text">{meeting.title}</span>
-          <span className="font-mono text-[9px] text-faint">
+          <span className="font-mono text-[11px] text-faint">
             {new Date(meeting.startsAt).toLocaleTimeString(undefined, {
               hour: "numeric",
               minute: "2-digit",
@@ -80,7 +85,7 @@ export function RoomMeetingBar({
               minute: "2-digit",
             })}
           </span>
-          <div className="ml-auto flex items-center gap-1.5">
+          <div className="ml-auto flex flex-wrap items-center gap-1.5">
             {meeting.status === "scheduled" ? (
               <Button size="sm" variant="outline" disabled={pending} onClick={() => run("start")}>
                 Start
@@ -88,40 +93,45 @@ export function RoomMeetingBar({
             ) : (
               <>
                 <Button size="sm" variant="outline" disabled={pending} onClick={() => run("wake")}>
-                  Wake bots
+                  Ask agents again
                 </Button>
-                <Button size="sm" variant="danger" disabled={pending} onClick={() => run("end")}>
-                  End
-                </Button>
+                <ConfirmButton
+                  label="End"
+                  confirmLabel="End meeting"
+                  pendingLabel="Ending…"
+                  warning="Any agent reply in progress will stop."
+                  pending={pending}
+                  onConfirm={() => run("end")}
+                />
               </>
             )}
             <Link
               href={`/${orgSlug}/meetings`}
-              className="px-1 font-mono text-[10px] text-faint hover:text-text"
+              className="px-1 font-mono text-[11px] text-faint hover:text-text"
             >
-              meetings
+              all meetings
             </Link>
           </div>
         </>
       ) : schedule ? (
         <>
-          <span className="font-mono text-[10px] text-faint">weekday cadence</span>
-          <span className="font-mono text-[10px] text-muted">
+          <span className="font-mono text-[11px] text-faint">weekday stand-ups</span>
+          <span className="font-mono text-[11px] text-muted">
             {formatMinutes(schedule.morningStartMinutes)}–{formatMinutes(schedule.morningEndMinutes)}
             {" · "}
             {formatMinutes(schedule.eveningStartMinutes)}–{formatMinutes(schedule.eveningEndMinutes)}
             {schedule.checkinsEnabled
-              ? ` · check-ins every ${schedule.checkinIntervalMinutes}m`
+              ? ` · check-ins every ${schedule.checkinIntervalMinutes} min`
               : ""}
           </span>
-          <span className="ml-auto font-mono text-[9px] text-faint">
+          <span className="ml-auto font-mono text-[11px] text-faint">
             {schedule.timezone.replaceAll("_", " ")}
           </span>
           <Link
             href={`/${orgSlug}/meetings`}
-            className="px-1 font-mono text-[10px] text-faint hover:text-text"
+            className="px-1 font-mono text-[11px] text-faint hover:text-text"
           >
-            meetings
+            all meetings
           </Link>
         </>
       ) : null}

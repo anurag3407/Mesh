@@ -361,3 +361,22 @@ export async function removeAgentFromRoom(
   return ok("Agent removed")
 }
 
+export async function deleteRoomAction(input: {
+  orgSlug: string
+  roomId: string
+}): Promise<ActionResult> {
+  const check = await adminRoomAccess(input.orgSlug, input.roomId)
+  if ("error" in check) return fail(check.error)
+  const admin = createAdminClient()
+  const { error } = await admin.from("rooms").delete().eq("id", input.roomId)
+  if (error) return fail(errorMessage(error))
+  await audit({
+    orgId: check.access.org.id,
+    actorId: check.access.user.id,
+    action: "room.deleted",
+    target: input.roomId,
+    metadata: { name: check.access.room.name },
+  })
+  revalidateOrg(input.orgSlug)
+  return ok("Room deleted")
+}

@@ -30,7 +30,7 @@ export function ForgotPasswordForm() {
       <Button type="submit" variant="primary" size="lg" className="w-full" disabled={pending}>
         {pending ? "Sending…" : "Send reset link"}
       </Button>
-      <p className="text-center font-mono text-[10px] text-faint">
+      <p className="text-center font-mono text-[11px] text-faint">
         <Link href="/login" className="underline underline-offset-2 hover:text-text">
           back to sign in
         </Link>

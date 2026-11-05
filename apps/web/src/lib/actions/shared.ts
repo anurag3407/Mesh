@@ -53,6 +53,24 @@ export function slugify(value: string): string {
     .slice(0, 48)
 }
 
+/** Top-level routes a workspace slug must never shadow. */
+const RESERVED_SLUGS = new Set([
+  "api", "auth", "forgot-password", "help", "login", "new-workspace", "offline", "onboarding",
+  "privacy", "reset-password", "security", "signup", "terms",
+])
+
+export async function uniqueOrgSlug(base: string): Promise<string> {
+  const admin = createAdminClient()
+  const root = slugify(base) || "workspace"
+  for (let i = 0; i < 50; i++) {
+    const candidate = i === 0 ? root : `${root}-${i + 1}`
+    if (RESERVED_SLUGS.has(candidate)) continue
+    const { data } = await admin.from("orgs").select("id").eq("slug", candidate).maybeSingle()
+    if (!data) return candidate
+  }
+  return `${root}-${Date.now().toString(36)}`
+}
+
 export async function adminOrgAccess(
   slug: string,
 ): Promise<{ access: OrgAccess } | { error: string }> {

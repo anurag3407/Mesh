@@ -1,10 +1,11 @@
 "use client"
 
 import Link from "next/link"
-import { useMemo, useState, useTransition } from "react"
+import { useEffect, useMemo, useRef, useState, useTransition } from "react"
 import { useRouter } from "next/navigation"
 import { setChatPreferenceAction } from "@/lib/actions/room-state"
 import { EmptyState, InlineAlert } from "@/components/ui/empty"
+import { showToast } from "@/components/ui/toast"
 import { cn } from "@/lib/format"
 import type { BotChatView, ChatListItem } from "@/lib/types"
 
@@ -14,7 +15,7 @@ const FILTERS: { key: Filter; label: string }[] = [
   { key: "all", label: "All" },
   { key: "unread", label: "Unread" },
   { key: "mentions", label: "Mentions" },
-  { key: "bots", label: "Bots" },
+  { key: "bots", label: "Agents" },
   { key: "archived", label: "Archived" },
 ]
 
@@ -46,6 +47,17 @@ function ChatListRow({
   const [menuOpen, setMenuOpen] = useState(false)
   const muted = item.mutedUntil ? new Date(item.mutedUntil).getTime() > Date.now() : false
   const unread = item.unreadCount > 0
+  const menuButton = useRef<HTMLButtonElement>(null)
+  useEffect(() => {
+    if (!menuOpen) return
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return
+      setMenuOpen(false)
+      menuButton.current?.focus()
+    }
+    document.addEventListener("keydown", onKeyDown)
+    return () => document.removeEventListener("keydown", onKeyDown)
+  }, [menuOpen])
   const mark = item.isBotDm ? "@" : item.kind === "public" ? "#" : "·"
 
   return (
@@ -76,26 +88,26 @@ function ChatListRow({
               >
                 {item.name}
               </span>
-              {item.pinned ? <span className="font-mono text-[9px] text-accent">pinned</span> : null}
-              <span className="ml-auto shrink-0 font-mono text-[10px] text-faint">
+              {item.pinned ? <span className="font-mono text-[11px] text-accent">pinned</span> : null}
+              <span className="ml-auto shrink-0 font-mono text-[11px] text-faint">
                 {relativeTime(item.lastAt)}
               </span>
             </span>
             <span className="mt-0.5 flex items-baseline gap-2">
               <span className={cn("truncate text-[12px]", unread ? "text-muted" : "text-faint")}>
                 {item.lastSender ? `${item.lastSender}: ` : ""}
-                {item.lastMessage ?? (item.isBotDm ? "Direct chat with a bot" : "No messages yet")}
+                {item.lastMessage ?? (item.isBotDm ? "Direct chat with an agent" : "No messages yet")}
               </span>
               {item.mentionCount > 0 ? (
-                <span className="ml-auto shrink-0 grid h-4 min-w-4 place-items-center rounded-full bg-accent px-1 font-mono text-[9px] font-medium text-void">
+                <span className="ml-auto shrink-0 grid h-4 min-w-4 place-items-center rounded-full bg-accent px-1 font-mono text-[11px] font-medium text-void">
                   {item.mentionCount}
                 </span>
               ) : unread ? (
                 <span className="ml-auto h-1.5 w-1.5 shrink-0 rounded-full bg-accent" />
               ) : null}
             </span>
-            <span className="mt-1 flex items-center gap-2 font-mono text-[9px] text-faint">
-              <span>{item.isBotDm ? "bot dm" : item.kind}</span>
+            <span className="mt-1 flex items-center gap-2 font-mono text-[11px] text-faint">
+              <span>{item.isBotDm ? "agent chat" : item.kind === "dm" ? "direct chat" : item.kind}</span>
               {item.agentNames.length && !item.isBotDm ? (
                 <span>· {item.agentNames.slice(0, 3).join(", ")}</span>
               ) : null}
@@ -106,11 +118,12 @@ function ChatListRow({
         </Link>
         <div className="relative shrink-0 pt-1">
           <button
+            ref={menuButton}
             type="button"
             onClick={() => setMenuOpen((open) => !open)}
             aria-expanded={menuOpen}
             aria-label={`Options for ${item.name}`}
-            className="grid h-6 w-6 place-items-center rounded-sm font-mono text-[12px] text-faint hover:bg-raised hover:text-text"
+            className="grid h-10 w-10 place-items-center rounded-sm font-mono text-[12px] text-faint hover:bg-raised hover:text-text md:h-6 md:w-6"
           >
             ···
           </button>
@@ -122,7 +135,7 @@ function ChatListRow({
                 aria-label="Close menu"
                 onClick={() => setMenuOpen(false)}
               />
-              <div className="absolute right-0 top-7 z-20 w-44 border border-line bg-panel py-1 text-[12px] shadow-[0_12px_30px_rgba(0,0,0,0.35)]">
+              <div className="absolute right-0 top-11 z-20 w-44 md:top-7 border border-line bg-panel py-1 text-[12px] shadow-[0_12px_30px_rgba(0,0,0,0.35)]">
                 <button
                   type="button"
                   disabled={pending}
@@ -130,7 +143,7 @@ function ChatListRow({
                     onAction(item.pinned ? "unpin" : "pin")
                     setMenuOpen(false)
                   }}
-                  className="block w-full px-3 py-1.5 text-left text-muted hover:bg-raised hover:text-text disabled:opacity-50"
+                  className="block w-full px-3 py-2.5 text-left text-muted hover:bg-raised hover:text-text disabled:opacity-50 md:py-1.5"
                 >
                   {item.pinned ? "Unpin chat" : "Pin chat"}
                 </button>
@@ -141,7 +154,7 @@ function ChatListRow({
                     onAction("mark_unread")
                     setMenuOpen(false)
                   }}
-                  className="block w-full px-3 py-1.5 text-left text-muted hover:bg-raised hover:text-text disabled:opacity-50"
+                  className="block w-full px-3 py-2.5 text-left text-muted hover:bg-raised hover:text-text disabled:opacity-50 md:py-1.5"
                 >
                   Mark unread
                 </button>
@@ -153,13 +166,13 @@ function ChatListRow({
                       onAction("unmute")
                       setMenuOpen(false)
                     }}
-                    className="block w-full px-3 py-1.5 text-left text-muted hover:bg-raised hover:text-text disabled:opacity-50"
+                    className="block w-full px-3 py-2.5 text-left text-muted hover:bg-raised hover:text-text disabled:opacity-50 md:py-1.5"
                   >
                     Unmute
                   </button>
                 ) : (
                   <>
-                    <p className="px-3 pb-0.5 pt-1.5 font-mono text-[9px] text-faint">mute for</p>
+                    <p className="px-3 pb-0.5 pt-1.5 font-mono text-[11px] text-faint">mute for</p>
                     {(["8h", "1w", "always"] as const).map((duration) => (
                       <button
                         key={duration}
@@ -169,7 +182,7 @@ function ChatListRow({
                           onAction("mute", duration)
                           setMenuOpen(false)
                         }}
-                        className="block w-full px-3 py-1.5 text-left text-muted hover:bg-raised hover:text-text disabled:opacity-50"
+                        className="block w-full px-3 py-2.5 text-left text-muted hover:bg-raised hover:text-text disabled:opacity-50 md:py-1.5"
                       >
                         {duration === "8h" ? "8 hours" : duration === "1w" ? "1 week" : "Until I unmute"}
                       </button>
@@ -184,7 +197,7 @@ function ChatListRow({
                     onAction(item.archived ? "unarchive" : "archive")
                     setMenuOpen(false)
                   }}
-                  className="block w-full px-3 py-1.5 text-left text-muted hover:bg-raised hover:text-text disabled:opacity-50"
+                  className="block w-full px-3 py-2.5 text-left text-muted hover:bg-raised hover:text-text disabled:opacity-50 md:py-1.5"
                 >
                   {item.archived ? "Unarchive" : "Archive chat"}
                 </button>
@@ -202,15 +215,15 @@ function HandoffRail({ orgSlug, handoffs }: { orgSlug: string; handoffs: BotChat
     <aside className="border-t border-line pt-6 lg:border-l lg:border-t-0 lg:pl-8 lg:pt-0">
       <div className="flex items-baseline justify-between">
         <h2 className="text-[13px] font-medium">Agent handoffs</h2>
-        <span className="font-mono text-[10px] text-faint">read-only</span>
+        <span className="font-mono text-[11px] text-faint">read-only</span>
       </div>
       <p className="mt-2 max-w-[36ch] text-[12px] leading-relaxed text-muted">
-        When one agent mentions another in a room, the exchange shows up here. Bots cannot start
-        chats on their own; humans open the door.
+        When one agent mentions another in a room, the exchange shows up here. Agents cannot start
+        chats on their own.
       </p>
       {handoffs.length === 0 ? (
-        <p className="mt-5 border-l-2 border-line-strong pl-3 font-mono text-[11px] leading-relaxed text-faint">
-          No bot-to-bot handoffs in the last 300 agent messages.
+        <p className="mt-5 border-l-2 border-line-strong pl-3 font-mono text-[12px] leading-relaxed text-faint">
+          No handoffs between agents recently.
         </p>
       ) : (
         <ul className="mt-4 space-y-3">
@@ -219,14 +232,14 @@ function HandoffRail({ orgSlug, handoffs }: { orgSlug: string; handoffs: BotChat
               <details>
                 <summary className="flex cursor-pointer list-none items-baseline gap-2 px-3 py-2 hover:bg-raised">
                   <span className="truncate text-[12px] text-text">{handoff.roomName}</span>
-                  <span className="ml-auto shrink-0 font-mono text-[9px] text-faint">
+                  <span className="ml-auto shrink-0 font-mono text-[11px] text-faint">
                     {handoff.messages.length} · {relativeTime(handoff.lastAt)}
                   </span>
                 </summary>
                 <div className="space-y-2 border-t border-line px-3 py-2.5">
                   {handoff.messages.slice(-6).map((message) => (
                     <div key={message.id} className="text-[12px] leading-relaxed">
-                      <p className="font-mono text-[10px] text-accent">
+                      <p className="font-mono text-[11px] text-accent">
                         @{message.senderHandle}
                         <span className="text-faint">
                           {" → "}
@@ -236,12 +249,12 @@ function HandoffRail({ orgSlug, handoffs }: { orgSlug: string; handoffs: BotChat
                       <p className="mt-0.5 line-clamp-4 text-muted">{message.content}</p>
                     </div>
                   ))}
-                  <p className="pt-1 font-mono text-[10px] text-faint">
+                  <p className="pt-1 font-mono text-[11px] text-faint">
                     read-only transcript · open the room to reply
                   </p>
                   <Link
                     href={`/${orgSlug}/r/${handoff.roomId}`}
-                    className="inline-block font-mono text-[10px] text-accent underline underline-offset-4"
+                    className="inline-block font-mono text-[11px] text-accent underline underline-offset-4"
                   >
                     open room
                   </Link>
@@ -271,6 +284,19 @@ export function ChatsView({
   const [query, setQuery] = useState("")
   const [error, setError] = useState<string | null>(null)
   const [pending, startTransition] = useTransition()
+  const searchInput = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "/" || event.metaKey || event.ctrlKey || event.altKey) return
+      const target = event.target as HTMLElement | null
+      if (target?.closest("input, textarea, select, [contenteditable='true']")) return
+      event.preventDefault()
+      searchInput.current?.focus()
+    }
+    window.addEventListener("keydown", onKeyDown)
+    return () => window.removeEventListener("keydown", onKeyDown)
+  }, [])
 
   const counts = {
     all: items.filter((item) => !item.archived).length,
@@ -307,8 +333,17 @@ export function ChatsView({
     setError(null)
     startTransition(async () => {
       const result = await setChatPreferenceAction({ orgSlug, roomId, action, duration })
-      if (!result.ok) setError(result.error ?? "Could not update the chat")
-      else router.refresh()
+      if (!result.ok) {
+        setError(result.error ?? "Could not update the chat")
+        return
+      }
+      router.refresh()
+      if (action === "archive") {
+        showToast({
+          message: "Chat archived",
+          action: { label: "Undo", onClick: () => act(roomId, "unarchive") },
+        })
+      }
     })
   }
 
@@ -317,9 +352,9 @@ export function ChatsView({
       <div className="mx-auto max-w-5xl px-5 py-8 sm:px-8">
         <header className="flex flex-wrap items-end justify-between gap-4 border-b border-line pb-5">
           <div>
-            <p className="font-mono text-[11px] text-faint">workspace</p>
+            <p className="font-mono text-[12px] text-faint">workspace</p>
             <h1 className="mt-1 text-2xl font-medium tracking-[-0.02em]">Chats</h1>
-            <p className="mt-1.5 font-mono text-[11px] text-muted">
+            <p className="mt-1.5 font-mono text-[12px] text-muted">
               {counts.all} active {counts.all === 1 ? "chat" : "chats"} · {counts.unread} unread ·{" "}
               {inboxCount} waiting in Inbox
             </p>
@@ -327,13 +362,13 @@ export function ChatsView({
           <div className="flex items-center gap-2">
             <Link
               href={`/${orgSlug}/inbox`}
-              className="inline-flex h-8 items-center rounded-sm border border-line px-2.5 font-mono text-[11px] text-muted hover:border-line-strong hover:text-text"
+              className="inline-flex h-8 items-center rounded-sm border border-line px-2.5 font-mono text-[12px] text-muted hover:border-line-strong hover:text-text"
             >
               Inbox{inboxCount ? ` · ${inboxCount}` : ""}
             </Link>
             <Link
               href={`/${orgSlug}/chats/new`}
-              className="inline-flex h-8 items-center gap-1.5 rounded-sm bg-accent px-3 font-mono text-[11px] font-medium text-void hover:bg-[var(--color-accent-strong)]"
+              className="inline-flex h-8 items-center gap-1.5 rounded-sm bg-accent px-3 font-mono text-[12px] font-medium text-void hover:bg-[var(--color-accent-strong)]"
             >
               + New chat
             </Link>
@@ -354,7 +389,7 @@ export function ChatsView({
                     onClick={() => setFilter(option.key)}
                     aria-pressed={filter === option.key}
                     className={cn(
-                      "inline-flex h-7 items-center gap-1.5 rounded-sm px-2.5 font-mono text-[10px] transition-colors",
+                      "inline-flex h-7 items-center gap-1.5 rounded-sm px-2.5 font-mono text-[11px] transition-colors",
                       filter === option.key
                         ? "bg-raised text-text"
                         : "text-muted hover:bg-raised/60 hover:text-text",
@@ -368,14 +403,15 @@ export function ChatsView({
                 ))}
               </div>
               <label className="ml-auto flex h-8 min-w-[11rem] items-center gap-2 rounded-sm border border-line bg-panel px-2.5 focus-within:border-accent">
-                <span className="sr-only">Search chats</span>
-                <span aria-hidden="true" className="font-mono text-[11px] text-faint">
+                <span className="sr-only">Filter chats by name (press / to focus)</span>
+                <span aria-hidden="true" className="font-mono text-[12px] text-faint">
                   /
                 </span>
                 <input
+                  ref={searchInput}
                   value={query}
                   onChange={(event) => setQuery(event.target.value)}
-                  placeholder="Search chats"
+                  placeholder="Filter chats"
                   className="w-full bg-transparent text-[12px] text-text outline-none placeholder:text-faint"
                 />
               </label>
@@ -390,19 +426,30 @@ export function ChatsView({
             {filtered.length === 0 ? (
               <div className="mt-8">
                 <EmptyState
-                  title={query ? "No chats match that search" : "Nothing here yet"}
+                  title={query ? "No chats match that" : "Nothing here yet"}
                   body={
                     query
-                      ? "Try a room name, an agent handle or a phrase from the last message."
-                      : "Start a room for your team, or open a direct chat with one of your bots."
+                      ? "Try a room or agent name. To look inside messages, use Search."
+                      : filter === "all"
+                        ? "If you were just invited, an admin may not have added you to a room yet. You can also start your own room, or open a direct chat with an agent."
+                        : "Nothing in this view right now."
                   }
                   action={
-                    <Link
-                      href={`/${orgSlug}/chats/new`}
-                      className="font-mono text-[11px] text-accent underline underline-offset-4"
-                    >
-                      new chat
-                    </Link>
+                    query ? (
+                      <Link
+                        href={`/${orgSlug}/search?q=${encodeURIComponent(query)}`}
+                        className="font-mono text-[12px] text-accent underline underline-offset-4"
+                      >
+                        search messages for “{query}”
+                      </Link>
+                    ) : (
+                      <Link
+                        href={`/${orgSlug}/chats/new`}
+                        className="font-mono text-[12px] text-accent underline underline-offset-4"
+                      >
+                        new chat
+                      </Link>
+                    )
                   }
                 />
               </div>
@@ -410,7 +457,7 @@ export function ChatsView({
               <div className="mt-4">
                 {pinned.length ? (
                   <div className="mb-6">
-                    <p className="mb-1 font-mono text-[10px] text-faint">pinned</p>
+                    <p className="mb-1 font-mono text-[11px] text-faint">pinned</p>
                     <ul className="border-t border-line">
                       {pinned.map((item) => (
                         <ChatListRow
@@ -425,7 +472,7 @@ export function ChatsView({
                   </div>
                 ) : null}
                 <div>
-                  {pinned.length ? <p className="mb-1 font-mono text-[10px] text-faint">all chats</p> : null}
+                  {pinned.length ? <p className="mb-1 font-mono text-[11px] text-faint">all chats</p> : null}
                   <ul className="border-t border-line">
                     {rest.map((item) => (
                       <ChatListRow

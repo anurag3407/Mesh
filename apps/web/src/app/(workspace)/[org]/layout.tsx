@@ -30,6 +30,9 @@ export default async function OrgLayout({
       }))}
       inboxCount={chatData.inboxCount}
       user={{
+        id: access.user.id,
+        notifications: access.user.notifications,
+        sound: access.user.sound,
         displayName: access.user.displayName,
         avatarUrl: access.user.avatarUrl,
         email: access.user.email,

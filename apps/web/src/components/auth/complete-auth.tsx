@@ -57,7 +57,7 @@ export function CompleteAuth({ next }: { next: string }) {
 
   if (!error) {
     return (
-      <p role="status" className="font-mono text-[11px] text-muted">
+      <p role="status" className="font-mono text-[12px] text-muted">
         Finishing sign-in…
       </p>
     )
@@ -70,7 +70,7 @@ export function CompleteAuth({ next }: { next: string }) {
       </p>
       <Link
         href="/login"
-        className="mt-4 inline-block font-mono text-[11px] text-accent underline underline-offset-4"
+        className="mt-4 inline-block font-mono text-[12px] text-accent underline underline-offset-4"
       >
         back to sign in
       </Link>

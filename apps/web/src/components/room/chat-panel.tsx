@@ -1,20 +1,25 @@
 "use client"
 
-import { useEffect, useMemo, useRef } from "react"
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react"
 import Link from "next/link"
 import { MessageItem } from "@/components/room/message-item"
 import { Composer } from "@/components/room/composer"
+import { SetupChecklist, type SetupState } from "@/components/room/setup-checklist"
 import { TurnStrip } from "@/components/room/turn-strip"
 import { ToolCallsList } from "@/components/room/tool-call-card"
-import { InlineAlert } from "@/components/ui/empty"
-import { EmptyState } from "@/components/ui/empty"
-
+import { Button } from "@/components/ui/button"
+import { EmptyState, InlineAlert } from "@/components/ui/empty"
+import { RETRYABLE_REASONS } from "@/lib/recovery-hint"
+import { truncate } from "@/lib/format"
 import type {
+  MemberView,
   MessageView,
   RoomAgentView,
   ToolCallView,
   TurnStateView,
 } from "@/lib/types"
+
+const STICK_THRESHOLD_PX = 140
 
 function dayLabel(iso: string) {
   const date = new Date(iso)
@@ -24,6 +29,17 @@ function dayLabel(iso: string) {
   if (date.toDateString() === today.toDateString()) return "today"
   if (date.toDateString() === yesterday.toDateString()) return "yesterday"
   return date.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" })
+}
+
+function canRetry(message: MessageView): boolean {
+  if (message.senderType === "system") {
+    return (
+      message.status === "halted" &&
+      typeof message.metadata.reason === "string" &&
+      RETRYABLE_REASONS.has(message.metadata.reason)
+    )
+  }
+  return message.senderType === "agent" && message.status === "error"
 }
 
 export function ChatPanel({
@@ -36,12 +52,20 @@ export function ChatPanel({
   toolCalls,
   turnState,
   roomAgents,
+  people,
   canAdmin,
   memberAvatars,
   connection,
   threadCounts,
+  hasOlder,
+  loadingOlder,
+  lastReadAt,
+  focusMessageId,
+  setup,
+  onLoadOlder,
   onOpenThread,
   onTyping,
+  onShowCanvas,
 }: {
   orgSlug: string
   roomId: string
@@ -52,19 +76,46 @@ export function ChatPanel({
   toolCalls: ToolCallView[]
   turnState: TurnStateView | null
   roomAgents: RoomAgentView[]
+  people: MemberView[]
   canAdmin: boolean
   memberAvatars: Record<string, string>
   connection: "connecting" | "connected" | "error" | "offline"
   threadCounts: Record<string, number>
+  hasOlder: boolean
+  loadingOlder: boolean
+  lastReadAt: string | null
+  focusMessageId: string | null
+  setup: SetupState | null
+  onLoadOlder: () => Promise<void>
   onOpenThread: (message: MessageView) => void
   onTyping: () => void
+  onShowCanvas: () => void
 }) {
   const scrollRef = useRef<HTMLDivElement>(null)
   const stickToBottom = useRef(true)
+  const prependAnchor = useRef<number | null>(null)
+  const initialScrollDone = useRef(false)
+  const seenCount = useRef(0)
+  const [showJump, setShowJump] = useState(false)
+  const [newCount, setNewCount] = useState(0)
+
   const mainMessages = useMemo(
     () => messages.filter((message) => message.threadRootId === null),
     [messages],
   )
+  const [firstUnreadId] = useState<string | null>(() => {
+    if (!lastReadAt) return null
+    const lastRead = new Date(lastReadAt).getTime()
+    return (
+      messages.find(
+        (message) =>
+          message.threadRootId === null &&
+          message.senderId !== user.id &&
+          new Date(message.createdAt).getTime() > lastRead,
+      )?.id ?? null
+    )
+  })
+
   const streamingMessage = [...messages]
     .reverse()
     .find(
@@ -73,37 +124,121 @@ export function ChatPanel({
         message.senderType === "agent" &&
         message.threadRootId === null,
     )
-  const orphanCalls = toolCalls.filter(
-    (call) => !call.messageId || !messages.some((message) => message.id === call.messageId),
+
+  const orphanCalls = useMemo(() => {
+    const shownInFeed = (call: ToolCallView) =>
+      mainMessages.some(
+        (message) =>
+          call.messageId === message.id ||
+          (message.runId !== null && call.runId === message.runId && call.messageId === null),
+      )
+    // Only items that still need attention belong above the composer. Finished calls from a
+    // thread, or from a message older than the loaded window, stay with their own message.
+    return toolCalls.filter(
+      (call) =>
+        !shownInFeed(call) &&
+        (call.status === "pending_approval" || (!call.messageId && call.status === "running")),
+    )
+  }, [toolCalls, mainMessages])
+
+  const latestCompleted = useMemo(
+    () =>
+      [...mainMessages]
+        .reverse()
+        .find((message) => message.status === "complete" && message.senderId !== user.id) ?? null,
+    [mainMessages, user.id],
   )
+  const [announced, setAnnounced] = useState("")
+  const announcedId = useRef(latestCompleted?.id ?? null)
 
   useEffect(() => {
+    if (!latestCompleted || latestCompleted.id === announcedId.current) return
+    announcedId.current = latestCompleted.id
+    setAnnounced(`${latestCompleted.senderName}: ${truncate(latestCompleted.content, 300)}`)
+  }, [latestCompleted])
+
+  function scrollToBottom() {
     const element = scrollRef.current
-    if (!element || !stickToBottom.current) return
+    if (!element) return
     element.scrollTop = element.scrollHeight
-  }, [messages])
+    stickToBottom.current = true
+    setShowJump(false)
+    setNewCount(0)
+  }
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const element = scrollRef.current
-    if (element) element.scrollTop = element.scrollHeight
-  }, [])
+    if (!element) return
+    if (!initialScrollDone.current) {
+      initialScrollDone.current = true
+      seenCount.current = mainMessages.length
+      const target = focusMessageId ?? firstUnreadId
+      const marker = target
+        ? element.querySelector<HTMLElement>(`[data-message-id="${target}"]`)
+        : null
+      if (marker) {
+        marker.scrollIntoView({ block: "center" })
+        stickToBottom.current = false
+      } else {
+        element.scrollTop = element.scrollHeight
+      }
+      return
+    }
+    if (prependAnchor.current !== null) {
+      element.scrollTop = element.scrollHeight - prependAnchor.current
+      prependAnchor.current = null
+      seenCount.current = mainMessages.length
+      return
+    }
+    if (stickToBottom.current) {
+      element.scrollTop = element.scrollHeight
+      seenCount.current = mainMessages.length
+      return
+    }
+    const added = mainMessages.length - seenCount.current
+    if (added > 0) {
+      seenCount.current = mainMessages.length
+      setNewCount((count) => count + added)
+    }
+  }, [messages, mainMessages.length, focusMessageId, firstUnreadId])
+
+  const focusedOnce = useRef(false)
+  useEffect(() => {
+    if (!focusMessageId || focusedOnce.current) return
+    const marker = scrollRef.current?.querySelector<HTMLElement>(
+      `[data-message-id="${focusMessageId}"]`,
+    )
+    if (!marker) return
+    focusedOnce.current = true
+    marker.scrollIntoView({ block: "center" })
+    stickToBottom.current = false
+    marker.classList.add("message-highlight")
+  }, [focusMessageId, mainMessages.length])
+
+  async function loadOlder() {
+    const element = scrollRef.current
+    if (element) prependAnchor.current = element.scrollHeight - element.scrollTop
+    await onLoadOlder()
+  }
+
+  const hasMessages = mainMessages.length > 0
 
   return (
     <section
-      className="flex h-full min-h-0 flex-col bg-void"
+      className="relative flex h-full min-h-0 flex-col bg-void"
       aria-label={`Chat in ${roomName}`}
     >
       {connection === "error" ? (
         <div className="border-b border-line px-4 py-2">
           <InlineAlert tone="warning">
-            Live updates are unavailable. The room is polling for new messages while it reconnects.
+            Live updates are paused, so new messages may take a few seconds. Reconnecting…
           </InlineAlert>
         </div>
       ) : null}
       {connection === "offline" ? (
         <div className="border-b border-line px-4 py-2">
           <InlineAlert tone="warning">
-            You are offline. Messages you write queue in this browser.
+            You are offline. Messages you write will send when you reconnect.
           </InlineAlert>
         </div>
       ) : null}
@@ -112,55 +247,78 @@ export function ChatPanel({
         ref={scrollRef}
         onScroll={(event) => {
           const element = event.currentTarget
-          stickToBottom.current =
-            element.scrollHeight - element.scrollTop - element.clientHeight < 140
+          const nearBottom =
+            element.scrollHeight - element.scrollTop - element.clientHeight < STICK_THRESHOLD_PX
+          stickToBottom.current = nearBottom
+          setShowJump(!nearBottom)
+          if (nearBottom) setNewCount(0)
         }}
-        className="min-h-0 flex-1 overflow-y-auto"
+        className="relative min-h-0 flex-1 overflow-y-auto"
         role="log"
-        aria-live="polite"
-        aria-relevant="additions text"
+        aria-live="off"
+        tabIndex={0}
+        aria-label="Messages"
       >
-        {mainMessages.length === 0 ? (
+        {setup ? <SetupChecklist setup={setup} orgSlug={orgSlug} roomId={roomId} /> : null}
+
+        {!hasMessages && setup ? null : !hasMessages ? (
           <div className="px-6 py-10">
             <EmptyState
               title="This room is quiet"
               body={
                 roomAgents.length
-                  ? `Mention an agent with @handle to give it the floor. ${roomAgents
+                  ? `Mention an agent with @handle to ask it something. In this room: ${roomAgents
                       .map(({ agent }) => `@${agent.handle}`)
-                      .join(", ")} are in the room.`
-                  : "Add an agent to the room, then mention it with @handle to start a turn."
+                      .join(", ")}.`
+                  : canAdmin
+                    ? "Add an agent to this room, then mention it with @handle."
+                    : "No agents are in this room yet. Ask a room admin to add one, or start talking with your team."
               }
               action={
                 canAdmin ? (
                   <Link
                     href={`/${orgSlug}/r/${roomId}/settings`}
-                    className="font-mono text-[11px] text-accent underline underline-offset-4"
+                    className="font-mono text-[12px] text-accent underline underline-offset-4"
                   >
                     room settings
                   </Link>
                 ) : null
               }
             />
-            <p className="mt-8 max-w-md font-mono text-[11px] leading-relaxed text-faint">
-              Turn order is serialized per room. Multiple agents run one after another, never
-              interleaved. The turn strip shows who has the floor.
-            </p>
           </div>
         ) : (
           <div className="pb-4">
+            {hasOlder ? (
+              <div className="flex justify-center pt-4">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={loadingOlder}
+                  onClick={() => void loadOlder()}
+                >
+                  {loadingOlder ? "Loading…" : "Load older messages"}
+                </Button>
+              </div>
+            ) : null}
             {mainMessages.map((message, index) => {
               const previous = mainMessages[index - 1]
               const showDay = !previous || dayLabel(previous.createdAt) !== dayLabel(message.createdAt)
               return (
-                <div key={message.id}>
+                <div key={message.id} data-message-id={message.id}>
                   {showDay ? (
                     <div className="flex items-center gap-3 px-4 pb-1 pt-5" aria-hidden="true">
                       <span className="h-px flex-1 bg-line" />
-                      <span className="font-mono text-[10px] text-faint">
+                      <span className="font-mono text-[11px] text-faint">
                         {dayLabel(message.createdAt)}
                       </span>
                       <span className="h-px flex-1 bg-line" />
+                    </div>
+                  ) : null}
+                  {message.id === firstUnreadId ? (
+                    <div className="flex items-center gap-3 px-4 pb-1 pt-3" role="separator">
+                      <span className="h-px flex-1 bg-accent/50" />
+                      <span className="font-mono text-[11px] text-accent">new messages</span>
+                      <span className="h-px flex-1 bg-accent/50" />
                     </div>
                   ) : null}
                   <MessageItem
@@ -171,6 +329,7 @@ export function ChatPanel({
                     threadReplyCount={threadCounts[message.id] ?? 0}
                     onOpenThread={onOpenThread}
                     avatarUrl={message.senderId ? memberAvatars[message.senderId] : null}
+                    showRetry={index === mainMessages.length - 1 && canRetry(message)}
                   />
                 </div>
               )
@@ -179,8 +338,22 @@ export function ChatPanel({
         )}
       </div>
 
+      {showJump ? (
+        <div className="pointer-events-none relative z-10 h-0">
+          <div className="absolute inset-x-0 bottom-3 flex justify-center">
+            <button
+              type="button"
+              onClick={scrollToBottom}
+              className="pointer-events-auto rounded-full border border-line-strong bg-raised px-3 py-2 font-mono text-[12px] text-text shadow-[0_8px_24px_rgba(0,0,0,0.45)] hover:bg-hover md:py-1.5"
+            >
+              {newCount > 0 ? `↓ ${newCount} new ${newCount === 1 ? "message" : "messages"}` : "↓ Latest"}
+            </button>
+          </div>
+        </div>
+      ) : null}
+
       {orphanCalls.length ? (
-        <div className="space-y-2 border-t border-line px-4 py-3">
+        <div className="max-h-[40%] space-y-2 overflow-y-auto border-t border-line px-4 py-3">
           <ToolCallsList calls={orphanCalls.slice(-6)} orgSlug={orgSlug} canApprove={canAdmin} />
         </div>
       ) : null}
@@ -198,12 +371,21 @@ export function ChatPanel({
           orgSlug={orgSlug}
           roomId={roomId}
           agents={roomAgents}
+          people={people}
+          selfId={user.id}
+          canAdmin={canAdmin}
+          roomKind={roomKind}
           placeholder={
-            roomKind === "dm" ? `Message ${roomName}` : `Message #${roomName}`
+            roomKind === "public" ? `Message #${roomName}` : `Message ${roomName}`
           }
           onTyping={onTyping}
+          onSent={scrollToBottom}
+          onShowCanvas={onShowCanvas}
         />
       </div>
+      <p className="sr-only" aria-live="polite">
+        {announced}
+      </p>
       <p className="sr-only">
         You are {user.displayName}. Agents in this room:{" "}
         {roomAgents.map(({ agent }) => `@${agent.handle}`).join(", ") || "none"}.

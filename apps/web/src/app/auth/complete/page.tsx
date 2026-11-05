@@ -15,7 +15,7 @@ export default async function AuthCompletePage({
   return (
     <PublicShell>
       <div className="mx-auto w-full max-w-md px-5 py-16 sm:px-8">
-        <p className="font-mono text-[11px] text-faint">auth</p>
+        <p className="font-mono text-[12px] text-faint">auth</p>
         <h1 className="mt-2 text-2xl font-medium tracking-[-0.02em]">Finishing sign-in</h1>
         <p className="mt-2 max-w-[46ch] text-[13px] leading-relaxed text-muted">
           One moment while we open your workspace.

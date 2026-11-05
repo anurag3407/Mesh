@@ -12,14 +12,14 @@ export default function OrgError({
   return (
     <div className="grid h-full place-items-center px-6">
       <div className="max-w-md border-l-2 border-[var(--color-danger)] pl-4">
-        <p className="font-mono text-[11px] text-danger">workspace error</p>
-        <h1 className="mt-2 text-lg font-medium">This view could not load</h1>
+        <p className="font-mono text-[12px] text-danger">something went wrong</p>
+        <h1 className="mt-2 text-lg font-medium">This page could not load</h1>
         <p className="mt-2 text-[13px] leading-relaxed text-muted">
-          {error.message || "The request failed."} Check that the Supabase project and orchestrator
-          are reachable, then retry.
+          Check your connection and try again. If it keeps happening, give your administrator this
+          reference{error.digest ? `: ${error.digest}` : "."}
         </p>
         <Button className="mt-4" onClick={reset}>
-          Retry
+          Try again
         </Button>
       </div>
     </div>

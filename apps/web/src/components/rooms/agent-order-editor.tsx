@@ -62,10 +62,10 @@ export function AgentOrderEditor({
           if (!agent) return null
           return (
             <li key={id} className="flex items-center gap-2 py-1.5">
-              <span className="w-5 font-mono text-[10px] text-faint">{index + 1}</span>
+              <span className="w-5 font-mono text-[11px] text-faint">{index + 1}</span>
               <span className="min-w-0 flex-1 truncate text-[12px] text-muted">
                 @{agent.handle}{" "}
-                <span className="font-mono text-[10px] text-faint">{agent.displayName}</span>
+                <span className="font-mono text-[11px] text-faint">{agent.displayName}</span>
               </span>
               <Button
                 variant="ghost"
@@ -89,7 +89,7 @@ export function AgentOrderEditor({
           )
         })}
       </ol>
-      <p className="mt-1.5 font-mono text-[10px] text-faint">
+      <p className="mt-1.5 font-mono text-[11px] text-faint">
         first is producer, last is summarizer, the agents between are critics
       </p>
     </div>

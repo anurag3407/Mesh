@@ -9,10 +9,12 @@
   --color-hover: #1a211c;
   --color-line: #232b25;
   --color-line-strong: #354037;
+  --color-control: #65726a;
   --color-text: #e9e5d8;
   --color-muted: #9aa39b;
   --color-faint: #7a857c;
   --color-accent: #ff7a45;
+  --color-accent-strong: #ff9468;
   --color-accent-soft: #2a1a12;
   --color-ok: #8fbf9f;
   --color-warn: #e2b36b;
@@ -67,6 +69,29 @@ input,
 textarea,
 select {
   color-scheme: dark;
+}
+
+/* iOS Safari zooms the page when a focused field is under 16px. */
+@media (max-width: 767px) {
+  input:not([type="checkbox"]):not([type="radio"]),
+  select,
+  textarea:not(.inputarea) {
+    font-size: 16px !important;
+  }
+}
+
+@keyframes mesh-highlight {
+  0%,
+  40% {
+    background: var(--color-accent-soft);
+  }
+  100% {
+    background: transparent;
+  }
+}
+
+.message-highlight {
+  animation: mesh-highlight 2.4s ease-out;
 }
 
 * {

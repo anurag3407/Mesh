@@ -2,6 +2,7 @@ import { and, desc, eq, ne } from "drizzle-orm"
 import { z } from "zod"
 import { tasks } from "@mesh/db"
 import { getDb } from "../../db"
+import { notifyHumansNeeded } from "../../push"
 import type { ToolSpec } from "../audited"
 
 const statusSchema = z.enum(["open", "in_progress", "stuck", "done"])
@@ -81,6 +82,14 @@ export function taskTools(args: { roomId: string; orgId: string; agentId: string
           })
           .returning({ id: tasks.id, number: tasks.number, kind: tasks.kind, title: tasks.title })
         if (!row) throw new Error("could not create the task")
+        if (row.kind === "request") {
+          notifyHumansNeeded({
+            roomId: args.roomId,
+            agentId: args.agentId,
+            kind: "request",
+            detail: row.title,
+          })
+        }
         return row
       },
     },

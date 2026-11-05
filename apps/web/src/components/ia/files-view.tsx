@@ -73,9 +73,9 @@ export function FilesView({
     <div className="h-full overflow-y-auto">
       <div className="mx-auto max-w-5xl px-5 py-8 sm:px-8">
         <header className="border-b border-line pb-5">
-          <p className="font-mono text-[11px] text-faint">workspace</p>
+          <p className="font-mono text-[12px] text-faint">workspace</p>
           <h1 className="mt-1 text-2xl font-medium tracking-[-0.02em]">Files</h1>
-          <p className="mt-1.5 max-w-[64ch] font-mono text-[11px] leading-relaxed text-muted">
+          <p className="mt-1.5 max-w-[64ch] font-mono text-[12px] leading-relaxed text-muted">
             Every room canvas is a live file: markdown notes, code, SVG and HTML previews. Humans
             and agents edit the same document; versions are kept server-side.
           </p>
@@ -90,7 +90,7 @@ export function FilesView({
                 onClick={() => setKind(option)}
                 aria-pressed={kind === option}
                 className={cn(
-                  "inline-flex h-7 items-center gap-1.5 rounded-sm px-2.5 font-mono text-[10px]",
+                  "inline-flex h-7 items-center gap-1.5 rounded-sm px-2.5 font-mono text-[11px]",
                   kind === option
                     ? "bg-raised text-text"
                     : "text-muted hover:bg-raised/60 hover:text-text",
@@ -106,7 +106,7 @@ export function FilesView({
               value={roomId}
               onChange={(event) => setRoomId(event.target.value)}
               aria-label="Filter files by room"
-              className="h-8 rounded-sm border border-line bg-panel px-2 font-mono text-[10px] text-text outline-none focus:border-accent"
+              className="h-8 rounded-sm border border-line bg-panel px-2 font-mono text-[11px] text-text outline-none focus:border-accent"
             >
               <option value="">All rooms</option>
               {rooms.map((room) => (
@@ -149,25 +149,25 @@ export function FilesView({
                   <div className="flex items-start gap-3">
                     <span
                       aria-hidden="true"
-                      className="grid h-8 w-8 shrink-0 place-items-center rounded-sm border border-line bg-ink font-mono text-[10px] text-accent"
+                      className="grid h-8 w-8 shrink-0 place-items-center rounded-sm border border-line bg-ink font-mono text-[11px] text-accent"
                     >
                       {fileMark(file.kind)}
                     </span>
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-[13px] text-text">{file.title}</p>
-                      <p className="mt-0.5 font-mono text-[9px] text-faint">
+                      <p className="mt-0.5 font-mono text-[11px] text-faint">
                         {KIND_LABELS[file.kind]}
                         {file.language ? ` · ${file.language}` : ""} · {file.roomName}
                       </p>
                     </div>
-                    <span className="shrink-0 font-mono text-[9px] text-faint">
+                    <span className="shrink-0 font-mono text-[11px] text-faint">
                       {updatedLabel(file.updatedAt)}
                     </span>
                   </div>
-                  <p className="mt-3 line-clamp-3 flex-1 whitespace-pre-wrap font-mono text-[11px] leading-relaxed text-muted">
+                  <p className="mt-3 line-clamp-3 flex-1 whitespace-pre-wrap font-mono text-[12px] leading-relaxed text-muted">
                     {file.preview || "Empty file"}
                   </p>
-                  <span className="mt-3 font-mono text-[10px] text-faint group-hover:text-accent">
+                  <span className="mt-3 font-mono text-[11px] text-faint group-hover:text-accent">
                     open in room →
                   </span>
                 </Link>
@@ -176,7 +176,7 @@ export function FilesView({
           </ul>
         )}
 
-        <p className="mt-8 font-mono text-[10px] leading-relaxed text-faint">
+        <p className="mt-8 font-mono text-[11px] leading-relaxed text-faint">
           Files are scoped to rooms and follow room membership. Agent edits are attributed in the
           canvas version history.
         </p>

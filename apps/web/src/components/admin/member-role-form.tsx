@@ -36,7 +36,7 @@ export function MemberRoleForm({
         id={`role-${userId}`}
         name="role"
         defaultValue={role}
-        className="h-7 w-28 text-[11px]"
+        className="h-7 w-28 text-[12px]"
       >
         <option value="member">member</option>
         <option value="admin">admin</option>
@@ -46,11 +46,11 @@ export function MemberRoleForm({
         {pending ? "saving" : "save"}
       </Button>
       {state && !state.ok ? (
-        <span role="alert" className="text-[11px] text-danger">
+        <span role="alert" className="text-[12px] text-danger">
           {state.error}
         </span>
       ) : null}
-      {state?.ok ? <span className="text-[11px] text-ok">saved</span> : null}
+      {state?.ok ? <span className="text-[12px] text-ok">saved</span> : null}
     </form>
   )
 }

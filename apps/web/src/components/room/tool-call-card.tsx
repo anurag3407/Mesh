@@ -1,27 +1,46 @@
 "use client"
 
-import { useTransition, useState } from "react"
+import { useEffect, useState, useTransition } from "react"
 import { resolveToolCall } from "@/lib/actions/messages"
 import { Button } from "@/components/ui/button"
 import { CopyButton } from "@/components/copy-button"
 import { StatusBadge } from "@/components/ui/status"
-import { clockTime, pretty } from "@/lib/format"
+import { clockTime, cn, pretty } from "@/lib/format"
 import { CheckIcon, CloseIcon } from "@/components/ui/icons"
+import { approvalMsLeft, describeToolCall, formatCountdown } from "@/lib/tool-summary"
 import type { ToolCallView } from "@/lib/types"
+
+const URGENT_MS = 60_000
+
+function useCountdown(createdAt: string, active: boolean): number | null {
+  const [now, setNow] = useState<number | null>(null)
+  useEffect(() => {
+    if (!active) return
+    setNow(Date.now())
+    const timer = window.setInterval(() => setNow(Date.now()), 1_000)
+    return () => window.clearInterval(timer)
+  }, [active])
+  return active && now !== null ? approvalMsLeft(createdAt, now) : null
+}
 
 export function ApprovalCard({
   call,
   orgSlug,
   canApprove,
   onResolved,
+  agentName,
 }: {
   call: ToolCallView
   orgSlug: string
   canApprove: boolean
   onResolved?: () => void
+  agentName?: string | null
 }) {
   const [pending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
+  const isPending = call.status === "pending_approval"
+  const msLeft = useCountdown(call.createdAt, isPending)
+  const expired = msLeft !== null && msLeft <= 0
 
   function decide(decision: "approved" | "rejected") {
     setError(null)
@@ -31,7 +50,7 @@ export function ApprovalCard({
         toolCallId: call.id,
         decision,
       })
-      if (!result.ok) setError(result.error ?? "Could not resolve the approval")
+      if (!result.ok) setError(result.error ?? "Could not save your decision")
       else onResolved?.()
     })
   }
@@ -45,20 +64,40 @@ export function ApprovalCard({
       className="rounded-sm border border-line border-l-2 border-l-[var(--color-accent)] bg-panel"
     >
       <div className="flex flex-wrap items-center gap-2 border-b border-line px-3 py-2">
-        <span className="font-mono text-[11px] text-accent">approval required</span>
-        <span className="font-mono text-[12px] text-text">{call.toolName}</span>
-        <StatusBadge status={call.status} />
-        <span className="ml-auto font-mono text-[10px] text-faint">{clockTime(call.createdAt)}</span>
+        <span className="font-mono text-[12px] text-accent">approval needed</span>
+        {isPending ? null : <StatusBadge status={call.status} />}
+        {isPending && msLeft !== null ? (
+          <span
+            className={cn(
+              "ml-auto font-mono text-[12px]",
+              expired ? "text-danger" : msLeft < URGENT_MS ? "text-warn" : "text-muted",
+            )}
+            title="An unanswered request is rejected automatically"
+          >
+            {expired ? "expired" : `${formatCountdown(msLeft)} left`}
+          </span>
+        ) : (
+          <span className="ml-auto font-mono text-[11px] text-faint">{clockTime(call.createdAt)}</span>
+        )}
       </div>
       <div className="space-y-3 px-3 py-3">
+        <p className="text-[13px] leading-relaxed text-text">
+          {describeToolCall({ toolName: call.toolName, input: call.args, agentName })}
+        </p>
         <div>
-          <p className="mb-1 font-mono text-[10px] text-faint">arguments</p>
-          <pre className="max-h-44 overflow-auto rounded-sm border border-line bg-ink p-2 font-mono text-[11px] leading-relaxed text-muted">
+          <p className="mb-1 font-mono text-[11px] text-faint">
+            exact request · <span className="text-muted">{call.toolName}</span>
+          </p>
+          <pre className="max-h-44 overflow-auto rounded-sm border border-line bg-ink p-2 font-mono text-[12px] leading-relaxed text-muted">
             {pretty(call.args)}
           </pre>
         </div>
-        {call.status === "pending_approval" ? (
-          canApprove ? (
+        {isPending ? (
+          expired ? (
+            <p className="font-mono text-[12px] text-muted">
+              This request timed out and was rejected.
+            </p>
+          ) : canApprove ? (
             <div className="flex flex-wrap items-center gap-2">
               <Button
                 size="sm"
@@ -80,15 +119,14 @@ export function ApprovalCard({
                 <CloseIcon width={14} height={14} />
                 Reject
               </Button>
-              <span className="font-mono text-[10px] text-faint">admins only, 5 min timeout</span>
             </div>
           ) : (
-            <p className="font-mono text-[11px] text-warn">
-              Waiting for a room or org admin. This request expires in 5 minutes.
+            <p className="font-mono text-[12px] text-warn">
+              Waiting for a room or workspace admin to decide.
             </p>
           )
         ) : (
-          <p className="font-mono text-[11px] text-muted">
+          <p className="font-mono text-[12px] text-muted">
             decision: {call.status}
             {call.resolvedAt ? ` · ${clockTime(call.resolvedAt)}` : ""}
           </p>
@@ -112,16 +150,16 @@ export function ToolCallCard({ call }: { call: ToolCallView }) {
       data-tool-call-id={call.id}
       data-status={call.status}
     >
-      <summary className="flex cursor-pointer list-none flex-wrap items-center gap-2 px-3 py-1.5 hover:bg-raised">
-        <span className="font-mono text-[11px] text-text">{call.toolName}</span>
+      <summary className="flex cursor-pointer list-none flex-wrap items-center gap-2 px-3 py-2 hover:bg-raised md:py-1.5">
+        <span className="font-mono text-[12px] text-text">{call.toolName}</span>
         <StatusBadge status={call.status} />
-        <span className="ml-auto font-mono text-[10px] text-faint">
+        <span className="ml-auto font-mono text-[11px] text-faint">
           {clockTime(call.createdAt)}
         </span>
       </summary>
       <div className="border-t border-line px-3 py-2.5">
-        <p className="mb-1 font-mono text-[10px] text-faint">arguments</p>
-        <pre className="max-h-40 overflow-auto rounded-sm border border-line bg-ink p-2 font-mono text-[11px] leading-relaxed text-muted">
+        <p className="mb-1 font-mono text-[11px] text-faint">arguments</p>
+        <pre className="max-h-40 overflow-auto rounded-sm border border-line bg-ink p-2 font-mono text-[12px] leading-relaxed text-muted">
           {pretty(call.args)}
         </pre>
         {call.error ? (
@@ -132,10 +170,10 @@ export function ToolCallCard({ call }: { call: ToolCallView }) {
         {resultText ? (
           <>
             <div className="mt-3 flex items-center justify-between">
-              <p className="font-mono text-[10px] text-faint">result</p>
+              <p className="font-mono text-[11px] text-faint">result</p>
               <CopyButton text={resultText} />
             </div>
-            <pre className="mt-1 max-h-64 overflow-auto rounded-sm border border-line bg-ink p-2 font-mono text-[11px] leading-relaxed text-muted">
+            <pre className="mt-1 max-h-64 overflow-auto rounded-sm border border-line bg-ink p-2 font-mono text-[12px] leading-relaxed text-muted">
               {resultText}
             </pre>
           </>
@@ -149,17 +187,25 @@ export function ToolCallsList({
   calls,
   orgSlug,
   canApprove,
+  agentName,
 }: {
   calls: ToolCallView[]
   orgSlug: string
   canApprove: boolean
+  agentName?: string | null
 }) {
   if (!calls.length) return null
   return (
     <div className="mt-3 space-y-2">
       {calls.map((call) =>
         call.status === "pending_approval" ? (
-          <ApprovalCard key={call.id} call={call} orgSlug={orgSlug} canApprove={canApprove} />
+          <ApprovalCard
+            key={call.id}
+            call={call}
+            orgSlug={orgSlug}
+            canApprove={canApprove}
+            agentName={agentName}
+          />
         ) : (
           <ToolCallCard key={call.id} call={call} />
         ),

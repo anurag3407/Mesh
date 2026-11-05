@@ -2,12 +2,13 @@
 
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { useState, useTransition } from "react"
+import { useCallback, useState, useTransition } from "react"
 import { answerTaskRequestAction } from "@/lib/actions/tasks"
 import { ApprovalCard } from "@/components/room/tool-call-card"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/field"
 import { InlineAlert } from "@/components/ui/empty"
+import { useWorkspaceChange } from "@/lib/use-workspace-change"
 import type { InboxApprovalView, InboxDoneView, InboxRequestView } from "@/lib/types"
 
 function when(iso: string): string {
@@ -58,7 +59,7 @@ function RequestCard({
     <li className="border border-line border-l-2 border-l-accent bg-panel p-4">
       <div className="flex flex-wrap items-start gap-2">
         <div className="min-w-0 flex-1">
-          <p className="font-mono text-[10px] text-accent">
+          <p className="font-mono text-[11px] text-accent">
             {task.requestedByHandle ? `@${task.requestedByHandle} asks` : "agent request"}
           </p>
           <p className="mt-1 text-[14px] leading-snug text-text">{task.title}</p>
@@ -67,14 +68,14 @@ function RequestCard({
               {task.description}
             </p>
           ) : null}
-          <p className="mt-2 font-mono text-[9px] text-faint">
+          <p className="mt-2 font-mono text-[11px] text-faint">
             {task.roomName} · MESH-{task.number} · {when(task.createdAt)}
           </p>
         </div>
         <div className="flex items-center gap-2">
           <Link
             href={`/${orgSlug}/r/${task.roomId}`}
-            className="inline-flex h-8 items-center rounded-sm px-2 font-mono text-[10px] text-muted hover:text-text"
+            className="inline-flex h-8 items-center rounded-sm px-2 font-mono text-[11px] text-muted hover:text-text"
           >
             room
           </Link>
@@ -91,7 +92,7 @@ function RequestCard({
             rows={3}
             placeholder="Give the agent the decision or the missing fact."
           />
-          <label className="mt-2 flex items-start gap-2 text-[11px] leading-relaxed text-muted">
+          <label className="mt-2 flex items-start gap-2 text-[12px] leading-relaxed text-muted">
             <input
               type="checkbox"
               checked={alsoPost}
@@ -132,7 +133,8 @@ export function InboxView({
   adminRoomIds: string[]
 }) {
   const router = useRouter()
-  const refresh = () => router.refresh()
+  const refresh = useCallback(() => router.refresh(), [router])
+  useWorkspaceChange(["tool_calls", "tasks"], refresh)
   const adminRooms = new Set(adminRoomIds)
   const canApproveAny = orgAdmin || adminRooms.size > 0
 
@@ -140,9 +142,9 @@ export function InboxView({
     <div className="h-full overflow-y-auto">
       <div className="mx-auto max-w-4xl px-5 py-8 sm:px-8">
         <header className="border-b border-line pb-5">
-          <p className="font-mono text-[11px] text-faint">workspace</p>
+          <p className="font-mono text-[12px] text-faint">workspace</p>
           <h1 className="mt-1 text-2xl font-medium tracking-[-0.02em]">Inbox</h1>
-          <p className="mt-1.5 font-mono text-[11px] text-muted">
+          <p className="mt-1.5 font-mono text-[12px] text-muted">
             {approvals.length} approvals · {requests.length} requests ·{" "}
             {done.length} resolved recently
           </p>
@@ -154,21 +156,21 @@ export function InboxView({
               <h2 id="approvals-heading" className="text-[15px] font-medium">
                 Waiting for approval
               </h2>
-              <span className="font-mono text-[10px] text-faint">tools paused</span>
+              <span className="font-mono text-[11px] text-faint">agents are paused</span>
             </div>
             <p className="mt-1.5 max-w-[66ch] text-[12px] leading-relaxed text-muted">
-              An agent asked to use a tool that changes state. It waits until someone with room or
-              org admin rights decides. The call expires after five minutes.
+              An agent wants to do something that changes data. It waits for a room or workspace admin
+              to decide, and the request is rejected after five minutes without an answer.
             </p>
             {approvals.length === 0 ? (
-              <p className="mt-3 border-l-2 border-line-strong pl-3 font-mono text-[11px] leading-relaxed text-faint">
+              <p className="mt-3 border-l-2 border-line-strong pl-3 font-mono text-[12px] leading-relaxed text-faint">
                 Nothing is blocked. Agents can keep working.
               </p>
             ) : (
               <ul className="mt-4 space-y-3">
                 {approvals.map((item) => (
                   <li key={item.toolCall.id}>
-                    <div className="mb-1.5 flex flex-wrap items-baseline gap-2 font-mono text-[10px] text-faint">
+                    <div className="mb-1.5 flex flex-wrap items-baseline gap-2 font-mono text-[11px] text-faint">
                       <span className="text-muted">{item.roomName}</span>
                       {item.agentHandle ? <span>@{item.agentHandle}</span> : null}
                       <span className="ml-auto">{when(item.toolCall.createdAt)}</span>
@@ -177,6 +179,7 @@ export function InboxView({
                       call={item.toolCall}
                       orgSlug={orgSlug}
                       canApprove={orgAdmin || adminRooms.has(item.toolCall.roomId)}
+                      agentName={item.agentName}
                       onResolved={refresh}
                     />
                   </li>
@@ -192,17 +195,17 @@ export function InboxView({
               </h2>
               <Link
                 href={`/${orgSlug}/tasks`}
-                className="font-mono text-[10px] text-muted hover:text-text"
+                className="font-mono text-[11px] text-muted hover:text-text"
               >
                 all tasks
               </Link>
             </div>
             <p className="mt-1.5 max-w-[66ch] text-[12px] leading-relaxed text-muted">
-              An agent needs a human decision. Your answer is posted as you and gives the agent one
-              more turn.
+              An agent needs a decision from a person. Your answer is posted under your name, and the
+              agent then continues.
             </p>
             {requests.length === 0 ? (
-              <p className="mt-3 border-l-2 border-line-strong pl-3 font-mono text-[11px] leading-relaxed text-faint">
+              <p className="mt-3 border-l-2 border-line-strong pl-3 font-mono text-[12px] leading-relaxed text-faint">
                 No agent is blocked on a question.
               </p>
             ) : (
@@ -224,20 +227,20 @@ export function InboxView({
               <h2 id="resolved-heading" className="text-[15px] font-medium">
                 Recently resolved
               </h2>
-              <span className="font-mono text-[10px] text-faint">last 7 days</span>
+              <span className="font-mono text-[11px] text-faint">last 7 days</span>
             </div>
             {done.length === 0 ? (
-              <p className="mt-3 border-l-2 border-line-strong pl-3 font-mono text-[11px] text-faint">
+              <p className="mt-3 border-l-2 border-line-strong pl-3 font-mono text-[12px] text-faint">
                 Nothing resolved recently.
               </p>
             ) : (
               <ul className="mt-3 divide-y divide-line border-y border-line">
                 {done.map((item) => (
                   <li key={`${item.kind}-${item.id}`} className="flex flex-wrap items-baseline gap-2 py-2.5">
-                    <span className="font-mono text-[9px] uppercase text-faint">{item.kind}</span>
+                    <span className="font-mono text-[11px] uppercase text-faint">{item.kind}</span>
                     <span className="text-[12px] text-muted">{item.label}</span>
-                    <span className="font-mono text-[9px] text-faint">· {item.status}</span>
-                    <span className="ml-auto font-mono text-[10px] text-faint">
+                    <span className="font-mono text-[11px] text-faint">· {item.status}</span>
+                    <span className="ml-auto font-mono text-[11px] text-faint">
                       {when(item.resolvedAt)}
                     </span>
                   </li>
@@ -250,14 +253,13 @@ export function InboxView({
         {!canApproveAny ? (
           <div className="mt-8">
             <InlineAlert tone="neutral">
-              You can read every approval here. A room admin or an org admin has to decide.
+              You can read every approval here. A room or workspace admin has to decide.
             </InlineAlert>
           </div>
         ) : null}
 
-        <p className="mt-8 font-mono text-[10px] leading-relaxed text-faint">
-          Inbox counts approvals and open requests only. Mentions live in the chat list and in your
-          notification preference.
+        <p className="mt-8 font-mono text-[11px] leading-relaxed text-faint">
+          The Inbox holds approvals and open requests. Mentions appear in your chat list.
         </p>
       </div>
     </div>

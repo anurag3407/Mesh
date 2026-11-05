@@ -3,30 +3,11 @@
 import { useEffect, useRef, useState } from "react"
 import { markRoomReadAction } from "@/lib/actions/room-state"
 import { humanHandle } from "@/lib/human-handle"
+import { desktopNotify, softBeep } from "@/lib/notify"
+import { subscribeToPush } from "@/lib/push-client"
+import { requestActivityRefresh } from "@/lib/use-workspace-change"
 import { Button } from "@/components/ui/button"
 import type { MessageView } from "@/lib/types"
-
-function beep() {
-  try {
-    const AudioContextClass =
-      window.AudioContext ??
-      (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext
-    if (!AudioContextClass) return
-    const context = new AudioContextClass()
-    const oscillator = context.createOscillator()
-    const gain = context.createGain()
-    oscillator.type = "sine"
-    oscillator.frequency.value = 740
-    gain.gain.value = 0.035
-    oscillator.connect(gain)
-    gain.connect(context.destination)
-    oscillator.start()
-    oscillator.stop(context.currentTime + 0.07)
-    oscillator.onended = () => void context.close()
-  } catch {
-    // Autoplay policies can block audio until the user interacts.
-  }
-}
 
 export function RoomActivity({
   orgSlug,
@@ -64,7 +45,7 @@ export function RoomActivity({
   useEffect(() => {
     if (!visible) return
     const timer = window.setTimeout(() => {
-      void markRoomReadAction(orgSlug, roomId)
+      void markRoomReadAction(orgSlug, roomId).then(requestActivityRefresh)
     }, 600)
     return () => window.clearTimeout(timer)
   }, [orgSlug, roomId, latestCompletedId, visible])
@@ -85,27 +66,23 @@ export function RoomActivity({
     })
     if (!relevant.length) return
     if (document.visibilityState === "hidden") {
-      if (typeof Notification !== "undefined" && Notification.permission === "granted") {
-        const last = relevant[relevant.length - 1]!
-        try {
-          new Notification(`#${roomName}`, {
-            body: `${last.senderName}: ${last.content.replace(/\s+/g, " ").slice(0, 140)}`,
-            tag: `mesh-${roomId}`,
-          })
-        } catch {
-          // Some browsers only allow notifications from a service worker.
-        }
-      }
+      const last = relevant[relevant.length - 1]!
+      void desktopNotify({
+        title: roomName,
+        body: `${last.senderName}: ${last.content.replace(/\s+/g, " ").slice(0, 140)}`,
+        tag: `mesh-${roomId}`,
+        url: `/${orgSlug}/r/${roomId}`,
+      })
     } else if (sound && relevant.some((message) => message.senderType === "agent")) {
       const now = Date.now()
       if (now - lastBeep.current > 1_500) {
         lastBeep.current = now
-        beep()
+        softBeep()
       }
     }
     // completed is derived from messages; the ref prevents replaying old items.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [messages, notifications, sound, userId, userName, roomId, roomName])
+  }, [messages, notifications, sound, userId, userName, orgSlug, roomId, roomName])
 
   return null
 }
@@ -131,11 +108,12 @@ export function EnableAlerts({ enabled }: { enabled: boolean }) {
         try {
           const next = await Notification.requestPermission()
           setPermission(next)
+          if (next === "granted") await subscribeToPush()
         } finally {
           setBusy(false)
         }
       }}
-      title="Show a desktop notification when this tab is in the background"
+      title="Get an alert when an agent needs a decision or someone mentions you"
     >
       {busy ? "…" : "Enable alerts"}
     </Button>

@@ -15,6 +15,13 @@
       "when": 1793408761301,
       "tag": "0001_amusing_tarot",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1793882851230,
+      "tag": "0002_tranquil_mac_gargan",
+      "breakpoints": true
     }
   ]
 }

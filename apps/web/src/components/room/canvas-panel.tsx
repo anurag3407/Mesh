@@ -1,16 +1,30 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import dynamic from "next/dynamic"
+import { useRouter } from "next/navigation"
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react"
 import { Group, Panel, Separator } from "react-resizable-panels"
-import { CanvasEditor } from "@/components/room/canvas-editor"
 import { CanvasVersions } from "@/components/room/canvas-versions"
 import { CreateCanvasForm } from "@/components/room/create-canvas-form"
 import { Markdown } from "@/components/markdown"
+import { deleteCanvasAction } from "@/lib/actions/canvas"
 import { Button } from "@/components/ui/button"
+import { ConfirmButton } from "@/components/ui/confirm-button"
+import { showToast } from "@/components/ui/toast"
 import { EmptyState } from "@/components/ui/empty"
 import { PlusIcon } from "@/components/ui/icons"
 import { cn } from "@/lib/format"
 import type { CanvasView } from "@/lib/types"
+
+// Monaco and its Yjs binding touch `window` as soon as they load, so they can only run in the
+// browser. Loading them separately also keeps them out of the room's first download.
+const CanvasEditor = dynamic(
+  () => import("@/components/room/canvas-editor").then((mod) => mod.CanvasEditor),
+  {
+    ssr: false,
+    loading: () => <div className="p-4 font-mono text-[12px] text-faint">Loading editor…</div>,
+  },
+)
 
 type CanvasConnection = "connecting" | "connected" | "synced" | "disconnected" | "denied"
 
@@ -28,13 +42,17 @@ export function CanvasPanel({
   roomId,
   userName,
   initialCanvasId = null,
+  canAdmin = false,
 }: {
   canvases: CanvasView[]
   orgSlug: string
   roomId: string
   userName: string
   initialCanvasId?: string | null
+  canAdmin?: boolean
 }) {
+  const router = useRouter()
+  const [deleting, startDelete] = useTransition()
   const [selectedId, setSelectedId] = useState<string | null>(
     (initialCanvasId && canvases.some((canvas) => canvas.id === initialCanvasId)
       ? initialCanvasId
@@ -72,10 +90,25 @@ export function CanvasPanel({
     setShowCreate(false)
   }, [])
 
+  function removeSelected() {
+    if (!selected) return
+    const canvasId = selected.id
+    startDelete(async () => {
+      const result = await deleteCanvasAction({ orgSlug, roomId, canvasId })
+      if (!result.ok) {
+        showToast({ message: result.error ?? "Could not delete the canvas", tone: "danger" })
+        return
+      }
+      showToast({ message: "Canvas deleted", tone: "success" })
+      setSelectedId(null)
+      router.refresh()
+    })
+  }
+
   return (
     <section className="flex h-full min-h-0 flex-col bg-void" aria-label="Room canvas">
       <div className="flex flex-wrap items-center gap-2 border-b border-line bg-ink px-3 py-2">
-        <span className="font-mono text-[10px] text-faint">canvas</span>
+        <span className="font-mono text-[11px] text-faint">canvas</span>
         <div className="flex min-w-0 flex-1 items-center gap-1 overflow-x-auto">
           {canvases.map((canvas) => (
             <button
@@ -91,13 +124,13 @@ export function CanvasPanel({
               )}
             >
               {canvas.title}
-              <span className="font-mono text-[9px] text-faint">{canvas.kind}</span>
+              <span className="font-mono text-[11px] text-faint">{canvas.kind}</span>
             </button>
           ))}
         </div>
         {selected ? (
           <span
-            className="inline-flex items-center gap-1.5 font-mono text-[10px] text-faint"
+            className="inline-flex items-center gap-1.5 font-mono text-[11px] text-faint"
             title={`Canvas connection: ${connectionLabel(connection)}`}
           >
             <span
@@ -117,6 +150,17 @@ export function CanvasPanel({
         {selected ? (
           <CanvasVersions canvasId={selected.id} orgSlug={orgSlug} roomId={roomId} />
         ) : null}
+        {selected && canAdmin ? (
+          <ConfirmButton
+            label="Delete"
+            confirmLabel={`Delete “${selected.title}”`}
+            pendingLabel="Deleting…"
+            warning="This also deletes its version history."
+            variant="ghost"
+            pending={deleting}
+            onConfirm={removeSelected}
+          />
+        ) : null}
         <Button
           variant="ghost"
           size="sm"
@@ -124,7 +168,7 @@ export function CanvasPanel({
           aria-expanded={showCreate}
         >
           <PlusIcon width={13} height={13} />
-          new
+          New
         </Button>
       </div>
 
@@ -136,7 +180,7 @@ export function CanvasPanel({
         <div className="flex-1 p-6">
           <EmptyState
             title="No canvas yet"
-            body="A canvas is a shared Yjs document. Agents can write to it or patch it with search and replace while humans type in the same document."
+            body="A canvas is a shared document. You and your agents can edit it at the same time."
             action={
               !showCreate ? (
                 <Button size="sm" onClick={() => setShowCreate(true)}>
@@ -175,10 +219,10 @@ export function CanvasPanel({
               <Panel defaultSize="38%" minSize="120px" className="min-h-0 overflow-hidden">
                 <div className="flex h-full min-h-0 flex-col">
                   <div className="flex items-center justify-between border-b border-line bg-panel px-3 py-1">
-                    <span className="font-mono text-[10px] text-faint">
-                      preview · sandboxed
+                    <span className="font-mono text-[11px] text-faint">
+                      preview
                     </span>
-                    <span className="font-mono text-[10px] text-faint">
+                    <span className="font-mono text-[11px] text-faint">
                       {text.length} chars
                     </span>
                   </div>
@@ -188,7 +232,7 @@ export function CanvasPanel({
                         {text.trim() ? (
                           <Markdown content={text} />
                         ) : (
-                          <p className="font-mono text-[11px] text-faint">
+                          <p className="font-mono text-[12px] text-faint">
                             Empty canvas. Write in the editor; the preview follows the shared
                             document.
                           </p>

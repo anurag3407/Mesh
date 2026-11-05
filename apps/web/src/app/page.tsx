@@ -14,27 +14,27 @@ export const metadata: Metadata = {
 }
 
 const roomFacts = [
-  ["turn order", "serialized per room, never interleaved"],
-  ["approval", "dangerous tools wait for a human"],
-  ["canvas", "one Yjs document people and agents edit together"],
-  ["keys", "BYOK secrets are sealed with AES-256-GCM"],
+  ["taking turns", "agents reply one at a time, never over each other"],
+  ["approval", "risky actions wait for a person to say yes"],
+  ["canvas", "one live document people and agents edit together"],
+  ["keys", "bring your own API keys, encrypted when saved"],
 ]
 
 const principles = [
   {
     number: "01",
-    title: "Turn order is a database fact",
-    body: "A per-room advisory lock serializes agent runs. Mention mode queues agents in mention order, debate mode assigns producer, critics and summarizer, and moderated mode lets a model choose the next speaker.",
+    title: "Agents take turns",
+    body: "Agents reply one at a time, in the order they were mentioned. Or run a debate with set roles, or let one agent choose who speaks next.",
   },
   {
     number: "02",
-    title: "A human is in the dangerous path",
-    body: "A dangerous tool call becomes a pending card. Room admins approve or reject it, and five minutes without a decision counts as a rejection. The model cannot talk its way around the wait.",
+    title: "A person approves the risky parts",
+    body: "When an agent wants to do something risky, it stops and asks. An admin approves or rejects it, and no answer within five minutes counts as a no.",
   },
   {
     number: "03",
-    title: "One shared document, not a rewrite",
-    body: "Canvases are Yjs documents. Agents patch them with search and replace as live splices, so a concurrent human edit survives the same transaction.",
+    title: "One shared document",
+    body: "You and your agents edit the same canvas at the same time. An agent's change never overwrites what you are typing.",
   },
   {
     number: "04",
@@ -48,8 +48,8 @@ const principles = [
   },
   {
     number: "06",
-    title: "Secrets stay sealed",
-    body: "Provider keys, MCP headers and webhook secrets are encrypted before insert. Only the orchestrator and the key-test action decrypt a provider key, and the UI never reads ciphertext.",
+    title: "Your keys stay protected",
+    body: "API keys and other secrets are encrypted before they are saved, and can't be read back in the app.",
   },
 ]
 
@@ -64,7 +64,7 @@ export default async function HomePage() {
       <section className="relative overflow-hidden border-b border-line">
         <div className="mx-auto grid w-full max-w-6xl gap-10 px-5 py-10 sm:px-8 lg:grid-cols-[1.15fr_0.85fr] lg:items-center lg:py-16">
           <div>
-            <p className="font-mono text-[11px] text-faint">shared rooms · humans + agents</p>
+            <p className="font-mono text-[12px] text-faint">shared rooms · humans + agents</p>
             <h1 className="mt-4 max-w-[18ch] text-balance text-4xl font-medium leading-[1.04] tracking-[-0.03em] sm:text-5xl lg:text-[3.75rem]">
               Your team and its agents, in one room.
             </h1>
@@ -76,7 +76,7 @@ export default async function HomePage() {
             <dl className="mt-8 grid max-w-2xl grid-cols-1 gap-px overflow-hidden border border-line bg-line sm:grid-cols-2">
               {roomFacts.map(([term, detail]) => (
                 <div key={term} className="bg-ink px-3 py-2.5">
-                  <dt className="font-mono text-[10px] text-faint">{term}</dt>
+                  <dt className="font-mono text-[11px] text-faint">{term}</dt>
                   <dd className="mt-0.5 text-[12px] leading-snug text-muted">{detail}</dd>
                 </div>
               ))}
@@ -84,11 +84,11 @@ export default async function HomePage() {
             <div className="mt-7 flex flex-wrap items-center gap-4">
               <Link
                 href="#tutorial"
-                className="font-mono text-[11px] text-accent underline underline-offset-4"
+                className="font-mono text-[12px] text-accent underline underline-offset-4"
               >
                 see the full flow
               </Link>
-              <Link href="/help" className="font-mono text-[11px] text-faint hover:text-text">
+              <Link href="/help" className="font-mono text-[12px] text-faint hover:text-text">
                 read the help
               </Link>
             </div>
@@ -109,7 +109,7 @@ export default async function HomePage() {
         <div className="mx-auto w-full max-w-6xl px-5 py-12 sm:px-8 lg:py-16">
           <div className="flex flex-wrap items-end justify-between gap-4">
             <div className="max-w-2xl">
-              <p className="font-mono text-[11px] text-faint">product tour</p>
+              <p className="font-mono text-[12px] text-faint">product tour</p>
               <h2 className="mt-2 text-2xl font-medium tracking-[-0.02em] sm:text-3xl">
                 From a first account to the room's first meeting.
               </h2>
@@ -118,7 +118,7 @@ export default async function HomePage() {
                 chats, meetings, tasks and files that carry the work.
               </p>
             </div>
-            <p className="max-w-[260px] font-mono text-[10px] leading-relaxed text-faint">
+            <p className="max-w-[260px] font-mono text-[11px] leading-relaxed text-faint">
               Static previews of the flow. These are not a live room and contain no customer data.
             </p>
           </div>
@@ -132,7 +132,7 @@ export default async function HomePage() {
         <div className="mx-auto w-full max-w-6xl px-5 py-12 sm:px-8 lg:py-16">
           <div className="grid gap-10 lg:grid-cols-[300px_1fr]">
             <div>
-              <p className="font-mono text-[11px] text-faint">what stays in the room</p>
+              <p className="font-mono text-[12px] text-faint">what stays in the room</p>
               <h2 className="mt-2 text-2xl font-medium tracking-[-0.02em]">
                 Not another chat window with a bot bolted on.
               </h2>
@@ -144,7 +144,7 @@ export default async function HomePage() {
             <div className="divide-y divide-line border-y border-line">
               {principles.map((item) => (
                 <div key={item.number} className="grid gap-3 py-5 sm:grid-cols-[48px_1fr]">
-                  <span className="font-mono text-[11px] text-accent">{item.number}</span>
+                  <span className="font-mono text-[12px] text-accent">{item.number}</span>
                   <div>
                     <h3 className="text-[14px] font-medium">{item.title}</h3>
                     <p className="mt-1.5 max-w-[64ch] text-[13px] leading-relaxed text-muted">
@@ -170,13 +170,13 @@ export default async function HomePage() {
           <div className="flex flex-wrap gap-3">
             <Link
               href="/signup"
-              className="rounded-sm bg-accent px-4 py-2.5 font-mono text-[11px] font-medium text-void hover:bg-[var(--color-accent-strong)]"
+              className="rounded-sm bg-accent px-4 py-2.5 font-mono text-[12px] font-medium text-void hover:bg-[var(--color-accent-strong)]"
             >
               create a workspace
             </Link>
             <Link
               href="/login"
-              className="rounded-sm border border-line px-4 py-2.5 font-mono text-[11px] text-muted hover:border-line-strong hover:text-text"
+              className="rounded-sm border border-line px-4 py-2.5 font-mono text-[12px] text-muted hover:border-line-strong hover:text-text"
             >
               sign in
             </Link>

@@ -188,7 +188,7 @@ export default async function AnalyticsPage({
   return (
     <div className="h-full overflow-y-auto">
       <div className="mx-auto max-w-5xl px-5 py-8 sm:px-8">
-        <p className="font-mono text-[11px] text-faint">
+        <p className="font-mono text-[12px] text-faint">
           <Link href={`/${orgSlug}`} className="hover:text-text">
             workspace
           </Link>{" "}
@@ -203,7 +203,7 @@ export default async function AnalyticsPage({
                 href={`/${orgSlug}/analytics?days=${value}`}
                 aria-current={days === value ? "page" : undefined}
                 className={cn(
-                  "rounded-sm border px-2 py-1 font-mono text-[10px]",
+                  "rounded-sm border px-2 py-1 font-mono text-[11px]",
                   days === value
                     ? "border-line-strong bg-raised text-text"
                     : "border-line text-muted hover:text-text",
@@ -215,7 +215,7 @@ export default async function AnalyticsPage({
           </div>
         </div>
         <p className="mt-2 max-w-2xl text-[13px] leading-relaxed text-muted">
-          Model calls recorded by the orchestrator. Cost uses the pricing table. Rows appear after an
+          Every model call your agents make. Costs are estimated from the prices in Settings. Rows appear after an
           agent answers; moderator decisions also count.
         </p>
 
@@ -223,11 +223,11 @@ export default async function AnalyticsPage({
           <div className="mt-8">
             <EmptyState
               title={`No usage in the last ${days} days`}
-              body="Send a message that mentions an agent. If agents fail before their first token, check provider keys and the orchestrator logs."
+              body="Send a message that mentions an agent. If agents do not reply, check your provider keys."
               action={
                 <Link
                   href={`/${orgSlug}/settings/keys`}
-                  className="font-mono text-[11px] text-accent underline underline-offset-4"
+                  className="font-mono text-[12px] text-accent underline underline-offset-4"
                 >
                   provider keys
                 </Link>
@@ -246,7 +246,7 @@ export default async function AnalyticsPage({
                 ["p95 latency", formatMs(p95Latency)],
               ].map(([label, value]) => (
                 <div key={label} className="bg-ink px-3 py-2.5">
-                  <dt className="font-mono text-[10px] text-faint">{label}</dt>
+                  <dt className="font-mono text-[11px] text-faint">{label}</dt>
                   <dd className="mt-0.5 font-mono text-[15px] text-text">{value}</dd>
                 </div>
               ))}
@@ -261,7 +261,7 @@ export default async function AnalyticsPage({
                 <div className="overflow-x-auto border-y border-line">
                   <table className="w-full border-collapse text-left">
                     <thead>
-                      <tr className="border-b border-line font-mono text-[10px] text-faint">
+                      <tr className="border-b border-line font-mono text-[11px] text-faint">
                         <th className="py-2 pr-3 font-normal">agent</th>
                         <th className="py-2 pr-3 font-normal">runs</th>
                         <th className="py-2 pr-3 font-normal">input</th>
@@ -276,26 +276,26 @@ export default async function AnalyticsPage({
                         <tr key={row.id}>
                           <td className="py-2 pr-3 text-[12px] text-text">
                             {row.handle}{" "}
-                            <span className="font-mono text-[10px] text-faint">{row.name}</span>
+                            <span className="font-mono text-[11px] text-faint">{row.name}</span>
                           </td>
-                          <td className="py-2 pr-3 font-mono text-[11px] text-muted">{row.runs}</td>
-                          <td className="py-2 pr-3 font-mono text-[11px] text-muted">
+                          <td className="py-2 pr-3 font-mono text-[12px] text-muted">{row.runs}</td>
+                          <td className="py-2 pr-3 font-mono text-[12px] text-muted">
                             {formatNumber(row.input)}
                           </td>
-                          <td className="py-2 pr-3 font-mono text-[11px] text-muted">
+                          <td className="py-2 pr-3 font-mono text-[12px] text-muted">
                             {formatNumber(row.output)}
                           </td>
-                          <td className="py-2 pr-3 font-mono text-[11px] text-muted">
+                          <td className="py-2 pr-3 font-mono text-[12px] text-muted">
                             {formatUsd(row.cost)}
                           </td>
-                          <td className="py-2 pr-3 font-mono text-[11px] text-muted">
+                          <td className="py-2 pr-3 font-mono text-[12px] text-muted">
                             {formatMs(
                               row.ttfts.length
                                 ? Math.round(row.ttfts.reduce((s, v) => s + v, 0) / row.ttfts.length)
                                 : null,
                             )}
                           </td>
-                          <td className="py-2 font-mono text-[11px] text-muted">
+                          <td className="py-2 font-mono text-[12px] text-muted">
                             {formatMs(percentile(row.latencies, 95))}
                           </td>
                         </tr>
@@ -311,7 +311,7 @@ export default async function AnalyticsPage({
                 <div className="overflow-x-auto border-y border-line">
                   <table className="w-full border-collapse text-left">
                     <thead>
-                      <tr className="border-b border-line font-mono text-[10px] text-faint">
+                      <tr className="border-b border-line font-mono text-[11px] text-faint">
                         <th className="py-2 pr-3 font-normal">room</th>
                         <th className="py-2 pr-3 font-normal">runs</th>
                         <th className="py-2 pr-3 font-normal">tokens</th>
@@ -322,11 +322,11 @@ export default async function AnalyticsPage({
                       {roomRows.map((row) => (
                         <tr key={row.id}>
                           <td className="py-2 pr-3 text-[12px] text-text">{row.name}</td>
-                          <td className="py-2 pr-3 font-mono text-[11px] text-muted">{row.runs}</td>
-                          <td className="py-2 pr-3 font-mono text-[11px] text-muted">
+                          <td className="py-2 pr-3 font-mono text-[12px] text-muted">{row.runs}</td>
+                          <td className="py-2 pr-3 font-mono text-[12px] text-muted">
                             {formatNumber(row.tokens)}
                           </td>
-                          <td className="py-2 font-mono text-[11px] text-muted">
+                          <td className="py-2 font-mono text-[12px] text-muted">
                             {formatUsd(row.cost)}
                           </td>
                         </tr>
@@ -338,13 +338,13 @@ export default async function AnalyticsPage({
             </div>
 
             <details className="mt-10">
-              <summary className="cursor-pointer font-mono text-[10px] text-faint hover:text-text">
+              <summary className="cursor-pointer font-mono text-[11px] text-faint hover:text-text">
                 daily data table
               </summary>
               <div className="mt-2 overflow-x-auto border-y border-line">
                 <table className="w-full border-collapse text-left">
                   <thead>
-                    <tr className="border-b border-line font-mono text-[10px] text-faint">
+                    <tr className="border-b border-line font-mono text-[11px] text-faint">
                       <th className="py-2 pr-3 font-normal">day</th>
                       {series.map((item) => (
                         <th key={item.key} className="py-2 pr-3 font-normal">
@@ -357,16 +357,16 @@ export default async function AnalyticsPage({
                   <tbody className="divide-y divide-line">
                     {daily.map((point) => (
                       <tr key={point.day}>
-                        <td className="py-1.5 pr-3 font-mono text-[10px] text-faint">{point.day}</td>
+                        <td className="py-1.5 pr-3 font-mono text-[11px] text-faint">{point.day}</td>
                         {series.map((item) => (
                           <td
                             key={item.key}
-                            className="py-1.5 pr-3 font-mono text-[10px] text-muted"
+                            className="py-1.5 pr-3 font-mono text-[11px] text-muted"
                           >
                             {formatNumber(Number(point[item.key] ?? 0))}
                           </td>
                         ))}
-                        <td className="py-1.5 font-mono text-[10px] text-muted">
+                        <td className="py-1.5 font-mono text-[11px] text-muted">
                           {formatUsd(point.cost)}
                         </td>
                       </tr>

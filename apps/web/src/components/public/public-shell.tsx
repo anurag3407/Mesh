@@ -19,7 +19,7 @@ export function PublicShell({ children }: { children: ReactNode }) {
             </span>
             <span className="font-mono text-sm text-text">mesh</span>
           </Link>
-          <nav className="flex items-center gap-4 font-mono text-[11px] text-muted" aria-label="Public">
+          <nav className="flex items-center gap-4 font-mono text-[12px] text-muted" aria-label="Public">
             <Link href="/#tutorial" className="hover:text-text">
               tutorial
             </Link>
@@ -30,13 +30,13 @@ export function PublicShell({ children }: { children: ReactNode }) {
           <div className="ml-auto flex items-center gap-2">
             <Link
               href="/login"
-              className="rounded-sm px-2.5 py-1.5 font-mono text-[11px] text-muted hover:bg-raised hover:text-text"
+              className="rounded-sm px-2.5 py-1.5 font-mono text-[12px] text-muted hover:bg-raised hover:text-text"
             >
               sign in
             </Link>
             <Link
               href="/signup"
-              className="rounded-sm bg-accent px-2.5 py-1.5 font-mono text-[11px] font-medium text-void hover:bg-[var(--color-accent-strong)]"
+              className="rounded-sm bg-accent px-2.5 py-1.5 font-mono text-[12px] font-medium text-void hover:bg-[var(--color-accent-strong)]"
             >
               create account
             </Link>
@@ -45,14 +45,14 @@ export function PublicShell({ children }: { children: ReactNode }) {
       </header>
       <main className="flex-1">{children}</main>
       <footer className="border-t border-line">
-        <div className="mx-auto flex w-full max-w-6xl flex-wrap items-center gap-x-5 gap-y-2 px-5 py-5 font-mono text-[10px] text-faint sm:px-8">
+        <div className="mx-auto flex w-full max-w-6xl flex-wrap items-center gap-x-5 gap-y-2 px-5 py-5 font-mono text-[11px] text-faint sm:px-8">
           <span className="text-muted">mesh</span>
           {footerLinks.map((link) => (
             <Link key={link.href} href={link.href} className="hover:text-text">
               {link.label}
             </Link>
           ))}
-          <span className="ml-auto">self-hosted with Supabase</span>
+          <span className="ml-auto">self-hosted</span>
         </div>
       </footer>
     </div>

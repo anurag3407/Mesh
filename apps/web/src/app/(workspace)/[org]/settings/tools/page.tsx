@@ -30,7 +30,7 @@ export default async function ToolsPage({ params }: { params: Promise<{ org: str
         title="MCP servers"
         description="Model Context Protocol servers are mounted per room, or across the whole workspace. Their headers are encrypted at rest. Mark write-capable tools as dangerous to require a human approval."
         actions={
-          <span className="font-mono text-[10px] text-faint">
+          <span className="font-mono text-[11px] text-faint">
             {servers.length} {servers.length === 1 ? "server" : "servers"}
           </span>
         }
@@ -47,11 +47,11 @@ export default async function ToolsPage({ params }: { params: Promise<{ org: str
                 <div className="flex flex-wrap items-start gap-x-4 gap-y-1">
                   <div className="min-w-0 flex-1">
                     <p className="text-[13px] text-text">{server.name}</p>
-                    <p className="mt-0.5 font-mono text-[10px] text-faint">
+                    <p className="mt-0.5 font-mono text-[11px] text-faint">
                       {server.transport} · {server.url} ·{" "}
                       {server.roomId ? roomsById.get(server.roomId)?.name ?? "room" : "workspace"}
                     </p>
-                    <p className="mt-0.5 font-mono text-[10px] text-faint">
+                    <p className="mt-0.5 font-mono text-[11px] text-faint">
                       {server.enabled ? "enabled" : "disabled"}
                       {server.dangerousTools.length
                         ? ` · needs approval: ${server.dangerousTools.join(", ")}`
@@ -60,7 +60,7 @@ export default async function ToolsPage({ params }: { params: Promise<{ org: str
                   </div>
                 </div>
                 <details className="mt-2">
-                  <summary className="cursor-pointer font-mono text-[10px] text-muted hover:text-text">
+                  <summary className="cursor-pointer font-mono text-[11px] text-muted hover:text-text">
                     inspect tools
                   </summary>
                   <div className="mt-2 border-l border-line pl-3">
@@ -68,7 +68,7 @@ export default async function ToolsPage({ params }: { params: Promise<{ org: str
                   </div>
                 </details>
                 <details className="mt-2">
-                  <summary className="cursor-pointer font-mono text-[10px] text-muted hover:text-text">
+                  <summary className="cursor-pointer font-mono text-[11px] text-muted hover:text-text">
                     edit
                   </summary>
                   <div className="mt-2 border-l border-line pl-3">
@@ -109,7 +109,7 @@ export default async function ToolsPage({ params }: { params: Promise<{ org: str
                         <Textarea
                           id={`headers-${server.id}`}
                           name="headers"
-                          className="min-h-16 font-mono text-[11px]"
+                          className="min-h-16 font-mono text-[12px]"
                           placeholder='{"Authorization":"Bearer …"}'
                         />
                       </Field>
@@ -170,7 +170,7 @@ export default async function ToolsPage({ params }: { params: Promise<{ org: str
             <Textarea
               id="mcp-headers"
               name="headers"
-              className="min-h-16 font-mono text-[11px]"
+              className="min-h-16 font-mono text-[12px]"
               placeholder='{"Authorization":"Bearer …"}'
             />
           </Field>
@@ -179,27 +179,27 @@ export default async function ToolsPage({ params }: { params: Promise<{ org: str
 
       <Section
         title="Built-in tools"
-        description="These ship with the orchestrator. The database inspector only runs a single read-only SELECT in a 10 second transaction. The GitHub bridge asks for approval before committing."
+        description="These come built in. The database inspector only runs a single read-only SELECT in a 10 second transaction. The GitHub bridge asks for approval before committing."
       >
         <div className="space-y-5">
           <div className="border-y border-line py-3">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div>
                 <p className="text-[13px] text-text">web_search</p>
-                <p className="mt-0.5 font-mono text-[10px] text-faint">
-                  Brave Search · enabled when BRAVE_SEARCH_API_KEY is set on the orchestrator
+                <p className="mt-0.5 font-mono text-[11px] text-faint">
+                  Brave Search · available when your server administrator has set it up
                 </p>
               </div>
             </div>
             <p className="mt-2 text-[12px] leading-relaxed text-faint">
               Without the key, the tool reports a configuration error to the agent instead of
-              searching. The key is read from the orchestrator environment, not from this page.
+              searching. Its key is set on the server, not on this page.
             </p>
           </div>
 
           <div className="border-b border-line pb-5">
             <p className="text-[13px] text-text">github_bridge</p>
-            <p className="mt-0.5 font-mono text-[10px] text-faint">
+            <p className="mt-0.5 font-mono text-[11px] text-faint">
               {github ? `configured · ${github.enabled ? "enabled" : "disabled"}` : "not configured"}
             </p>
             <div className="mt-3">
@@ -237,7 +237,7 @@ export default async function ToolsPage({ params }: { params: Promise<{ org: str
 
           <div>
             <p className="text-[13px] text-text">postgres_inspector</p>
-            <p className="mt-0.5 font-mono text-[10px] text-faint">
+            <p className="mt-0.5 font-mono text-[11px] text-faint">
               {postgres
                 ? `configured · ${postgres.enabled ? "enabled" : "disabled"}`
                 : "not configured"}

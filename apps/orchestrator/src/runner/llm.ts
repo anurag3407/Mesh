@@ -67,7 +67,7 @@ export async function resolveAgentModel(agent: AgentRow): Promise<ResolvedModel>
   const dev = devModelConfig()
   if (!dev) {
     throw new Error(
-      `@${agent.handle} has no provider key and the dev OpenAI-compatible fallback is not configured`,
+      `@${agent.handle} has no API key yet. A workspace admin can add one in Settings, then choose it on the Agents page.`,
     )
   }
   const modelName = agent.model ?? dev.model

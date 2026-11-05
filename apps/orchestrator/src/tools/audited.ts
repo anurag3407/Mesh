@@ -4,6 +4,7 @@ import { tool, type ToolSet } from "ai"
 import { eq } from "drizzle-orm"
 import { z } from "zod"
 import { getDb } from "../db"
+import { notifyHumansNeeded } from "../push"
 import { broadcast } from "../realtime"
 import { resolveApprovalWaiter, waitForApproval } from "./approvals"
 
@@ -89,6 +90,12 @@ export function toAuditedTools(specs: ToolSpec[], runtime: ToolRuntime): ToolSet
             agentId: runtime.agentId,
             toolName: spec.name,
             args: storedArgs,
+          })
+          notifyHumansNeeded({
+            roomId: runtime.roomId,
+            agentId: runtime.agentId,
+            kind: "approval",
+            detail: spec.name,
           })
           const signal = options.abortSignal
           const decision = await Promise.race([

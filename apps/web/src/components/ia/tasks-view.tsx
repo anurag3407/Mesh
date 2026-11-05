@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { useMemo, useState, useTransition } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react"
 import {
   addTaskCommentAction,
   answerTaskRequestAction,
@@ -13,7 +13,9 @@ import { Button } from "@/components/ui/button"
 import { Field, Input, Select, Textarea } from "@/components/ui/field"
 import { EmptyState, InlineAlert } from "@/components/ui/empty"
 import { StatusBadge } from "@/components/ui/status"
+import { showToast } from "@/components/ui/toast"
 import { cn } from "@/lib/format"
+import { useWorkspaceChange } from "@/lib/use-workspace-change"
 import type { TaskView } from "@/lib/types"
 
 interface TaskRoom {
@@ -83,19 +85,19 @@ function TaskCard({
         )}
       >
         <div className="flex items-center gap-2">
-          <span className="font-mono text-[9px] text-faint">MESH-{task.number}</span>
+          <span className="font-mono text-[11px] text-faint">MESH-{task.number}</span>
           {task.kind === "request" ? (
-            <span className="font-mono text-[9px] text-accent">request</span>
+            <span className="font-mono text-[11px] text-accent">request</span>
           ) : null}
-          <span className="ml-auto font-mono text-[9px] text-faint">{shortDate(task.updatedAt)}</span>
+          <span className="ml-auto font-mono text-[11px] text-faint">{shortDate(task.updatedAt)}</span>
         </div>
         <p className="mt-1.5 text-[13px] leading-snug text-text">{task.title}</p>
         {task.description ? (
-          <p className="mt-1 line-clamp-2 text-[11px] leading-relaxed text-muted">
+          <p className="mt-1 line-clamp-2 text-[12px] leading-relaxed text-muted">
             {task.description}
           </p>
         ) : null}
-        <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 font-mono text-[9px] text-faint">
+        <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 font-mono text-[11px] text-faint">
           {showRoom ? <span>{task.roomName}</span> : null}
           <span>· {assigneeLabel(task)}</span>
           {task.comments.length ? <span>· {task.comments.length} comments</span> : null}
@@ -126,18 +128,22 @@ function TaskDetail({
   const [comment, setComment] = useState("")
   const [answer, setAnswer] = useState("")
   const [alsoPost, setAlsoPost] = useState(true)
-  const [notice, setNotice] = useState<string | null>(null)
+  const dialogRef = useRef<HTMLDialogElement>(null)
+
+  useEffect(() => {
+    const dialog = dialogRef.current
+    if (dialog && !dialog.open) dialog.showModal()
+  }, [])
 
   function update(input: { status?: TaskView["status"]; assignee?: string }) {
     setError(null)
-    setNotice(null)
     startTransition(async () => {
       const result = await updateTaskAction({ orgSlug, taskId: task.id, ...input })
       if (!result.ok) {
         setError(result.error ?? "Could not update the task")
         return
       }
-      setNotice(result.message ?? "Task updated")
+      showToast({ message: result.message ?? "Task updated", tone: "success" })
       onChanged()
     })
   }
@@ -145,7 +151,6 @@ function TaskDetail({
   function addComment() {
     if (!comment.trim()) return
     setError(null)
-    setNotice(null)
     const form = new FormData()
     form.set("orgSlug", orgSlug)
     form.set("taskId", task.id)
@@ -164,7 +169,6 @@ function TaskDetail({
   function sendAnswer() {
     if (!answer.trim()) return
     setError(null)
-    setNotice(null)
     startTransition(async () => {
       const result = await answerTaskRequestAction({
         orgSlug,
@@ -177,7 +181,7 @@ function TaskDetail({
         return
       }
       setAnswer("")
-      setNotice(result.message ?? "Answer sent")
+      showToast({ message: result.message ?? "Answer sent", tone: "success" })
       onChanged()
     })
   }
@@ -189,26 +193,26 @@ function TaskDetail({
       : ""
 
   return (
-    <div
-      className="fixed inset-0 z-40 flex justify-end bg-void/70"
-      role="dialog"
-      aria-modal="true"
+    <dialog
+      ref={dialogRef}
+      className="m-0 ml-auto h-dvh max-h-none w-full max-w-lg bg-ink p-0 pb-[env(safe-area-inset-bottom)] pt-[env(safe-area-inset-top)] text-text backdrop:bg-void/70"
       aria-label={`Task MESH-${task.number}`}
+      onClose={onClose}
       onClick={(event) => {
-        if (event.target === event.currentTarget) onClose()
+        if (event.target === dialogRef.current) dialogRef.current?.close()
       }}
     >
-      <div className="flex h-full w-full max-w-lg flex-col overflow-y-auto border-l border-line bg-ink">
+      <div className="flex h-full w-full flex-col overflow-y-auto border-l border-line bg-ink">
         <div className="sticky top-0 flex items-center gap-2 border-b border-line bg-ink px-4 py-3">
-          <span className="font-mono text-[10px] text-faint">MESH-{task.number}</span>
+          <span className="font-mono text-[11px] text-faint">MESH-{task.number}</span>
           <StatusBadge status={task.status} />
-          <span className="rounded-sm bg-raised px-1.5 py-0.5 font-mono text-[9px] text-muted">
+          <span className="rounded-sm bg-raised px-1.5 py-0.5 font-mono text-[11px] text-muted">
             {task.kind}
           </span>
           <button
             type="button"
-            onClick={onClose}
-            className="ml-auto grid h-7 w-7 place-items-center rounded-sm text-muted hover:bg-raised hover:text-text"
+            onClick={() => dialogRef.current?.close()}
+            className="ml-auto grid h-10 w-10 place-items-center rounded-sm text-muted hover:bg-raised hover:text-text md:h-7 md:w-7"
             aria-label="Close task"
           >
             ×
@@ -218,7 +222,7 @@ function TaskDetail({
         <div className="space-y-4 px-4 py-4">
           <div>
             <h2 className="text-[17px] font-medium leading-snug tracking-[-0.01em]">{task.title}</h2>
-            <p className="mt-1 font-mono text-[10px] text-faint">
+            <p className="mt-1 font-mono text-[11px] text-faint">
               {task.roomName} · updated {shortDate(task.updatedAt)} ·{" "}
               {task.requestedByHandle ? `requested by @${task.requestedByHandle}` : `by a teammate`}
             </p>
@@ -273,11 +277,10 @@ function TaskDetail({
           </div>
 
           {error ? <InlineAlert tone="danger">{error}</InlineAlert> : null}
-          {notice ? <InlineAlert tone="success">{notice}</InlineAlert> : null}
 
           {task.kind === "request" && task.status !== "done" ? (
             <section className="border border-line border-l-2 border-l-accent bg-panel p-3">
-              <h3 className="font-mono text-[10px] text-accent">answer this request</h3>
+              <h3 className="font-mono text-[11px] text-accent">answer this request</h3>
               <p className="mt-1 text-[12px] leading-relaxed text-muted">
                 {task.requestedByHandle
                   ? `@${task.requestedByHandle} is waiting on a human answer.`
@@ -290,7 +293,7 @@ function TaskDetail({
                 className="mt-2"
                 placeholder="Write the answer the agent should use."
               />
-              <label className="mt-2 flex items-start gap-2 text-[11px] text-muted">
+              <label className="mt-2 flex items-start gap-2 text-[12px] text-muted">
                 <input
                   type="checkbox"
                   checked={alsoPost}
@@ -318,19 +321,19 @@ function TaskDetail({
           <section>
             <div className="flex items-baseline justify-between">
               <h3 className="text-[13px] font-medium">Activity</h3>
-              <span className="font-mono text-[10px] text-faint">
+              <span className="font-mono text-[11px] text-faint">
                 {task.comments.length} comments
               </span>
             </div>
             {task.comments.length === 0 ? (
-              <p className="mt-2 border-l-2 border-line-strong pl-3 font-mono text-[10px] text-faint">
-                No comments yet. Agents can comment with their task tools.
+              <p className="mt-2 border-l-2 border-line-strong pl-3 font-mono text-[11px] text-faint">
+                No comments yet.
               </p>
             ) : (
               <ul className="mt-3 space-y-3">
                 {task.comments.map((item) => (
                   <li key={item.id} className="border-l-2 border-line pl-3">
-                    <p className="font-mono text-[10px] text-faint">
+                    <p className="font-mono text-[11px] text-faint">
                       {item.authorName} · {new Date(item.createdAt).toLocaleString()}
                     </p>
                     <p className="mt-1 whitespace-pre-wrap text-[12px] leading-relaxed text-muted">
@@ -360,16 +363,16 @@ function TaskDetail({
             </div>
           </section>
 
-          <div className="flex flex-wrap items-center gap-3 border-t border-line pt-3 font-mono text-[10px] text-faint">
+          <div className="flex flex-wrap items-center gap-3 border-t border-line pt-3 font-mono text-[11px] text-faint">
             <Link href={`/${orgSlug}/r/${task.roomId}`} className="hover:text-text">
               open room
             </Link>
             <span>·</span>
-            <span>status changes are audited</span>
+            <span>changes are recorded in the audit log</span>
           </div>
         </div>
       </div>
-    </div>
+    </dialog>
   )
 }
 
@@ -394,8 +397,9 @@ export function TasksView({
   const [roomFilter, setRoomFilter] = useState("")
   const [query, setQuery] = useState("")
   const [error, setError] = useState<string | null>(null)
-  const [notice, setNotice] = useState<string | null>(null)
   const [pending, startTransition] = useTransition()
+  const refresh = useCallback(() => router.refresh(), [router])
+  useWorkspaceChange(["tasks"], refresh)
 
   const selected = tasks.find((task) => task.id === selectedId) ?? null
   const requests = tasks.filter((task) => task.kind === "request")
@@ -403,9 +407,9 @@ export function TasksView({
   const openRequests = requests.filter((task) => task.status !== "done")
   const doneRequests = requests.filter((task) => task.status === "done")
 
-  const filtered = useMemo(() => {
-    const needle = query.trim().toLowerCase()
-    return boardTasks.filter((task) => {
+  const matches = useCallback(
+    (task: TaskView) => {
+      const needle = query.trim().toLowerCase()
       if (roomFilter && task.roomId !== roomFilter) return false
       if (!needle) return true
       return (
@@ -413,19 +417,23 @@ export function TasksView({
         task.description.toLowerCase().includes(needle) ||
         String(task.number).includes(needle)
       )
-    })
-  }, [boardTasks, roomFilter, query])
+    },
+    [query, roomFilter],
+  )
+  const filtered = useMemo(() => boardTasks.filter(matches), [boardTasks, matches])
+  const shownOpenRequests = openRequests.filter(matches)
+  const shownDoneRequests = doneRequests.filter(matches)
+  const filtering = Boolean(roomFilter || query.trim())
 
   function create(form: FormData) {
     setError(null)
-    setNotice(null)
     startTransition(async () => {
       const result = await createTaskAction(null, form)
       if (!result.ok) {
         setError(result.error ?? "Could not create the item")
         return
       }
-      setNotice(result.message ?? "Created")
+      showToast({ message: result.message ?? "Created", tone: "success" })
       setShowNew(false)
       router.refresh()
     })
@@ -436,9 +444,9 @@ export function TasksView({
       <div className="mx-auto max-w-6xl px-5 py-8 sm:px-8">
         <header className="flex flex-wrap items-end justify-between gap-4 border-b border-line pb-5">
           <div>
-            <p className="font-mono text-[11px] text-faint">workspace</p>
+            <p className="font-mono text-[12px] text-faint">workspace</p>
             <h1 className="mt-1 text-2xl font-medium tracking-[-0.02em]">Tasks</h1>
-            <p className="mt-1.5 font-mono text-[11px] text-muted">
+            <p className="mt-1.5 font-mono text-[12px] text-muted">
               {boardTasks.filter((task) => task.status !== "done").length} open tasks ·{" "}
               {openRequests.length} requests waiting · {doneRequests.length} answered
             </p>
@@ -460,12 +468,6 @@ export function TasksView({
             <InlineAlert tone="danger">{error}</InlineAlert>
           </div>
         ) : null}
-        {notice ? (
-          <div className="mt-4">
-            <InlineAlert tone="success">{notice}</InlineAlert>
-          </div>
-        ) : null}
-
         {showNew ? (
           <form action={create} className="mt-5 border border-line bg-panel p-4 sm:p-5">
             <input type="hidden" name="orgSlug" value={orgSlug} />
@@ -488,7 +490,7 @@ export function TasksView({
                   onChange={(event) => setNewKind(event.target.value as "task" | "request")}
                 >
                   <option value="task">Task</option>
-                  <option value="request">Request from an agent</option>
+                  <option value="request">Request (needs a decision)</option>
                 </Select>
               </Field>
             </div>
@@ -505,7 +507,7 @@ export function TasksView({
                   ))}
                 </Select>
               </Field>
-              <Field label="assignee" htmlFor="new-task-assignee" hint="must be in the room">
+              <Field label="assignee" htmlFor="new-task-assignee" hint="must already be in the room">
                 <Select id="new-task-assignee" name="assignee" defaultValue="">
                   <option value="">Unassigned</option>
                   <optgroup label="People">
@@ -557,7 +559,7 @@ export function TasksView({
                 onClick={() => setView(option.key)}
                 aria-pressed={view === option.key}
                 className={cn(
-                  "-mb-px flex items-center gap-1.5 border-b-2 px-3 py-2 font-mono text-[11px]",
+                  "-mb-px flex items-center gap-1.5 border-b-2 px-3 py-2 font-mono text-[12px]",
                   view === option.key
                     ? "border-accent text-text"
                     : "border-transparent text-muted hover:text-text",
@@ -572,7 +574,7 @@ export function TasksView({
             <Select
               value={roomFilter}
               onChange={(event) => setRoomFilter(event.target.value)}
-              className="h-7 w-auto font-mono text-[10px]"
+              className="h-7 w-auto font-mono text-[11px]"
               aria-label="Filter by room"
             >
               <option value="">All rooms</option>
@@ -588,7 +590,7 @@ export function TasksView({
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
                 placeholder="Search"
-                className="w-full bg-transparent font-mono text-[10px] text-text outline-none placeholder:text-faint"
+                className="w-full bg-transparent font-mono text-[11px] text-text outline-none placeholder:text-faint"
               />
             </label>
           </div>
@@ -598,12 +600,29 @@ export function TasksView({
           filtered.length === 0 ? (
             <div className="mt-8">
               <EmptyState
-                title="No tasks match"
-                body="Create a task and assign it to a person or an agent. Agents can create tasks too."
+                title={filtering ? "No tasks match" : "No tasks yet"}
+                body={
+                  filtering
+                    ? "Try another room or search phrase."
+                    : "Create a task and assign it to a person or an agent. Agents can create tasks too."
+                }
                 action={
-                  <Button size="sm" variant="outline" onClick={() => setShowNew(true)}>
-                    New task
-                  </Button>
+                  filtering ? (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => {
+                        setRoomFilter("")
+                        setQuery("")
+                      }}
+                    >
+                      Clear filters
+                    </Button>
+                  ) : (
+                    <Button size="sm" variant="outline" onClick={() => setShowNew(true)}>
+                      New task
+                    </Button>
+                  )
                 }
               />
             </div>
@@ -616,14 +635,14 @@ export function TasksView({
                     <div className="flex items-baseline justify-between border-b border-line pb-2">
                       <h2
                         id={`column-${column.key}`}
-                        className="font-mono text-[10px] uppercase tracking-wide text-muted"
+                        className="font-mono text-[11px] uppercase tracking-wide text-muted"
                       >
                         {column.label}
                       </h2>
-                      <span className="font-mono text-[10px] text-faint">{items.length}</span>
+                      <span className="font-mono text-[11px] text-faint">{items.length}</span>
                     </div>
                     {items.length === 0 ? (
-                      <p className="mt-3 border border-dashed border-line px-3 py-4 font-mono text-[10px] text-faint">
+                      <p className="mt-3 border border-dashed border-line px-3 py-4 font-mono text-[11px] text-faint">
                         nothing here
                       </p>
                     ) : (
@@ -646,18 +665,20 @@ export function TasksView({
           <div className="mt-5 grid gap-8 lg:grid-cols-[1fr_320px]">
             <section>
               <div className="flex items-baseline justify-between border-b border-line pb-2">
-                <h2 className="font-mono text-[10px] uppercase tracking-wide text-muted">
+                <h2 className="font-mono text-[11px] uppercase tracking-wide text-muted">
                   Waiting on a human
                 </h2>
-                <span className="font-mono text-[10px] text-faint">{openRequests.length}</span>
+                <span className="font-mono text-[11px] text-faint">{shownOpenRequests.length}</span>
               </div>
-              {openRequests.length === 0 ? (
-                <p className="mt-4 border-l-2 border-line-strong pl-3 font-mono text-[11px] leading-relaxed text-faint">
-                  No open requests. Agents create one when they need a decision a tool cannot make.
+              {shownOpenRequests.length === 0 ? (
+                <p className="mt-4 border-l-2 border-line-strong pl-3 font-mono text-[12px] leading-relaxed text-faint">
+                  {filtering
+                    ? "No open requests match these filters."
+                    : "No open requests. Agents create one when they need a decision from a person."}
                 </p>
               ) : (
                 <ul className="mt-3 space-y-2">
-                  {openRequests.map((task) => (
+                  {shownOpenRequests.map((task) => (
                     <TaskCard
                       key={task.id}
                       task={task}
@@ -669,16 +690,18 @@ export function TasksView({
             </section>
             <aside className="border-t border-line pt-5 lg:border-l lg:border-t-0 lg:pl-8 lg:pt-0">
               <div className="flex items-baseline justify-between border-b border-line pb-2">
-                <h2 className="font-mono text-[10px] uppercase tracking-wide text-muted">
+                <h2 className="font-mono text-[11px] uppercase tracking-wide text-muted">
                   Answered
                 </h2>
-                <span className="font-mono text-[10px] text-faint">{doneRequests.length}</span>
+                <span className="font-mono text-[11px] text-faint">{shownDoneRequests.length}</span>
               </div>
-              {doneRequests.length === 0 ? (
-                <p className="mt-4 font-mono text-[10px] text-faint">No answered requests yet.</p>
+              {shownDoneRequests.length === 0 ? (
+                <p className="mt-4 font-mono text-[11px] text-faint">
+                  {filtering ? "No answered requests match." : "No answered requests yet."}
+                </p>
               ) : (
                 <ul className="mt-3 space-y-2">
-                  {doneRequests.slice(0, 8).map((task) => (
+                  {shownDoneRequests.slice(0, 8).map((task) => (
                     <li key={task.id}>
                       <button
                         type="button"
@@ -686,7 +709,7 @@ export function TasksView({
                         className="w-full border border-line bg-panel px-3 py-2 text-left hover:bg-raised"
                       >
                         <p className="truncate text-[12px] text-muted">{task.title}</p>
-                        <p className="mt-0.5 font-mono text-[9px] text-faint">
+                        <p className="mt-0.5 font-mono text-[11px] text-faint">
                           {task.roomName} · {shortDate(task.updatedAt)}
                         </p>
                       </button>
@@ -694,16 +717,16 @@ export function TasksView({
                   ))}
                 </ul>
               )}
-              <p className="mt-4 font-mono text-[10px] leading-relaxed text-faint">
+              <p className="mt-4 font-mono text-[11px] leading-relaxed text-faint">
                 Answers can post in the room or go to the agent&apos;s direct chat. Either way the
-                agent gets a turn.
+                agent then continues.
               </p>
             </aside>
           </div>
         )}
 
-        <p className="mt-10 font-mono text-[10px] leading-relaxed text-faint">
-          Task numbers are scoped to the workspace. Changing a status or assignee is audited.
+        <p className="mt-10 font-mono text-[11px] leading-relaxed text-faint">
+          Status and assignee changes are recorded in the audit log.
         </p>
       </div>
 

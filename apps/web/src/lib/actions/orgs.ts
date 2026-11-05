@@ -13,23 +13,12 @@ import {
   field,
   ok,
   revalidateOrg,
-  slugify,
+  uniqueOrgSlug,
 } from "@/lib/actions/shared"
 import { ssoEnabled } from "@/lib/env"
 import type { ActionResult } from "@/lib/types"
 
 const orgRoleSchema = z.enum(["owner", "admin", "member"])
-
-async function uniqueSlug(base: string): Promise<string> {
-  const admin = createAdminClient()
-  const root = slugify(base) || "workspace"
-  for (let i = 0; i < 50; i++) {
-    const candidate = i === 0 ? root : `${root}-${i + 1}`
-    const { data } = await admin.from("orgs").select("id").eq("slug", candidate).maybeSingle()
-    if (!data) return candidate
-  }
-  return `${root}-${Date.now().toString(36)}`
-}
 
 export async function createOrg(
   _prev: ActionResult | null,
@@ -42,20 +31,20 @@ export async function createOrg(
   if (requestedSlug && !/^[a-z0-9][a-z0-9-]{1,47}$/.test(requestedSlug)) {
     return fail("Slug can use lowercase letters, numbers and hyphens")
   }
-  const slug = await uniqueSlug(requestedSlug || name)
+  const slug = await uniqueOrgSlug(requestedSlug || name)
   const admin = createAdminClient()
   const { data: org, error } = await admin
     .from("orgs")
     .insert({ name, slug })
     .select("id")
     .single()
-  if (error || !org) return fail(errorMessage(error) || "Could not create the organization")
+  if (error || !org) return fail(errorMessage(error) || "Could not create the workspace")
   const { error: memberError } = await admin
     .from("org_members")
     .insert({ org_id: org.id, user_id: user.id, role: "owner" })
   if (memberError) {
     await admin.from("orgs").delete().eq("id", org.id)
-    return fail("Could not add you as the organization owner")
+    return fail("Could not add you as the workspace owner")
   }
   await audit({
     orgId: org.id,
@@ -126,6 +115,35 @@ export async function inviteMember(
     .from("org_members")
     .insert({ org_id: check.access.org.id, user_id: userId, role })
   if (error) return fail(errorMessage(error))
+
+  const requestedRooms = formData
+    .getAll("roomIds")
+    .filter((value): value is string => typeof value === "string")
+  if (requestedRooms.length) {
+    const { data: rooms } = await admin
+      .from("rooms")
+      .select("id")
+      .eq("org_id", check.access.org.id)
+      .neq("kind", "dm")
+      .in("id", requestedRooms)
+    const roomIds = (rooms ?? []).map((room) => room.id as string)
+    if (roomIds.length) {
+      await admin
+        .from("room_members")
+        .upsert(
+          roomIds.map((roomId) => ({ room_id: roomId, user_id: userId, role: "member" })),
+          { onConflict: "room_id,user_id" },
+        )
+      await admin.from("room_reads").upsert(
+        roomIds.map((roomId) => ({
+          room_id: roomId,
+          user_id: userId,
+          last_read_at: new Date().toISOString(),
+        })),
+        { onConflict: "user_id,room_id" },
+      )
+    }
+  }
   await audit({
     orgId: check.access.org.id,
     actorId: check.access.user.id,
@@ -135,6 +153,75 @@ export async function inviteMember(
   })
   revalidateOrg(orgSlug)
   return ok(existing ? "Member added" : "Invitation sent")
+}
+
+export async function renameWorkspaceAction(
+  _prev: ActionResult | null,
+  formData: FormData,
+): Promise<ActionResult> {
+  const orgSlug = field(formData, "orgSlug")
+  const check = await adminOrgAccess(orgSlug)
+  if ("error" in check) return fail(check.error)
+  const name = field(formData, "name")
+  if (name.length < 2 || name.length > 60) return fail("Name must be 2 to 60 characters")
+  const admin = createAdminClient()
+  const { error } = await admin.from("orgs").update({ name }).eq("id", check.access.org.id)
+  if (error) return fail(errorMessage(error))
+  await audit({
+    orgId: check.access.org.id,
+    actorId: check.access.user.id,
+    action: "org.renamed",
+    target: orgSlug,
+    metadata: { name },
+  })
+  revalidateOrg(orgSlug)
+  return ok("Workspace renamed")
+}
+
+export async function removeMemberAction(input: {
+  orgSlug: string
+  userId: string
+}): Promise<ActionResult> {
+  const check = await adminOrgAccess(input.orgSlug)
+  if ("error" in check) return fail(check.error)
+  if (input.userId === check.access.user.id) return fail("You cannot remove yourself")
+  const admin = createAdminClient()
+  const orgId = check.access.org.id
+  const { data: members } = await admin
+    .from("org_members")
+    .select("user_id, role")
+    .eq("org_id", orgId)
+  const target = members?.find((member) => member.user_id === input.userId)
+  if (!target) return fail("Member not found")
+  if (target.role === "owner" && check.access.role !== "owner") {
+    return fail("Only an owner can remove another owner")
+  }
+  const ownerCount = members?.filter((member) => member.role === "owner").length ?? 0
+  if (target.role === "owner" && ownerCount <= 1) {
+    return fail("A workspace needs at least one owner")
+  }
+  // Room membership has no link to the workspace row, so it has to be cleared here too.
+  const { data: rooms } = await admin.from("rooms").select("id").eq("org_id", orgId)
+  const roomIds = (rooms ?? []).map((room) => room.id as string)
+  if (roomIds.length) {
+    await admin.from("room_members").delete().eq("user_id", input.userId).in("room_id", roomIds)
+    await admin.from("room_reads").delete().eq("user_id", input.userId).in("room_id", roomIds)
+  }
+  const { error } = await admin
+    .from("org_members")
+    .delete()
+    .eq("org_id", orgId)
+    .eq("user_id", input.userId)
+  if (error) return fail(errorMessage(error))
+  await audit({
+    orgId,
+    actorId: check.access.user.id,
+    action: "member.removed",
+    target: input.userId,
+    metadata: { role: target.role },
+  })
+  revalidateOrg(input.orgSlug)
+  return ok("Member removed")
 }
 
 export async function setMemberRole(
@@ -163,7 +250,7 @@ export async function setMemberRole(
   }
   const ownerCount = members?.filter((m) => m.role === "owner").length ?? 0
   if (target.role === "owner" && role !== "owner" && ownerCount <= 1) {
-    return fail("An organization needs at least one owner")
+    return fail("A workspace needs at least one owner")
   }
   const { error } = await admin
     .from("org_members")

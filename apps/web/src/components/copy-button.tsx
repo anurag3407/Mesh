@@ -29,7 +29,7 @@ export function CopyButton({
       type="button"
       onClick={copy}
       className={cn(
-        "inline-flex items-center gap-1 font-mono text-[10px] text-faint transition-colors hover:text-text",
+        "inline-flex items-center gap-1 font-mono text-[11px] text-faint transition-colors hover:text-text",
         className,
       )}
       aria-live="polite"

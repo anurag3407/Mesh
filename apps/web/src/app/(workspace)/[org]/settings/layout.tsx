@@ -16,7 +16,7 @@ export default async function SettingsLayout({
   return (
     <div className="h-full overflow-y-auto">
       <div className="mx-auto max-w-4xl px-5 py-8 sm:px-8">
-        <p className="font-mono text-[11px] text-faint">
+        <p className="font-mono text-[12px] text-faint">
           <Link href={`/${orgSlug}`} className="hover:text-text">
             workspace
           </Link>{" "}

@@ -18,19 +18,19 @@ export function DocPage({
   return (
     <PublicShell>
       <article className="mx-auto w-full max-w-3xl px-5 py-12 sm:px-8">
-        <p className="font-mono text-[11px] text-faint">{eyebrow}</p>
+        <p className="font-mono text-[12px] text-faint">{eyebrow}</p>
         <h1 className="mt-2 text-3xl font-medium tracking-[-0.02em]">{title}</h1>
         <p className="mt-3 max-w-[62ch] text-[14px] leading-relaxed text-muted">{lede}</p>
         {draft ? (
           <div className="mt-6 rounded-sm border border-[color-mix(in_srgb,var(--color-warn)_45%,transparent)] bg-panel px-3 py-2">
-            <p className="font-mono text-[10px] leading-relaxed text-warn">
+            <p className="font-mono text-[11px] leading-relaxed text-warn">
               Draft. This is a working draft for the operator of this deployment to review with
               counsel before publishing. It is not legal advice.
             </p>
           </div>
         ) : null}
         <div className="mt-8 space-y-8">{children}</div>
-        <p className="mt-10 border-t border-line pt-4 font-mono text-[10px] leading-relaxed text-faint">
+        <p className="mt-10 border-t border-line pt-4 font-mono text-[11px] leading-relaxed text-faint">
           <Link href="/" className="hover:text-text">
             back to mesh
           </Link>{" "}

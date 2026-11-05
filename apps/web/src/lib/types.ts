@@ -366,6 +366,8 @@ export interface RoomPageData {
   threadCounts: Record<string, number>
   meeting: MeetingView | null
   roomSchedule: RoomScheduleView | null
+  lastReadAt: string | null
+  roomMemberIds: string[]
 }
 
 export interface ActionResult {

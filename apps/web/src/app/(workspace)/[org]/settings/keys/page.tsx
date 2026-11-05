@@ -22,12 +22,12 @@ export default async function KeysPage({ params }: { params: Promise<{ org: stri
     <>
       <Section
         title="Provider keys"
-        description="Keys are encrypted with AES-256-GCM before they reach the database. The web app and orchestrator are the only processes that decrypt them. Only the last four characters are readable after saving."
+        description="API keys let your agents use an AI model. They are encrypted when saved, and only the last four characters can be seen afterwards."
       >
         {keys.length === 0 ? (
           <EmptyState
             title="No provider keys"
-            body="Add a key, then attach it to an agent. Agents without a key use the orchestrator's DEV_OPENAI_COMPAT_* fallback when it is configured; otherwise they cannot run."
+            body="Add a key below, then choose it when you create an agent. Agents need a key to reply."
           />
         ) : (
           <ul className="divide-y divide-line border-y border-line">
@@ -35,7 +35,7 @@ export default async function KeysPage({ params }: { params: Promise<{ org: stri
               <li key={key.id} className="flex flex-wrap items-center gap-x-4 gap-y-2 py-3">
                 <div className="min-w-0 flex-1">
                   <p className="text-[13px] text-text">{key.label}</p>
-                  <p className="mt-0.5 font-mono text-[10px] text-faint">
+                  <p className="mt-0.5 font-mono text-[11px] text-faint">
                     {PROVIDER_LABELS[key.provider] ?? key.provider} · •••• {key.last4}
                     {key.baseUrl ? ` · ${key.baseUrl}` : ""}
                   </p>
@@ -50,7 +50,7 @@ export default async function KeysPage({ params }: { params: Promise<{ org: stri
 
       <Section
         title="Add a key"
-        description="Use the provider's own key. For Ollama, vLLM, LM Studio or another OpenAI-compatible endpoint, choose the compatible provider and give its base URL."
+        description="Paste a key from your provider. For Ollama, LM Studio or a similar server, choose OpenAI-compatible and enter its base URL."
       >
         <ActionForm action={saveProviderKey} submitLabel="Save key" resetOnSuccess>
           <input type="hidden" name="orgSlug" value={orgSlug} />
@@ -78,12 +78,12 @@ export default async function KeysPage({ params }: { params: Promise<{ org: stri
               placeholder="sk-…"
             />
           </Field>
-          <Field label="base url" htmlFor="base-url" hint="OpenAI-compatible only">
+          <Field label="base url" htmlFor="base-url" hint="only for OpenAI-compatible servers">
             <Input id="base-url" name="baseUrl" placeholder="http://localhost:11434/v1" />
           </Field>
           <HelpText>
-            The key is tested after saving. Delete a key at any time; agents bound to it stop
-            working until another key is attached.
+            Use Test after saving to check that it works. If you delete a key, agents using it stop
+            replying until you give them another one.
           </HelpText>
         </ActionForm>
       </Section>

@@ -81,7 +81,7 @@ export function ProfileForm({
               </Button>
             ) : null}
           </div>
-          <p className="font-mono text-[10px] text-faint">PNG, JPEG or WebP · under 200 KB</p>
+          <p className="font-mono text-[11px] text-faint">PNG, JPEG or WebP · under 200 KB</p>
         </div>
       </div>
       <input
@@ -109,7 +109,7 @@ export function ProfileForm({
       </Field>
 
       <fieldset>
-        <legend className="mb-1.5 font-mono text-[11px] text-muted">notifications</legend>
+        <legend className="mb-1.5 font-mono text-[12px] text-muted">notifications</legend>
         <div className="divide-y divide-line border border-line">
           {MODES.map((option) => {
             const active = mode === option.value

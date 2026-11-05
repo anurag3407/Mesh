@@ -105,6 +105,28 @@ export async function createAgent(
       error?.code === "23505" ? `@${fields.handle} already exists` : errorMessage(error),
     )
   }
+  const roomId = optionalField(formData, "roomId")
+  let addedToRoom = false
+  if (roomId) {
+    const { data: room } = await admin
+      .from("rooms")
+      .select("id, org_id, kind")
+      .eq("id", roomId)
+      .maybeSingle()
+    if (room && room.org_id === check.access.org.id && room.kind !== "dm") {
+      const { data: last } = await admin
+        .from("room_agents")
+        .select("position")
+        .eq("room_id", roomId)
+        .order("position", { ascending: false })
+        .limit(1)
+        .maybeSingle()
+      const { error: linkError } = await admin
+        .from("room_agents")
+        .insert({ room_id: roomId, agent_id: agent.id, position: (last?.position ?? -1) + 1 })
+      addedToRoom = !linkError
+    }
+  }
   await audit({
     orgId: check.access.org.id,
     actorId: check.access.user.id,
@@ -114,8 +136,12 @@ export async function createAgent(
   })
   revalidateOrg(orgSlug)
   return ok(
-    webhookSecret ? "Agent created. Copy the webhook secret now." : "Agent created",
-    { agentId: agent.id, webhookSecret },
+    webhookSecret
+      ? "Agent created. Copy the webhook secret now."
+      : addedToRoom
+        ? "Agent created and added to the room"
+        : "Agent created",
+    { agentId: agent.id, kind, webhookSecret },
   )
 }
 
@@ -170,6 +196,47 @@ export async function updateAgent(
   return ok("Agent saved")
 }
 
+export async function deleteAgentAction(input: {
+  orgSlug: string
+  agentId: string
+}): Promise<ActionResult> {
+  const check = await adminOrgAccess(input.orgSlug)
+  if ("error" in check) return fail(check.error)
+  const admin = createAdminClient()
+  const orgId = check.access.org.id
+  const { data: agent } = await admin
+    .from("agents")
+    .select("id, org_id, handle")
+    .eq("id", input.agentId)
+    .maybeSingle()
+  if (!agent || agent.org_id !== orgId) return fail("Agent not found")
+  // A direct chat with a deleted agent could never get another reply.
+  await admin.from("rooms").delete().eq("org_id", orgId).eq("agent_dm_agent_id", input.agentId)
+  const { data: debateRooms } = await admin
+    .from("rooms")
+    .select("id, debate_order")
+    .eq("org_id", orgId)
+    .contains("debate_order", [input.agentId])
+  for (const room of debateRooms ?? []) {
+    await admin
+      .from("rooms")
+      .update({
+        debate_order: (room.debate_order as string[]).filter((id) => id !== input.agentId),
+      })
+      .eq("id", room.id)
+  }
+  const { error } = await admin.from("agents").delete().eq("id", input.agentId)
+  if (error) return fail(errorMessage(error))
+  await audit({
+    orgId,
+    actorId: check.access.user.id,
+    action: "agent.deleted",
+    target: agent.handle,
+  })
+  revalidateOrg(input.orgSlug)
+  return ok("Agent deleted")
+}
+
 export async function testAgent(orgSlug: string, agentId: string): Promise<ActionResult> {
   const check = await adminOrgAccess(orgSlug)
   if ("error" in check) return fail(check.error)
@@ -181,7 +248,7 @@ export async function testAgent(orgSlug: string, agentId: string): Promise<Actio
     .maybeSingle()
   if (!agent || agent.org_id !== check.access.org.id) return fail("Agent not found")
   if (agent.kind === "external") {
-    return fail("External agents are tested by their webhook delivery log")
+    return fail("External agents are checked in their webhook delivery log")
   }
   const result = await testAgentInOrchestrator(agentId, check.access.org.id)
   if (!result.ok) {

@@ -1,14 +1,20 @@
 "use client"
 
-import { useEffect, useLayoutEffect, useRef, useState } from "react"
-import Link from "next/link"
+import { useEffect, useId, useLayoutEffect, useRef, useState, useTransition } from "react"
+import { useRouter } from "next/navigation"
 import { sendMessage } from "@/lib/actions/messages"
+import { startMeetingNowAction } from "@/lib/actions/meetings"
+import { createTaskAction } from "@/lib/actions/tasks"
 import { enqueueOutbox, flushOutbox, readOutbox } from "@/lib/outbox"
+import { humanHandle } from "@/lib/human-handle"
 import { Button } from "@/components/ui/button"
+import { DetailsMenu } from "@/components/ui/details-menu"
+import { Field, Input, Select, Textarea } from "@/components/ui/field"
 import { Kbd } from "@/components/ui/status"
+import { showToast } from "@/components/ui/toast"
 import { SendIcon } from "@/components/ui/icons"
 import { cn } from "@/lib/format"
-import type { RoomAgentView } from "@/lib/types"
+import type { MemberView, RoomAgentView } from "@/lib/types"
 
 interface MentionState {
   start: number
@@ -17,39 +23,231 @@ interface MentionState {
   index: number
 }
 
+interface MentionOption {
+  handle: string
+  displayName: string
+  group: "agents" | "people"
+}
+
+type QuickAction = "task" | "meeting"
+
+function draftKey(roomId: string, threadRootId: string | null): string {
+  return `mesh:draft:${roomId}:${threadRootId ?? "main"}`
+}
+
+function readDraft(key: string): string {
+  try {
+    return window.localStorage.getItem(key) ?? ""
+  } catch {
+    return ""
+  }
+}
+
+function writeDraft(key: string, value: string): void {
+  try {
+    if (value) window.localStorage.setItem(key, value)
+    else window.localStorage.removeItem(key)
+  } catch {
+    // Drafts are a convenience; losing storage must not block typing.
+  }
+}
+
+function QuickActionDialog({
+  action,
+  orgSlug,
+  roomId,
+  agents,
+  people,
+  onClose,
+}: {
+  action: QuickAction
+  orgSlug: string
+  roomId: string
+  agents: RoomAgentView[]
+  people: MemberView[]
+  onClose: () => void
+}) {
+  const ref = useRef<HTMLDialogElement>(null)
+  const router = useRouter()
+  const [pending, startTransition] = useTransition()
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    const dialog = ref.current
+    if (dialog && !dialog.open) dialog.showModal()
+  }, [])
+
+  function submit(form: FormData) {
+    setError(null)
+    form.set("orgSlug", orgSlug)
+    form.set("roomId", roomId)
+    startTransition(async () => {
+      const result =
+        action === "task"
+          ? await createTaskAction(null, form)
+          : await startMeetingNowAction(null, form)
+      if (!result.ok) {
+        setError(result.error ?? "Something went wrong")
+        return
+      }
+      showToast({
+        message: result.message ?? (action === "task" ? "Task created" : "Meeting started"),
+        tone: "success",
+        action: action === "task" ? { label: "View tasks", href: `/${orgSlug}/tasks` } : undefined,
+      })
+      ref.current?.close()
+      router.refresh()
+    })
+  }
+
+  return (
+    <dialog
+      ref={ref}
+      className="m-auto w-[min(480px,92vw)] rounded-md border border-line-strong bg-panel p-0 text-text backdrop:bg-void/75"
+      onClose={onClose}
+      aria-label={action === "task" ? "New task" : "Start a meeting"}
+    >
+      <form action={submit} className="space-y-3 p-4">
+        <h2 className="text-[15px] font-medium">
+          {action === "task" ? "New task in this room" : "Start a meeting in this room"}
+        </h2>
+        {action === "task" ? (
+          <>
+            <input type="hidden" name="kind" value="task" />
+            <Field label="title" htmlFor="quick-task-title">
+              <Input id="quick-task-title" name="title" required minLength={2} maxLength={120} autoFocus />
+            </Field>
+            <Field label="assignee" htmlFor="quick-task-assignee" hint="optional">
+              <Select id="quick-task-assignee" name="assignee" defaultValue="">
+                <option value="">Unassigned</option>
+                {people.length ? (
+                  <optgroup label="People">
+                    {people.map((person) => (
+                      <option key={person.userId} value={`user:${person.userId}`}>
+                        {person.displayName}
+                      </option>
+                    ))}
+                  </optgroup>
+                ) : null}
+                {agents.length ? (
+                  <optgroup label="Agents">
+                    {agents.map(({ agent }) => (
+                      <option key={agent.id} value={`agent:${agent.id}`}>
+                        @{agent.handle}
+                      </option>
+                    ))}
+                  </optgroup>
+                ) : null}
+              </Select>
+            </Field>
+            <Field label="description" htmlFor="quick-task-description" hint="optional">
+              <Textarea id="quick-task-description" name="description" rows={3} />
+            </Field>
+          </>
+        ) : (
+          <>
+            <Field label="title" htmlFor="quick-meeting-title">
+              <Input id="quick-meeting-title" name="title" required maxLength={80} defaultValue="Stand-up" autoFocus />
+            </Field>
+            <Field label="length" htmlFor="quick-meeting-length">
+              <Select id="quick-meeting-length" name="durationMinutes" defaultValue="15">
+                {[10, 15, 30, 45, 60].map((minutes) => (
+                  <option key={minutes} value={minutes}>
+                    {minutes} minutes
+                  </option>
+                ))}
+              </Select>
+            </Field>
+            <Field label="agenda" htmlFor="quick-meeting-agenda" hint="optional">
+              <Textarea id="quick-meeting-agenda" name="agenda" rows={2} className="min-h-16" />
+            </Field>
+            <p className="text-[12px] leading-relaxed text-muted">
+              Every agent in the room will reply, one at a time. This uses your API credits.
+            </p>
+          </>
+        )}
+        {error ? (
+          <p role="alert" className="text-[12px] text-danger">
+            {error}
+          </p>
+        ) : null}
+        <div className="flex justify-end gap-2 pt-1">
+          <Button size="sm" variant="ghost" onClick={() => ref.current?.close()}>
+            Cancel
+          </Button>
+          <Button size="sm" variant="primary" type="submit" disabled={pending}>
+            {pending ? "Saving…" : action === "task" ? "Create task" : "Start meeting"}
+          </Button>
+        </div>
+      </form>
+    </dialog>
+  )
+}
+
 export function Composer({
   orgSlug,
   roomId,
   threadRootId = null,
   agents,
+  people = [],
+  selfId,
+  canAdmin = false,
+  roomKind = "public",
   placeholder,
   compact = false,
   autoFocus = false,
   onTyping,
   onSent,
+  onShowCanvas,
 }: {
   orgSlug: string
   roomId: string
   threadRootId?: string | null
   agents: RoomAgentView[]
+  people?: MemberView[]
+  selfId?: string
+  canAdmin?: boolean
+  roomKind?: "public" | "private" | "dm"
   placeholder: string
   compact?: boolean
   autoFocus?: boolean
   onTyping?: () => void
   onSent?: () => void
+  onShowCanvas?: () => void
 }) {
+  const storageKey = draftKey(roomId, threadRootId)
   const [value, setValue] = useState("")
   const [pending, setPending] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
   const [mention, setMention] = useState<MentionState | null>(null)
   const [outboxCount, setOutboxCount] = useState(0)
+  const [quickAction, setQuickAction] = useState<QuickAction | null>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const baseId = useId()
+  const listboxId = `${baseId}-mentions`
 
-  const options = mention
+  useEffect(() => {
+    setValue(readDraft(storageKey))
+  }, [storageKey])
+
+  const others = people.filter((person) => person.userId !== selfId)
+
+  const options: MentionOption[] = mention
     ? [
-        { handle: "all_bots", displayName: "every agent in the room" },
-        ...agents.map(({ agent }) => ({ handle: agent.handle, displayName: agent.displayName })),
+        ...(agents.length > 1
+          ? [{ handle: "all_bots", displayName: "every agent in the room", group: "agents" as const }]
+          : []),
+        ...agents.map(({ agent }) => ({
+          handle: agent.handle,
+          displayName: agent.displayName,
+          group: "agents" as const,
+        })),
+        ...others.map((person) => ({
+          handle: humanHandle(person.displayName),
+          displayName: person.displayName,
+          group: "people" as const,
+        })),
       ].filter((option) => {
         const query = mention.query.toLowerCase()
         return (
@@ -59,6 +257,8 @@ export function Composer({
         )
       })
     : []
+  const activeOptionId =
+    mention && options.length ? `${listboxId}-${mention.index % options.length}` : undefined
 
   const refreshOutbox = async () => {
     const items = await readOutbox()
@@ -87,6 +287,19 @@ export function Composer({
     textarea.style.height = `${Math.min(Math.max(textarea.scrollHeight, 40), max)}px`
   }, [value, compact])
 
+  function updateValue(next: string) {
+    setValue(next)
+    writeDraft(storageKey, next)
+  }
+
+  function clearIfUnchanged(sent: string) {
+    setValue((current) => {
+      const next = current.trim() === sent ? "" : current
+      writeDraft(storageKey, next)
+      return next
+    })
+  }
+
   function updateMention(nextValue: string, caret: number) {
     const before = nextValue.slice(0, caret)
     const match = /(^|[\s(])@([a-zA-Z0-9_-]*)$/.exec(before)
@@ -105,7 +318,7 @@ export function Composer({
   function insertMention(handle: string) {
     if (!mention) return
     const next = `${value.slice(0, mention.start)}@${handle} ${value.slice(mention.end)}`
-    setValue(next)
+    updateValue(next)
     setMention(null)
     requestAnimationFrame(() => {
       const textarea = textareaRef.current
@@ -127,7 +340,7 @@ export function Composer({
       createdAt: new Date().toISOString(),
     })
     await refreshOutbox()
-    setNotice("Written offline. It sends when the connection returns.")
+    setNotice("Saved. It will send when you are back online.")
   }
 
   async function send() {
@@ -139,9 +352,9 @@ export function Composer({
     if (!navigator.onLine) {
       try {
         await queueOffline(content)
-        setValue((current) => (current.trim() === content ? "" : current))
+        clearIfUnchanged(content)
       } catch {
-        setError("Could not write to the offline queue in this browser.")
+        setError("Could not save this message for later in this browser.")
       } finally {
         setPending(false)
       }
@@ -152,16 +365,16 @@ export function Composer({
       if (!result.ok) {
         setError(result.error ?? "Message could not be sent")
       } else {
-        setValue((current) => (current.trim() === content ? "" : current))
+        clearIfUnchanged(content)
         if (result.warning) setNotice(result.warning)
         onSent?.()
       }
     } catch {
       try {
         await queueOffline(content)
-        setValue((current) => (current.trim() === content ? "" : current))
+        clearIfUnchanged(content)
       } catch {
-        setError("Connection lost and the offline queue is unavailable.")
+        setError("Connection lost, and this message could not be saved for later.")
       }
     } finally {
       setPending(false)
@@ -183,7 +396,7 @@ export function Composer({
       }
       if (event.key === "Enter" || event.key === "Tab") {
         event.preventDefault()
-        const option = options[mention.index]
+        const option = options[mention.index % options.length]
         if (option) insertMention(option.handle)
         return
       }
@@ -198,48 +411,60 @@ export function Composer({
     }
   }
 
+  const showQuickActions = !threadRootId
+  const menuItemClass =
+    "block w-full px-3 py-2.5 text-left text-[13px] text-muted hover:bg-raised hover:text-text md:py-1.5 md:text-[12px]"
+
   return (
-    <div className={cn("relative", compact ? "px-3 pb-3" : "px-4 pb-4")}>
+    <div className={cn("relative", compact ? "px-3 pb-3 pt-2" : "px-3 pb-3 pt-2 md:px-4 md:pb-4")}>
       {mention && options.length ? (
         <div
-          className="absolute bottom-full left-3 z-10 mb-1 max-h-56 w-72 overflow-y-auto rounded-sm border border-line-strong bg-panel py-1 shadow-[0_12px_32px_rgba(0,0,0,0.45)]"
-          id="mention-options"
+          className="absolute bottom-full left-3 z-10 mb-1 max-h-56 w-72 max-w-[calc(100%-1.5rem)] overflow-y-auto rounded-sm border border-line-strong bg-panel py-1 shadow-[0_12px_32px_rgba(0,0,0,0.45)]"
+          id={listboxId}
           role="listbox"
-          aria-label="Mention an agent"
+          aria-label="Mention an agent or a person"
         >
-          <p className="px-2 py-1 font-mono text-[10px] text-faint">agents</p>
           {options.map((option, index) => (
-            <button
-              key={option.handle}
-              type="button"
-              role="option"
-              aria-selected={index === mention.index}
-              onMouseDown={(event) => {
-                event.preventDefault()
-                insertMention(option.handle)
-              }}
-              className={cn(
-                "flex w-full items-baseline justify-between gap-3 px-2 py-1.5 text-left",
-                index === mention.index ? "bg-raised text-text" : "text-muted hover:bg-raised",
-              )}
-            >
-              <span className="font-mono text-[12px]">@{option.handle}</span>
-              <span className="truncate text-[11px] text-faint">{option.displayName}</span>
-            </button>
+            <div key={`${option.group}-${option.handle}`}>
+              {index === 0 || options[index - 1]?.group !== option.group ? (
+                <p className="px-2 py-1 font-mono text-[11px] text-faint">{option.group}</p>
+              ) : null}
+              <button
+                type="button"
+                id={`${listboxId}-${index}`}
+                role="option"
+                aria-selected={index === mention.index % options.length}
+                onMouseDown={(event) => {
+                  event.preventDefault()
+                  insertMention(option.handle)
+                }}
+                className={cn(
+                  "flex w-full items-baseline justify-between gap-3 px-2 py-2 text-left md:py-1.5",
+                  index === mention.index % options.length
+                    ? "bg-raised text-text"
+                    : "text-muted hover:bg-raised",
+                )}
+              >
+                <span className="truncate font-mono text-[12px]">@{option.handle}</span>
+                <span className="truncate text-[12px] text-faint">{option.displayName}</span>
+              </button>
+            </div>
           ))}
         </div>
       ) : null}
 
-      <div className="rounded-md border border-line bg-panel focus-within:border-line-strong">
-        <label htmlFor={`composer-${threadRootId ?? "main"}`} className="sr-only">
+      <div className="rounded-md border border-[var(--color-control)] bg-panel focus-within:border-accent">
+        <label htmlFor={`${baseId}-input`} className="sr-only">
           {placeholder}
         </label>
         <textarea
-          id={`composer-${threadRootId ?? "main"}`}
+          id={`${baseId}-input`}
           data-testid="composer"
+          role="combobox"
           aria-autocomplete="list"
           aria-expanded={Boolean(mention && options.length)}
-          aria-controls="mention-options"
+          aria-controls={mention && options.length ? listboxId : undefined}
+          aria-activedescendant={activeOptionId}
           ref={textareaRef}
           value={value}
           autoFocus={autoFocus}
@@ -249,7 +474,7 @@ export function Composer({
           placeholder={placeholder}
           onChange={(event) => {
             const next = event.target.value
-            setValue(next)
+            updateValue(next)
             updateMention(next, event.target.selectionStart ?? next.length)
             onTyping?.()
           }}
@@ -261,42 +486,40 @@ export function Composer({
           className="block max-h-[220px] min-h-10 w-full resize-none bg-transparent px-3 pt-2.5 text-[13px] leading-relaxed text-text outline-none placeholder:text-faint"
         />
         <div className="flex flex-wrap items-center gap-2 px-2.5 pb-2">
-          <details className="relative">
-            <summary
-              className="grid h-6 w-6 cursor-pointer list-none place-items-center rounded-sm border border-line font-mono text-[13px] text-muted hover:border-line-strong hover:text-text"
-              aria-label="More actions"
-              title="More actions"
+          {showQuickActions ? (
+            <DetailsMenu
+              className="relative"
+              summaryLabel="More actions"
+              summaryClassName="grid h-10 w-10 cursor-pointer list-none place-items-center rounded-sm border border-line font-mono text-[15px] text-muted hover:border-line-strong hover:text-text md:h-7 md:w-7 md:text-[13px]"
+              summary="+"
             >
-              +
-            </summary>
-            <div className="absolute bottom-full left-0 z-10 mb-1 w-48 border border-line-strong bg-panel py-1 shadow-[0_12px_32px_rgba(0,0,0,0.45)]">
-              <Link
-                href={`/${orgSlug}/meetings`}
-                className="block px-3 py-1.5 text-[12px] text-muted hover:bg-raised hover:text-text"
-              >
-                Start a meeting
-              </Link>
-              <Link
-                href={`/${orgSlug}/tasks`}
-                className="block px-3 py-1.5 text-[12px] text-muted hover:bg-raised hover:text-text"
-              >
-                New task or request
-              </Link>
-              <Link
-                href={`/${orgSlug}/files`}
-                className="block px-3 py-1.5 text-[12px] text-muted hover:bg-raised hover:text-text"
-              >
-                Browse files
-              </Link>
-            </div>
-          </details>
-          <span className="font-mono text-[10px] text-faint">
-            <Kbd>@</Kbd> agent · <Kbd>Enter</Kbd> send · <Kbd>Shift</Kbd>+
-            <Kbd>Enter</Kbd> newline
+              <div className="absolute bottom-full left-0 z-10 mb-1 w-52 border border-line-strong bg-panel py-1 shadow-[0_12px_32px_rgba(0,0,0,0.45)]">
+                <button type="button" className={menuItemClass} onClick={() => setQuickAction("task")}>
+                  New task in this room
+                </button>
+                {canAdmin && roomKind !== "dm" ? (
+                  <button
+                    type="button"
+                    className={menuItemClass}
+                    onClick={() => setQuickAction("meeting")}
+                  >
+                    Start a meeting
+                  </button>
+                ) : null}
+                {onShowCanvas ? (
+                  <button type="button" className={menuItemClass} onClick={onShowCanvas}>
+                    Open canvas
+                  </button>
+                ) : null}
+              </div>
+            </DetailsMenu>
+          ) : null}
+          <span className="hidden font-mono text-[11px] text-faint md:inline">
+            <Kbd>@</Kbd> mention · <Kbd>Enter</Kbd> send · <Kbd>Shift</Kbd>+<Kbd>Enter</Kbd> new line
           </span>
           <div className="ml-auto flex items-center gap-2">
             {value.length > 90_000 ? (
-              <span className="font-mono text-[10px] text-warn">{value.length}/100000</span>
+              <span className="font-mono text-[11px] text-warn">{value.length}/100000</span>
             ) : null}
             <Button
               size="sm"
@@ -306,29 +529,42 @@ export function Composer({
               disabled={pending || !value.trim()}
             >
               <SendIcon width={14} height={14} />
-              {pending ? "sending" : "send"}
+              {pending ? "Sending…" : "Send"}
             </Button>
           </div>
         </div>
       </div>
 
-      <div className="mt-2 space-y-1.5">
-        {error ? (
-          <p role="alert" className="text-[12px] text-danger">
-            {error}
-          </p>
-        ) : null}
-        {notice ? (
-          <p role="status" className="text-[12px] text-warn">
-            {notice}
-          </p>
-        ) : null}
-        {outboxCount > 0 ? (
-          <p className="font-mono text-[10px] text-faint">
-            {outboxCount} {outboxCount === 1 ? "message" : "messages"} queued offline
-          </p>
-        ) : null}
-      </div>
+      {error || notice || outboxCount > 0 ? (
+        <div className="mt-2 space-y-1.5">
+          {error ? (
+            <p role="alert" className="text-[12px] text-danger">
+              {error}
+            </p>
+          ) : null}
+          {notice ? (
+            <p role="status" className="text-[12px] text-warn">
+              {notice}
+            </p>
+          ) : null}
+          {outboxCount > 0 ? (
+            <p className="font-mono text-[11px] text-faint">
+              {outboxCount} {outboxCount === 1 ? "message" : "messages"} waiting to send
+            </p>
+          ) : null}
+        </div>
+      ) : null}
+
+      {quickAction ? (
+        <QuickActionDialog
+          action={quickAction}
+          orgSlug={orgSlug}
+          roomId={roomId}
+          agents={agents}
+          people={others}
+          onClose={() => setQuickAction(null)}
+        />
+      ) : null}
     </div>
   )
 }

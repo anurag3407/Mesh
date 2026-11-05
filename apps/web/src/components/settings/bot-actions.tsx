@@ -50,10 +50,10 @@ export function IssueApiKey({ orgSlug, agentId }: { orgSlug: string; agentId: st
       {token ? (
         <div className="rounded-sm border border-[color-mix(in_srgb,var(--color-accent)_40%,transparent)] bg-accent-soft p-3">
           <div className="flex items-center justify-between gap-2">
-            <p className="font-mono text-[10px] text-accent">copy this key now, it is not shown again</p>
+            <p className="font-mono text-[11px] text-accent">copy this key now, it is not shown again</p>
             <CopyButton text={token} label="copy key" />
           </div>
-          <code className="mt-1 block break-all font-mono text-[11px] text-text">{token}</code>
+          <code className="mt-1 block break-all font-mono text-[12px] text-text">{token}</code>
         </div>
       ) : null}
     </div>
@@ -104,7 +104,7 @@ export function RotateWebhookSecret({
           >
             cancel
           </Button>
-          <span className="text-[11px] text-warn">The old secret stops working immediately.</span>
+          <span className="text-[12px] text-warn">The old secret stops working immediately.</span>
         </div>
       ) : (
         <Button
@@ -120,12 +120,12 @@ export function RotateWebhookSecret({
       {secret ? (
         <div className="rounded-sm border border-[color-mix(in_srgb,var(--color-accent)_40%,transparent)] bg-accent-soft p-3">
           <div className="flex items-center justify-between gap-2">
-            <p className="font-mono text-[10px] text-accent">
+            <p className="font-mono text-[11px] text-accent">
               new webhook secret, shown once. Update the bot now.
             </p>
             <CopyButton text={secret} label="copy secret" />
           </div>
-          <code className="mt-1 block break-all font-mono text-[11px] text-text">{secret}</code>
+          <code className="mt-1 block break-all font-mono text-[12px] text-text">{secret}</code>
         </div>
       ) : null}
     </div>
@@ -174,7 +174,7 @@ export function RevokeKeyButton({ orgSlug, keyId }: { orgSlug: string; keyId: st
         </Button>
       )}
       {error ? (
-        <span role="alert" className="text-[11px] text-danger">
+        <span role="alert" className="text-[12px] text-danger">
           {error}
         </span>
       ) : null}

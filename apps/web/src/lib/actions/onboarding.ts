@@ -16,7 +16,7 @@ import {
   fail,
   field,
   ok,
-  slugify,
+  uniqueOrgSlug,
 } from "@/lib/actions/shared"
 import type { ActionResult } from "@/lib/types"
 
@@ -29,24 +29,17 @@ function validTimeZone(timeZone: string): boolean {
   }
 }
 
-async function uniqueOrgSlug(base: string): Promise<string> {
-  const admin = createAdminClient()
-  const root = slugify(base) || "workspace"
-  for (let i = 0; i < 50; i++) {
-    const candidate = i === 0 ? root : `${root}-${i + 1}`
-    const { data } = await admin.from("orgs").select("id").eq("slug", candidate).maybeSingle()
-    if (!data) return candidate
-  }
-  return `${root}-${Date.now().toString(36)}`
-}
-
 export async function setupWorkspaceAction(
   _prev: ActionResult | null,
   formData: FormData,
 ): Promise<ActionResult> {
   const user = await requireUser("/onboarding")
   const roomName = field(formData, "roomName")
+  const workspaceName = field(formData, "workspaceName") || roomName
   const timezone = field(formData, "timezone") || "UTC"
+  if (workspaceName.length < 2 || workspaceName.length > 60) {
+    return fail("Workspace name must be 2 to 60 characters")
+  }
   if (roomName.length < 1 || roomName.length > 60) {
     return fail("Room name must be 1 to 60 characters")
   }
@@ -60,10 +53,10 @@ export async function setupWorkspaceAction(
     .limit(1)
   if (memberships?.length) return fail("You already have a workspace")
 
-  const slug = await uniqueOrgSlug(roomName)
+  const slug = await uniqueOrgSlug(workspaceName)
   const { data: org, error: orgError } = await admin
     .from("orgs")
-    .insert({ name: roomName, slug })
+    .insert({ name: workspaceName, slug })
     .select("id, slug")
     .single()
   if (orgError || !org) return fail(errorMessage(orgError) || "Could not create the workspace")
@@ -115,6 +108,7 @@ export async function setupWorkspaceAction(
         preferences: {
           ...((profile?.preferences as Record<string, unknown>) ?? {}),
           timezone,
+          onboarding: { orgSlug: org.slug, roomId: room.id },
         },
       })
       .eq("id", user.id)
@@ -132,61 +126,11 @@ export async function setupWorkspaceAction(
       target: org.slug,
       metadata: { roomName, timezone },
     })
-    revalidatePath("/", "layout")
     return ok("Workspace ready", { orgSlug: org.slug, orgId: org.id, roomId: room.id })
   } catch (error) {
     await admin.from("orgs").delete().eq("id", org.id)
     return fail(errorMessage(error))
   }
-}
-
-export async function saveOnboardingPhotoAction(
-  _prev: ActionResult | null,
-  formData: FormData,
-): Promise<ActionResult> {
-  const user = await requireUser("/onboarding")
-  const photo = field(formData, "photo")
-  if (!photo) {
-    const admin = createAdminClient()
-    await admin.from("profiles").update({ avatar_url: null }).eq("id", user.id)
-    return ok("Photo removed")
-  }
-  if (!/^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/.test(photo)) {
-    return fail("Use a PNG, JPEG or WebP image")
-  }
-  if (photo.length > 300_000) return fail("That image is too large. Use a smaller photo.")
-  const admin = createAdminClient()
-  const { error } = await admin.from("profiles").update({ avatar_url: photo }).eq("id", user.id)
-  if (error) return fail(errorMessage(error))
-  revalidatePath("/", "layout")
-  return ok("Photo saved")
-}
-
-export async function saveNotificationsAction(
-  _prev: ActionResult | null,
-  formData: FormData,
-): Promise<ActionResult> {
-  const user = await requireUser("/onboarding")
-  const mode = field(formData, "mode")
-  if (!["all", "mentions", "off"].includes(mode)) return fail("Choose a notification option")
-  const sound = field(formData, "sound") === "on"
-  const admin = createAdminClient()
-  const { data: profile } = await admin
-    .from("profiles")
-    .select("preferences")
-    .eq("id", user.id)
-    .maybeSingle()
-  const preferences = {
-    ...((profile?.preferences as Record<string, unknown>) ?? {}),
-    notifications: mode,
-    sound,
-  }
-  const { error } = await admin
-    .from("profiles")
-    .update({ preferences })
-    .eq("id", user.id)
-  if (error) return fail(errorMessage(error))
-  return ok("Notification preference saved")
 }
 
 export async function saveRoomScheduleAction(
@@ -253,32 +197,6 @@ export async function saveRoomScheduleAction(
   return ok("Schedule saved")
 }
 
-export async function saveRoomInstructionsAction(
-  _prev: ActionResult | null,
-  formData: FormData,
-): Promise<ActionResult> {
-  const orgSlug = field(formData, "orgSlug")
-  const roomId = field(formData, "roomId")
-  const check = await adminRoomAccess(orgSlug, roomId)
-  if ("error" in check) return fail(check.error)
-  const instructions = field(formData, "instructions")
-  if (instructions.length > 4_000) return fail("Keep room instructions under 4,000 characters")
-  const admin = createAdminClient()
-  const { error } = await admin
-    .from("rooms")
-    .update({ system_directive: instructions || null })
-    .eq("id", roomId)
-  if (error) return fail(errorMessage(error))
-  await audit({
-    orgId: check.access.org.id,
-    actorId: check.access.user.id,
-    action: "room.instructions_changed",
-    target: roomId,
-  })
-  revalidatePath(`/${orgSlug}`, "layout")
-  return ok("Room instructions saved")
-}
-
 export async function finishOnboardingAction(
   orgSlug: string,
   roomId: string,
@@ -286,6 +204,14 @@ export async function finishOnboardingAction(
   const check = await adminRoomAccess(orgSlug, roomId)
   if ("error" in check) return fail(check.error)
   const admin = createAdminClient()
+  const { data: profile } = await admin
+    .from("profiles")
+    .select("preferences")
+    .eq("id", check.access.user.id)
+    .maybeSingle()
+  const { onboarding: _finished, ...preferences } =
+    (profile?.preferences as Record<string, unknown> | null) ?? {}
+  await admin.from("profiles").update({ preferences }).eq("id", check.access.user.id)
   const { data: existing } = await admin
     .from("messages")
     .select("id")
@@ -323,7 +249,7 @@ export async function finishOnboardingAction(
       room_id: roomId,
       sender_type: "system",
       sender_id: null,
-      content: `Welcome to ${room.name}. Add an agent or invite someone to get started.`,
+      content: `Welcome to ${room.name}.`,
       status: "complete",
       metadata: { onboarding: true },
     })
@@ -336,7 +262,6 @@ export async function finishOnboardingAction(
     },
     { onConflict: "user_id,room_id" },
   )
-  revalidatePath(`/${orgSlug}`, "layout")
   return ok("Room ready", {
     path: `/${orgSlug}/r/${roomId}`,
     queued: Boolean(messageId),

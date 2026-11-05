@@ -26,7 +26,7 @@ function meetingPrompt(args: {
       ? `Check-in: ${args.title}.`
       : `Meeting started: ${args.title}.`
   const agenda = args.agenda.trim() ? `\n\nAgenda: ${args.agenda.trim()}` : ""
-  return `${lead}${agenda}\n\nBots: report what you have done, what you are doing next, and anything you need from the humans.`
+  return `${lead}${agenda}\n\nAgents: report what you have done, what you are doing next, and anything you need from the humans.`
 }
 
 async function postMeetingPrompt(args: {
@@ -252,6 +252,8 @@ export async function scheduleMeetingAction(
   if (title.length < 2 || title.length > 80) return fail("Give the meeting a short title")
   if (agenda.length > 4_000) return fail("Keep the agenda under 4,000 characters")
   if (!duration.success) return fail("Choose a meeting length between 5 and 240 minutes")
+  // A value without a zone would be read in the server's zone, not the user's.
+  if (!/(Z|[+-]\d{2}:\d{2})$/.test(when)) return fail("Choose a start date and time")
   const startsAt = new Date(when)
   if (Number.isNaN(startsAt.getTime())) return fail("Choose a start date and time")
   if (startsAt.getTime() < Date.now() - 60_000) return fail("Schedule the meeting in the future")

@@ -12,7 +12,7 @@ export function StatusBadge({
   return (
     <span
       className={cn(
-        "inline-flex items-center gap-1.5 rounded-sm border border-line bg-panel px-1.5 py-0.5 font-mono text-[10px] leading-4",
+        "inline-flex items-center gap-1.5 rounded-sm border border-line bg-panel px-1.5 py-0.5 font-mono text-[11px] leading-4",
         statusTone(status),
         className,
       )}
@@ -28,7 +28,7 @@ export function StatusBadge({
 
 export function Kbd({ children }: { children: React.ReactNode }) {
   return (
-    <kbd className="rounded-[3px] border border-line bg-raised px-1 py-0.5 font-mono text-[10px] text-muted">
+    <kbd className="rounded-[3px] border border-line bg-raised px-1 py-0.5 font-mono text-[11px] text-muted">
       {children}
     </kbd>
   )

@@ -70,7 +70,7 @@ export function RoomScheduleForm({
 
       <div className="grid gap-3 sm:grid-cols-2">
         <div className="space-y-3 border border-line bg-panel p-3">
-          <p className="font-mono text-[10px] text-faint">morning meeting</p>
+          <p className="font-mono text-[11px] text-faint">morning meeting</p>
           <div className="grid grid-cols-2 gap-2">
             <Field label="starts" htmlFor="morning-start">
               <Input
@@ -91,7 +91,7 @@ export function RoomScheduleForm({
           </div>
         </div>
         <div className="space-y-3 border border-line bg-panel p-3">
-          <p className="font-mono text-[10px] text-faint">evening meeting</p>
+          <p className="font-mono text-[11px] text-faint">evening meeting</p>
           <div className="grid grid-cols-2 gap-2">
             <Field label="starts" htmlFor="evening-start">
               <Input
@@ -174,7 +174,7 @@ export function RoomScheduleForm({
 
       <HelpText>
         Meetings fire in this room&apos;s time zone. A host message mentions every agent and the
-        normal turn queue runs. The orchestrator checks every minute.
+        agents reply one at a time as usual.
       </HelpText>
       {state ? (
         <InlineAlert tone={state.ok ? "success" : "danger"}>

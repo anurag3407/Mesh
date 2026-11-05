@@ -24,7 +24,7 @@ export function RoomForm({
       <div>
         <h2 className="text-[15px] font-medium">New room</h2>
         <p className="mt-1 text-[12px] leading-relaxed text-muted">
-          Rooms hold a feed, a canvas and the agents that may be called into it.
+          A room has its own chat, canvas and agents.
         </p>
       </div>
       <Field label="name" htmlFor="room-name" hint="1 to 60 characters">
@@ -36,11 +36,11 @@ export function RoomForm({
           placeholder="release-triage"
         />
       </Field>
-      <Field label="kind" htmlFor="room-kind">
+      <Field label="who can see it" htmlFor="room-kind">
         <Select id="room-kind" name="kind" value={kind} onChange={(e) => setKind(e.target.value)}>
-          <option value="private">private: members only</option>
-          <option value="public">public: everyone in the org can read</option>
-          <option value="dm">direct message</option>
+          <option value="private">Private: only people you add</option>
+          <option value="public">Public: anyone in the workspace can read</option>
+          <option value="dm">Direct chat with one person</option>
         </Select>
       </Field>
       <Field
@@ -60,7 +60,7 @@ export function RoomForm({
         </Select>
       </Field>
       <HelpText>
-        Agents are added after the room exists, from the room settings page or the agents page.
+        You can add agents and more people from room settings once the room exists.
       </HelpText>
       {state && !state.ok ? <InlineAlert tone="danger">{state.error}</InlineAlert> : null}
       <Button type="submit" disabled={pending} className="w-full">

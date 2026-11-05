@@ -40,7 +40,7 @@ export function AnalyticsCharts({
     <div className="space-y-8">
       <div>
         <h3 className="text-[13px] font-medium">Where did tokens go each day?</h3>
-        <p className="mt-1 font-mono text-[10px] text-faint">
+        <p className="mt-1 font-mono text-[11px] text-faint">
           input plus output tokens, stacked by agent
         </p>
         <div className="mt-3 h-[260px] w-full">
@@ -85,7 +85,7 @@ export function AnalyticsCharts({
 
       <div>
         <h3 className="text-[13px] font-medium">What did each day cost?</h3>
-        <p className="mt-1 font-mono text-[10px] text-faint">USD, from the pricing table</p>
+        <p className="mt-1 font-mono text-[11px] text-faint">USD, from the pricing table</p>
         <div className="mt-3 h-[200px] w-full">
           <ResponsiveContainer width="100%" height="100%">
             <LineChart data={daily} margin={{ top: 8, right: 8, bottom: 0, left: -12 }}>

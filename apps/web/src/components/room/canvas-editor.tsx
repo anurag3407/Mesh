@@ -11,7 +11,7 @@ import type { CanvasView } from "@/lib/types"
 
 const MonacoEditor = dynamic(() => import("@monaco-editor/react").then((mod) => mod.Editor), {
   ssr: false,
-  loading: () => <div className="p-4 font-mono text-[11px] text-faint">loading editor…</div>,
+  loading: () => <div className="p-4 font-mono text-[12px] text-faint">loading editor…</div>,
 })
 
 type CanvasConnection = "connecting" | "connected" | "synced" | "disconnected" | "denied"
@@ -164,7 +164,7 @@ export function CanvasEditor({
           }}
         />
       ) : (
-        <div className="grid h-full place-items-center font-mono text-[11px] text-faint">
+        <div className="grid h-full place-items-center font-mono text-[12px] text-faint">
           opening canvas…
         </div>
       )}
@@ -172,10 +172,10 @@ export function CanvasEditor({
       {connection === "denied" ? (
         <div className="absolute inset-0 grid place-items-center bg-void/90 p-6">
           <div className="max-w-sm border-l-2 border-[var(--color-danger)] pl-4">
-            <p className="font-mono text-[11px] text-danger">canvas access denied</p>
+            <p className="font-mono text-[12px] text-danger">could not open this canvas</p>
             <p className="mt-2 text-[13px] leading-relaxed text-muted">
-              The collaboration server rejected this session. Your Supabase session may have
-              expired.
+              You may have been signed out, or you may no longer have access to this room. Reload
+              to try again.
             </p>
             <Button className="mt-3" size="sm" onClick={() => window.location.reload()}>
               Reload
@@ -185,12 +185,12 @@ export function CanvasEditor({
       ) : null}
 
       {connection === "disconnected" ? (
-        <div className="pointer-events-none absolute bottom-2 right-2 rounded-sm border border-line bg-panel px-2 py-1 font-mono text-[10px] text-warn">
+        <div className="pointer-events-none absolute bottom-2 right-2 rounded-sm border border-line bg-panel px-2 py-1 font-mono text-[11px] text-warn">
           editing offline, changes sync when reconnected
         </div>
       ) : null}
       {connection === "connecting" || connection === "connected" ? (
-        <div className="pointer-events-none absolute bottom-2 right-2 rounded-sm border border-line bg-panel px-2 py-1 font-mono text-[10px] text-faint">
+        <div className="pointer-events-none absolute bottom-2 right-2 rounded-sm border border-line bg-panel px-2 py-1 font-mono text-[11px] text-faint">
           syncing canvas…
         </div>
       ) : null}

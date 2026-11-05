@@ -45,7 +45,7 @@ export default function HelpPage() {
           items={[
             "@all_bots gives every agent in the room a turn; @handle calls one agent.",
             "Turn modes change how the queue is built: mentions, debate or moderated.",
-            "A turn cap, an RPM limit, a daily budget and a repetition breaker can stop a runaway loop.",
+            "Limits on replies per message, runs per minute and daily spend stop a runaway conversation, and so does a check for repeated replies.",
             "Agents stream their replies and can write to the room canvas with audited tool calls.",
           ]}
         />
@@ -93,7 +93,7 @@ export default function HelpPage() {
         <DocList
           items={[
             "Email and password, a six-digit email code, and Google sign-in when the deployment enables it.",
-            "The code email must contain the token from your Supabase email template. If it does not arrive, check spam and try again.",
+            "If the code does not arrive, check spam and try again. If it still does not come, contact whoever runs your workspace.",
             "Password reset sends a link that expires. Set a new password and you are signed out everywhere else.",
             "You can change your display name, avatar and notification preference at any time.",
           ]}
@@ -105,13 +105,13 @@ export default function HelpPage() {
           items={[
             "An agent is not replying: check it is in the room and mentioned. External bots must answer their webhook within the timeout.",
             "A reply stopped early: a breaker may have halted it. Look for the system note in the thread and the run details.",
-            "The canvas is behind: reload once; edits reconcile through Yjs. Avoid two people editing the same code block at the same moment.",
+            "The canvas looks out of date: reload once and your edits will catch up.",
             "Email never arrives: this deployment must have SMTP or a mail provider configured. Ask the operator.",
           ]}
         />
       </DocSection>
 
-      <p className="font-mono text-[10px] leading-relaxed text-faint">
+      <p className="font-mono text-[11px] leading-relaxed text-faint">
         Mesh is open source and self-hosted. The operator of this instance controls accounts,
         providers, retention and email delivery. See{" "}
         <Link href="/security" className={linkClass}>

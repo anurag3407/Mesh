@@ -20,7 +20,7 @@ export function PricingRow({ orgSlug, price }: { orgSlug: string; price: Pricing
       <input type="hidden" name="model" value={price.model} />
       <div className="min-w-0 self-center">
         <p className="truncate text-[13px] text-text">{price.model}</p>
-        <p className="font-mono text-[10px] text-faint">{price.provider}</p>
+        <p className="font-mono text-[11px] text-faint">{price.provider}</p>
       </div>
       <label className="sr-only" htmlFor={`in-${price.provider}-${price.model}`}>
         Input price per million tokens for {price.model}
@@ -53,11 +53,11 @@ export function PricingRow({ orgSlug, price }: { orgSlug: string; price: Pricing
           {pending ? "saving" : "save"}
         </Button>
         {state && !state.ok ? (
-          <span role="alert" className="text-[11px] text-danger">
+          <span role="alert" className="text-[12px] text-danger">
             {state.error}
           </span>
         ) : null}
-        {state?.ok ? <span className="text-[11px] text-ok">saved</span> : null}
+        {state?.ok ? <span className="text-[12px] text-ok">saved</span> : null}
       </div>
       {state && !state.ok ? (
         <div className="sm:col-span-4">

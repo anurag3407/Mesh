@@ -156,7 +156,7 @@ function SignInForm({
           <div className="mt-1.5 text-right">
             <Link
               href="/forgot-password"
-              className="font-mono text-[10px] text-faint underline underline-offset-2 hover:text-text"
+              className="font-mono text-[11px] text-faint underline underline-offset-2 hover:text-text"
             >
               forgot password?
             </Link>
@@ -174,7 +174,7 @@ function SignInForm({
           Create an account
         </button>
       </p>
-      <p className="text-center font-mono text-[10px] leading-relaxed text-faint">
+      <p className="text-center font-mono text-[11px] leading-relaxed text-faint">
         Have an invite? Open the link from your email.
       </p>
     </div>
@@ -201,7 +201,7 @@ function VerifyForm({
   return (
     <div className="space-y-5">
       <div>
-        <p className="font-mono text-[11px] text-accent">verify your email</p>
+        <p className="font-mono text-[12px] text-accent">verify your email</p>
         <h2 className="mt-2 text-xl font-medium tracking-[-0.01em]">Check your inbox</h2>
         <p className="mt-2 text-[13px] leading-relaxed text-muted">
           We sent a 6-digit code to <span className="text-text">{email}</span>. Use it before it
@@ -222,17 +222,17 @@ function VerifyForm({
         <button
           type="submit"
           disabled={resendPending}
-          className="font-mono text-[11px] text-muted underline underline-offset-4 hover:text-text disabled:opacity-50"
+          className="font-mono text-[12px] text-muted underline underline-offset-4 hover:text-text disabled:opacity-50"
         >
           {resendPending ? "sending…" : "send a new code"}
         </button>
-        <button type="button" onClick={onBack} className="font-mono text-[11px] text-faint hover:text-text">
+        <button type="button" onClick={onBack} className="font-mono text-[12px] text-faint hover:text-text">
           use a different email
         </button>
       </form>
       {resendState?.message ? <InlineAlert tone="success">{resendState.message}</InlineAlert> : null}
       {resendState && !resendState.ok ? <InlineAlert tone="danger">{resendState.error}</InlineAlert> : null}
-      <p className="font-mono text-[10px] leading-relaxed text-faint">
+      <p className="font-mono text-[11px] leading-relaxed text-faint">
         The email link works too. If no code arrives, check spam, then resend.
       </p>
     </div>
@@ -306,8 +306,8 @@ export function AuthPanel({
           )}
         </>
       )}
-      <p className="mt-5 border-t border-line pt-3 font-mono text-[10px] leading-relaxed text-faint">
-        Access is limited to workspaces you belong to. Sessions use Supabase cookies.{" "}
+      <p className="mt-5 border-t border-line pt-3 font-mono text-[11px] leading-relaxed text-faint">
+        You can only see workspaces you belong to.{" "}
         <Link href="/security" className="underline underline-offset-2 hover:text-text">
           Security
         </Link>

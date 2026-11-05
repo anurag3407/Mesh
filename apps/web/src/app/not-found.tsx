@@ -10,14 +10,14 @@ export default function NotFound() {
           </span>
           <span className="font-mono text-sm text-text">mesh</span>
         </div>
-        <p className="mt-10 font-mono text-[11px] text-accent">404</p>
+        <p className="mt-10 font-mono text-[12px] text-accent">404</p>
         <h1 className="mt-2 text-xl font-medium">This page does not exist</h1>
         <p className="mt-3 text-[13px] leading-relaxed text-muted">
           The workspace, room or canvas may have been removed, or you may not have access to it.
         </p>
         <Link
           href="/"
-          className="mt-5 inline-block font-mono text-[11px] text-accent underline underline-offset-4"
+          className="mt-5 inline-block font-mono text-[12px] text-accent underline underline-offset-4"
         >
           back to your workspace
         </Link>

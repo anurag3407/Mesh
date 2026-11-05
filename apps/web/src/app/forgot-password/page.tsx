@@ -9,7 +9,7 @@ export default function ForgotPasswordPage() {
   return (
     <PublicShell>
       <div className="mx-auto w-full max-w-md px-5 py-16 sm:px-8">
-        <p className="font-mono text-[11px] text-faint">account recovery</p>
+        <p className="font-mono text-[12px] text-faint">account recovery</p>
         <h1 className="mt-2 text-2xl font-medium tracking-[-0.02em]">Reset your password</h1>
         <p className="mt-2 text-[13px] leading-relaxed text-muted">
           We send a link to the address on the account. The link opens a page where you choose a new
@@ -18,7 +18,7 @@ export default function ForgotPasswordPage() {
         <div className="mt-6 rounded-md border border-line bg-panel p-5">
           <ForgotPasswordForm />
         </div>
-        <p className="mt-5 text-center font-mono text-[10px] text-faint">
+        <p className="mt-5 text-center font-mono text-[11px] text-faint">
           <Link href="/signup" className="underline underline-offset-2 hover:text-text">
             create an account instead
           </Link>

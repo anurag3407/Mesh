@@ -4,9 +4,10 @@ import { useRef, useState, useTransition } from "react"
 import { restoreCanvasVersion } from "@/lib/actions/canvas"
 import { createSupabaseBrowserClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
+import { ConfirmButton } from "@/components/ui/confirm-button"
 import { HistoryIcon } from "@/components/ui/icons"
 import { InlineAlert } from "@/components/ui/empty"
-import { fullTime, pretty, truncate } from "@/lib/format"
+import { fullTime, truncate } from "@/lib/format"
 import type { CanvasVersionView } from "@/lib/types"
 
 export function CanvasVersions({
@@ -66,7 +67,7 @@ export function CanvasVersions({
     <>
       <Button variant="outline" size="sm" onClick={() => void open()} title="Canvas versions">
         <HistoryIcon width={14} height={14} />
-        versions
+        Versions
       </Button>
       <dialog
         ref={dialogRef}
@@ -78,16 +79,16 @@ export function CanvasVersions({
         <div className="flex items-center justify-between border-b border-line px-4 py-3">
           <div>
             <h2 className="text-[15px] font-medium">Canvas versions</h2>
-            <p className="mt-0.5 font-mono text-[10px] text-faint">
+            <p className="mt-0.5 font-mono text-[11px] text-faint">
               agent edits and restores are recorded
             </p>
           </div>
           <Button variant="ghost" size="sm" onClick={() => dialogRef.current?.close()}>
-            close
+            Close
           </Button>
         </div>
         <div className="max-h-[64vh] overflow-y-auto p-4">
-          {loading ? <p className="font-mono text-[11px] text-faint">loading versions…</p> : null}
+          {loading ? <p className="font-mono text-[12px] text-faint">loading versions…</p> : null}
           {error ? <InlineAlert tone="danger">{error}</InlineAlert> : null}
           {message ? <InlineAlert tone="success">{message}</InlineAlert> : null}
           {!loading && !versions.length ? (
@@ -100,31 +101,33 @@ export function CanvasVersions({
             {versions.map((version) => (
               <li key={version.id} className="rounded-sm border border-line bg-ink">
                 <div className="flex flex-wrap items-center gap-2 px-3 py-2">
-                  <span className="font-mono text-[11px] text-text">
+                  <span className="font-mono text-[12px] text-text">
                     {version.authorType === "agent" ? "agent" : "human"}
                   </span>
-                  <span className="font-mono text-[10px] text-faint">
+                  <span className="font-mono text-[11px] text-faint">
                     {fullTime(version.createdAt)}
                   </span>
-                  <span className="font-mono text-[10px] text-faint">
+                  <span className="font-mono text-[11px] text-faint">
                     {version.snapshotText.length} chars
                   </span>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="ml-auto h-7"
-                    disabled={pending}
-                    onClick={() => restore(version)}
-                  >
-                    restore
-                  </Button>
+                  <span className="ml-auto">
+                    <ConfirmButton
+                      label="Restore"
+                      confirmLabel="Replace current text"
+                      pendingLabel="Restoring…"
+                      warning="The current text is replaced for everyone."
+                      variant="outline"
+                      pending={pending}
+                      onConfirm={() => restore(version)}
+                    />
+                  </span>
                 </div>
                 <details>
-                  <summary className="cursor-pointer border-t border-line px-3 py-1.5 font-mono text-[10px] text-muted hover:text-text">
+                  <summary className="cursor-pointer border-t border-line px-3 py-2.5 md:py-1.5 font-mono text-[11px] text-muted hover:text-text">
                     preview
                   </summary>
-                  <pre className="max-h-52 overflow-auto border-t border-line px-3 py-2 font-mono text-[11px] leading-relaxed text-muted">
-                    {truncate(pretty(version.snapshotText), 4_000)}
+                  <pre className="max-h-52 overflow-auto border-t border-line px-3 py-2 font-mono text-[12px] leading-relaxed text-muted">
+                    {truncate(version.snapshotText, 4_000)}
                   </pre>
                 </details>
               </li>

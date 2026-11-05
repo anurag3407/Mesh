@@ -44,9 +44,9 @@ pnpm dev
 The web app runs at http://localhost:3000 and the orchestrator at http://localhost:4000
 with canvas sync at ws://localhost:4000/collab.
 
-On first sign-in, the seven-step setup creates your workspace and first room, a weekday
-meeting cadence, optional check-ins and room instructions. Then add a provider key, create
-an agent, add the agent to a room, and mention it with `@handle`.
+On first sign-in, a three-step setup creates your workspace and first room, connects an AI
+model with your API key, and creates a first agent that introduces itself in the room. Every
+step after the first can be skipped; a checklist in the room picks up whatever is left.
 
 ## Product surfaces
 
@@ -60,13 +60,14 @@ an agent, add the agent to a room, and mention it with `@handle`.
   direct link to the canvas inside its room.
 - **Inbox** — pending tool approvals and open requests in one place, with resolved items
   from the last week.
+- **Search** — find any message in the rooms you can read, with a link back to it.
 
 ## Supabase setup
 
 1. Create a project, then put the project URL, anon key, service role key and the
    **session pooler** connection string in `.env`. The transaction pooler does not support
    LISTEN/NOTIFY, which pg-boss and approvals use.
-2. Run `pnpm db:migrate`. The migration creates 26 tables, RLS policies, safe views, the
+2. Run `pnpm db:migrate`. The migration creates 27 tables, RLS policies, safe views, the
    auth profile trigger, the realtime publication entries and private-channel policies.
 3. Run `pnpm db:seed` to add starter model prices. Edit them under Settings, Pricing.
 4. In Supabase Auth, set the Site URL to your app URL and add

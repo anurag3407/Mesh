@@ -33,26 +33,25 @@ export function TurnStrip({
     setError(null)
     startTransition(async () => {
       const result = await stopGeneration({ orgSlug, roomId, runId: streamingRunId })
-      if (!result.ok) setError(result.error ?? "Could not stop the run")
+      if (!result.ok) setError(result.error ?? "Could not stop the agent")
     })
   }
 
   return (
     <div
       className="flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-line bg-panel px-4 py-2"
-      aria-live="polite"
-      aria-label="Turn state"
+      aria-label="Agent activity"
     >
-      <span className="font-mono text-[10px] text-accent">floor</span>
+      <span className="font-mono text-[11px] text-accent">replying</span>
       <span className={cn("text-[12px]", active || streamingRunId ? "text-text" : "text-faint")}>
-        {active ? `@${active.handle}` : streamingRunId ? "working" : "between turns"}
+        {active ? `@${active.handle}` : streamingRunId ? "an agent" : "next agent starting"}
       </span>
       {queue.length ? (
         <>
-          <span className="font-mono text-[10px] text-faint">next</span>
+          <span className="font-mono text-[11px] text-faint">up next</span>
           <span className="flex flex-wrap gap-1.5">
             {queue.map((agent) => (
-              <span key={agent!.id} className="font-mono text-[11px] text-muted">
+              <span key={agent!.id} className="font-mono text-[12px] text-muted">
                 @{agent!.handle}
               </span>
             ))}
@@ -63,16 +62,16 @@ export function TurnStrip({
         <Button
           size="sm"
           variant="outline"
-          className="ml-auto h-6 px-2 text-[11px]"
+          className="ml-auto md:h-6 md:px-2 md:text-[12px]"
           onClick={stop}
           disabled={pending}
         >
           <StopIcon width={11} height={11} />
-          {pending ? "stopping" : "stop"}
+          {pending ? "Stopping…" : "Stop"}
         </Button>
       ) : null}
       {error ? (
-        <span role="alert" className="w-full text-[11px] text-danger">
+        <span role="alert" className="w-full text-[12px] text-danger">
           {error}
         </span>
       ) : null}

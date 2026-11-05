@@ -39,7 +39,7 @@ function BotStartButton({ orgSlug, agentId }: { orgSlug: string; agentId: string
       >
         {pending ? "Opening…" : "Start chat"}
       </Button>
-      {error ? <span className="text-[11px] text-danger">{error}</span> : null}
+      {error ? <span className="text-[12px] text-danger">{error}</span> : null}
     </div>
   )
 }
@@ -49,18 +49,20 @@ export function NewChatView({
   members,
   selfId,
   agents,
+  initialTab = "room",
 }: {
   orgSlug: string
   members: MemberView[]
   selfId: string
   agents: AgentView[]
+  initialTab?: Tab
 }) {
-  const [tab, setTab] = useState<Tab>("room")
+  const [tab, setTab] = useState<Tab>(initialTab)
 
   return (
     <div className="h-full overflow-y-auto">
       <div className="mx-auto max-w-3xl px-5 py-8 sm:px-8">
-        <p className="font-mono text-[11px] text-faint">
+        <p className="font-mono text-[12px] text-faint">
           <Link href={`/${orgSlug}`} className="hover:text-text">
             chats
           </Link>{" "}
@@ -68,15 +70,15 @@ export function NewChatView({
         </p>
         <h1 className="mt-1 text-2xl font-medium tracking-[-0.02em]">Start a new chat</h1>
         <p className="mt-2 max-w-[58ch] text-[13px] leading-relaxed text-muted">
-          A room is a shared thread with its own canvas, agents and meetings. A bot chat is a
-          private thread with a single agent.
+          A room is a shared space with its own canvas, agents and meetings. An agent chat is a
+          private conversation between you and one agent.
         </p>
 
         <div className="mt-7 flex gap-1 border-b border-line">
           {(
             [
               { key: "room", label: "Room with people" },
-              { key: "bot", label: "Chat with a bot" },
+              { key: "bot", label: "Chat with an agent" },
             ] as const
           ).map((option) => (
             <button
@@ -85,7 +87,7 @@ export function NewChatView({
               onClick={() => setTab(option.key)}
               aria-pressed={tab === option.key}
               className={cn(
-                "-mb-px border-b-2 px-3 py-2 font-mono text-[11px] transition-colors",
+                "-mb-px border-b-2 px-3 py-2 font-mono text-[12px] transition-colors",
                 tab === option.key
                   ? "border-accent text-text"
                   : "border-transparent text-muted hover:text-text",
@@ -104,11 +106,11 @@ export function NewChatView({
           ) : agents.length === 0 ? (
             <EmptyState
               title="No agents yet"
-              body="Create an agent first, then you can open a direct chat with it. Agents can also be added to rooms."
+              body="Create an agent first, then you can chat with it directly or add it to rooms."
               action={
                 <Link
                   href={`/${orgSlug}/agents`}
-                  className="font-mono text-[11px] text-accent underline underline-offset-4"
+                  className="font-mono text-[12px] text-accent underline underline-offset-4"
                 >
                   create an agent
                 </Link>
@@ -117,8 +119,8 @@ export function NewChatView({
           ) : (
             <div>
               <p className="max-w-[58ch] text-[12px] leading-relaxed text-muted">
-                In a bot chat there is no mention required: every message you send is answered by
-                that agent, one turn at a time. Tools still follow their approval rules.
+                No @mention needed here: the agent answers every message you send. Risky actions still
+                wait for approval.
               </p>
               <ul className="mt-5 divide-y divide-line border-y border-line">
                 {agents.map((agent) => (
@@ -132,21 +134,20 @@ export function NewChatView({
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-[13px] text-text">
                         {agent.displayName}{" "}
-                        <span className="font-mono text-[10px] text-faint">@{agent.handle}</span>
+                        <span className="font-mono text-[11px] text-faint">@{agent.handle}</span>
                       </p>
-                      <p className="mt-0.5 font-mono text-[10px] text-faint">
+                      <p className="mt-0.5 font-mono text-[11px] text-faint">
                         {agent.kind === "external"
-                          ? "external · webhook"
-                          : `llm · ${agent.model ?? (agent.providerKeyId ? "default model" : "no key")}`}
+                          ? "external agent"
+                          : (agent.model ?? (agent.providerKeyId ? "default model" : "no API key yet"))}
                       </p>
                     </div>
                     <BotStartButton orgSlug={orgSlug} agentId={agent.id} />
                   </li>
                 ))}
               </ul>
-              <p className="mt-4 font-mono text-[10px] leading-relaxed text-faint">
-                Only you can read your bot chats. A bot-to-bot conversation never starts itself; if
-                an agent mentions another in a room, the handoff is visible there.
+              <p className="mt-4 font-mono text-[11px] leading-relaxed text-faint">
+                Only you can read your agent chats.
               </p>
             </div>
           )}

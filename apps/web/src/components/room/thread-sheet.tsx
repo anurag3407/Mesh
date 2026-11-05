@@ -4,12 +4,13 @@ import { useEffect, useRef, useState } from "react"
 import { createSupabaseBrowserClient } from "@/lib/supabase/client"
 import { Composer } from "@/components/room/composer"
 import { MessageItem } from "@/components/room/message-item"
+import { TurnStrip } from "@/components/room/turn-strip"
 import { Button } from "@/components/ui/button"
 import { CloseIcon } from "@/components/ui/icons"
 import { InlineAlert } from "@/components/ui/empty"
 import { truncate } from "@/lib/format"
 import type { RawMessageRow } from "@/lib/message-map"
-import type { MessageView, RoomAgentView, ToolCallView } from "@/lib/types"
+import type { MemberView, MessageView, RoomAgentView, ToolCallView } from "@/lib/types"
 
 export function ThreadSheet({
   root,
@@ -19,6 +20,8 @@ export function ThreadSheet({
   roomId,
   roomName,
   roomAgents,
+  people,
+  selfId,
   canAdmin,
   memberAvatars,
   mergeHistory,
@@ -32,6 +35,8 @@ export function ThreadSheet({
   roomId: string
   roomName: string
   roomAgents: RoomAgentView[]
+  people: MemberView[]
+  selfId: string
   canAdmin: boolean
   memberAvatars: Record<string, string>
   mergeHistory: (rows: RawMessageRow[]) => void
@@ -82,10 +87,19 @@ export function ThreadSheet({
 
   if (!root) return null
 
+  const streaming = [...threadMessages]
+    .reverse()
+    .find(
+      (message) =>
+        message.status === "streaming" &&
+        message.senderType === "agent" &&
+        message.threadRootId === root.id,
+    )
+
   return (
     <dialog
       ref={dialogRef}
-      className="m-0 ml-auto h-dvh max-h-none w-full max-w-[560px] bg-ink p-0 text-text backdrop:bg-void/70"
+      className="m-0 ml-auto h-dvh max-h-none w-full max-w-[560px] bg-ink p-0 pt-[env(safe-area-inset-top)] text-text backdrop:bg-void/70"
       onClose={() => {
         setLoaded(null)
         onClose()
@@ -98,7 +112,7 @@ export function ThreadSheet({
       <div className="flex h-full flex-col">
         <div className="flex items-start gap-3 border-b border-line px-4 py-3">
           <div className="min-w-0 flex-1">
-            <p className="font-mono text-[10px] text-faint">
+            <p className="font-mono text-[11px] text-faint">
               thread · {truncate(root.content || "no text", 80)}
             </p>
             <p className="mt-1 text-[13px] text-text">{root.senderName}</p>
@@ -110,7 +124,7 @@ export function ThreadSheet({
 
         <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto" role="log">
           {loading ? (
-            <p className="px-4 py-4 font-mono text-[11px] text-faint">loading thread…</p>
+            <p className="px-4 py-4 font-mono text-[12px] text-faint">loading thread…</p>
           ) : null}
           {error ? (
             <div className="px-4 py-3">
@@ -130,11 +144,19 @@ export function ThreadSheet({
           ))}
           {!loading && !error && threadMessages.length <= 1 ? (
             <p className="px-4 py-6 text-[13px] leading-relaxed text-muted">
-              No replies yet. Replies here stay out of the main feed, and this thread gets its own
-              turn session.
+              No replies yet. Replies here stay out of the main chat. Mention an agent to ask it to
+              reply in this thread.
             </p>
           ) : null}
         </div>
+
+        <TurnStrip
+          turnState={null}
+          agents={roomAgents}
+          streamingRunId={streaming?.runId ?? null}
+          orgSlug={orgSlug}
+          roomId={roomId}
+        />
 
         <div className="shrink-0 border-t border-line pb-[env(safe-area-inset-bottom)]">
           <Composer
@@ -142,7 +164,9 @@ export function ThreadSheet({
             roomId={roomId}
             threadRootId={root.id}
             agents={roomAgents}
-            placeholder={`Reply in thread in #${roomName}`}
+            people={people}
+            selfId={selfId}
+            placeholder={`Reply in thread in ${roomName}`}
             compact
             autoFocus
             onTyping={onTyping}

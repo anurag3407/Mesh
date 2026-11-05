@@ -5,7 +5,7 @@ import { getRoomAccess } from "@/lib/auth"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { createSupabaseServerClient } from "@/lib/supabase/server"
 import { restoreCanvasInOrchestrator } from "@/lib/orchestrator"
-import { audit, errorMessage, fail, field, ok, optionalField, revalidateOrg } from "@/lib/actions/shared"
+import { adminRoomAccess, audit, errorMessage, fail, field, ok, optionalField, revalidateOrg } from "@/lib/actions/shared"
 import type { ActionResult } from "@/lib/types"
 
 const kindSchema = z.enum(["markdown", "code", "svg", "html"])
@@ -90,4 +90,31 @@ export async function restoreCanvasVersion(input: {
   })
   revalidateOrg(input.orgSlug)
   return ok("Version restored")
+}
+
+export async function deleteCanvasAction(input: {
+  orgSlug: string
+  roomId: string
+  canvasId: string
+}): Promise<ActionResult> {
+  const check = await adminRoomAccess(input.orgSlug, input.roomId)
+  if ("error" in check) return fail(check.error)
+  const admin = createAdminClient()
+  const { data: canvas } = await admin
+    .from("canvases")
+    .select("id, title, room_id")
+    .eq("id", input.canvasId)
+    .maybeSingle()
+  if (!canvas || canvas.room_id !== input.roomId) return fail("Canvas not found")
+  const { error } = await admin.from("canvases").delete().eq("id", input.canvasId)
+  if (error) return fail(errorMessage(error))
+  await audit({
+    orgId: check.access.org.id,
+    actorId: check.access.user.id,
+    action: "canvas.deleted",
+    target: input.canvasId,
+    metadata: { roomId: input.roomId, title: canvas.title },
+  })
+  revalidateOrg(input.orgSlug)
+  return ok("Canvas deleted")
 }

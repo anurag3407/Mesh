@@ -16,6 +16,9 @@ const envSchema = z.object({
   DEV_OPENAI_COMPAT_BASE_URL: z.string().optional(),
   DEV_OPENAI_COMPAT_API_KEY: z.string().optional(),
   DEV_OPENAI_COMPAT_MODEL: z.string().optional(),
+  NEXT_PUBLIC_VAPID_PUBLIC_KEY: z.string().optional(),
+  VAPID_PRIVATE_KEY: z.string().optional(),
+  VAPID_SUBJECT: z.string().optional(),
 })
 
 export type Env = z.infer<typeof envSchema>

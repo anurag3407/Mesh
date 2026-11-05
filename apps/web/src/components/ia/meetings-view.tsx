@@ -11,7 +11,10 @@ import {
   wakeBotsAction,
 } from "@/lib/actions/meetings"
 import { formatMinutes } from "@mesh/core"
+import { dateTimeLocalToIso, toDateTimeLocalValue } from "@/lib/datetime"
 import { Button } from "@/components/ui/button"
+import { ConfirmButton } from "@/components/ui/confirm-button"
+import { showToast } from "@/components/ui/toast"
 import { Field, Input, Select, Textarea } from "@/components/ui/field"
 import { EmptyState, InlineAlert } from "@/components/ui/empty"
 import { cn } from "@/lib/format"
@@ -84,16 +87,16 @@ function MeetingCard({
           <div className="flex flex-wrap items-center gap-2">
             <span
               className={cn(
-                "rounded-sm px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wide",
+                "rounded-sm px-1.5 py-0.5 font-mono text-[11px] uppercase tracking-wide",
                 statusTone(meeting.status),
               )}
             >
               {meeting.status}
             </span>
-            <span className="font-mono text-[10px] text-faint">{meeting.kind}</span>
+            <span className="font-mono text-[11px] text-faint">{meeting.kind}</span>
             <Link
               href={`/${orgSlug}/r/${meeting.roomId}`}
-              className="font-mono text-[10px] text-muted hover:text-text"
+              className="font-mono text-[11px] text-muted hover:text-text"
             >
               {meeting.roomName}
             </Link>
@@ -104,7 +107,7 @@ function MeetingCard({
               {meeting.agenda}
             </p>
           ) : null}
-          <p className="mt-2 font-mono text-[10px] text-faint">
+          <p className="mt-2 font-mono text-[11px] text-faint">
             {formatMeetingTime(meeting.startsAt)} → {formatMeetingTime(meeting.endsAt)}
           </p>
         </div>
@@ -117,16 +120,21 @@ function MeetingCard({
           {meeting.status === "active" ? (
             <>
               <Button size="sm" variant="outline" disabled={pending} onClick={() => onAction("wake", meeting)}>
-                Wake bots
+                Ask agents again
               </Button>
-              <Button size="sm" variant="danger" disabled={pending} onClick={() => onAction("end", meeting)}>
-                End
-              </Button>
+              <ConfirmButton
+                label="End"
+                confirmLabel="End meeting"
+                pendingLabel="Ending…"
+                warning="Any agent reply in progress will stop."
+                pending={pending}
+                onConfirm={() => onAction("end", meeting)}
+              />
             </>
           ) : null}
           <Link
             href={`/${orgSlug}/r/${meeting.roomId}`}
-            className="inline-flex h-8 items-center rounded-sm px-2 font-mono text-[10px] text-muted hover:text-text"
+            className="inline-flex h-8 items-center rounded-sm px-2 font-mono text-[11px] text-muted hover:text-text"
           >
             open room
           </Link>
@@ -154,18 +162,24 @@ function ScheduleCard({
       <li className="border border-line bg-panel p-4">
         <div className="flex items-center gap-2">
           <span className="truncate text-[13px] text-text">{room.name}</span>
-          <span className="ml-auto font-mono text-[9px] text-faint">no schedule</span>
+          <span className="ml-auto font-mono text-[11px] text-faint">no schedule</span>
         </div>
         <p className="mt-2 text-[12px] leading-relaxed text-muted">
-          This room has no weekday cadence yet.
+          This room has no weekday stand-ups yet.
         </p>
         <div className="mt-3 flex items-center gap-3">
-          <Button size="sm" variant="outline" disabled={pending} onClick={() => onStart(room.id)}>
-            Start a meeting
-          </Button>
+          <ConfirmButton
+            label="Start a meeting"
+            confirmLabel="Start now"
+            pendingLabel="Starting…"
+            warning="Every agent in this room will reply, using your API credits."
+            variant="outline"
+            pending={pending}
+            onConfirm={() => onStart(room.id)}
+          />
           <Link
             href={`/${orgSlug}/r/${room.id}/settings`}
-            className="font-mono text-[10px] text-muted hover:text-text"
+            className="font-mono text-[11px] text-muted hover:text-text"
           >
             set a schedule
           </Link>
@@ -184,15 +198,15 @@ function ScheduleCard({
       <div className="flex items-center gap-2">
         <span className="truncate text-[13px] text-text">{room.name}</span>
         {inMorning || inEvening ? (
-          <span className="rounded-sm bg-accent px-1.5 py-0.5 font-mono text-[9px] uppercase text-void">
+          <span className="rounded-sm bg-accent px-1.5 py-0.5 font-mono text-[11px] uppercase text-void">
             in window
           </span>
         ) : null}
-        <span className="ml-auto font-mono text-[9px] text-faint">
+        <span className="ml-auto font-mono text-[11px] text-faint">
           {schedule.timezone.replaceAll("_", " ")}
         </span>
       </div>
-      <dl className="mt-3 space-y-1.5 font-mono text-[10px]">
+      <dl className="mt-3 space-y-1.5 font-mono text-[11px]">
         <div className="flex justify-between gap-3">
           <dt className="text-faint">morning</dt>
           <dd className="text-muted">
@@ -215,18 +229,24 @@ function ScheduleCard({
         </div>
       </dl>
       <div className="mt-3 flex flex-wrap items-center gap-3 border-t border-line pt-3">
-        <Button size="sm" variant="outline" disabled={pending} onClick={() => onStart(room.id)}>
-          Start a meeting
-        </Button>
+        <ConfirmButton
+          label="Start a meeting"
+          confirmLabel="Start now"
+          pendingLabel="Starting…"
+          warning="Every agent in this room will reply, using your API credits."
+          variant="outline"
+          pending={pending}
+          onConfirm={() => onStart(room.id)}
+        />
         <Link
           href={`/${orgSlug}/r/${room.id}`}
-          className="font-mono text-[10px] text-muted hover:text-text"
+          className="font-mono text-[11px] text-muted hover:text-text"
         >
           open room
         </Link>
         <Link
           href={`/${orgSlug}/r/${room.id}/settings`}
-          className="ml-auto font-mono text-[10px] text-muted hover:text-text"
+          className="ml-auto font-mono text-[11px] text-muted hover:text-text"
         >
           edit schedule
         </Link>
@@ -250,7 +270,6 @@ export function MeetingsView({
   const [showForm, setShowForm] = useState(false)
   const [formMode, setFormMode] = useState<"now" | "later">("now")
   const [error, setError] = useState<string | null>(null)
-  const [notice, setNotice] = useState<string | null>(null)
   const [pending, startTransition] = useTransition()
   const [pendingId, setPendingId] = useState<string | null>(null)
 
@@ -276,7 +295,6 @@ export function MeetingsView({
 
   function act(kind: "start" | "end" | "wake", meeting: MeetingView) {
     setError(null)
-    setNotice(null)
     setPendingId(meeting.id)
     startTransition(async () => {
       const result =
@@ -290,7 +308,7 @@ export function MeetingsView({
         setError(result.error ?? "Could not update the meeting")
         return
       }
-      setNotice(result.message ?? "Meeting updated")
+      showToast({ message: result.message ?? "Meeting updated", tone: "success" })
       router.refresh()
     })
   }
@@ -318,7 +336,15 @@ export function MeetingsView({
 
   function submitMeeting(form: FormData) {
     setError(null)
-    setNotice(null)
+    if (formMode === "later") {
+      // datetime-local has no zone: convert here, where the browser knows the user's zone.
+      const startsAt = dateTimeLocalToIso(String(form.get("startsAt") ?? ""))
+      if (!startsAt) {
+        setError("Choose a start date and time")
+        return
+      }
+      form.set("startsAt", startsAt)
+    }
     startTransition(async () => {
       const result =
         formMode === "now"
@@ -334,7 +360,7 @@ export function MeetingsView({
         router.refresh()
         return
       }
-      setNotice(result.message ?? "Meeting scheduled")
+      showToast({ message: result.message ?? "Meeting scheduled", tone: "success" })
       setShowForm(false)
       router.refresh()
     })
@@ -345,12 +371,12 @@ export function MeetingsView({
       <div className="mx-auto max-w-5xl px-5 py-8 sm:px-8">
         <header className="flex flex-wrap items-end justify-between gap-4 border-b border-line pb-5">
           <div>
-            <p className="font-mono text-[11px] text-faint">{today}</p>
+            <p className="font-mono text-[12px] text-faint">{today}</p>
             <h1 className="mt-1 text-2xl font-medium tracking-[-0.02em]">Meetings</h1>
-            <p className="mt-1.5 max-w-[62ch] font-mono text-[11px] leading-relaxed text-muted">
+            <p className="mt-1.5 max-w-[62ch] font-mono text-[12px] leading-relaxed text-muted">
               {active.length
                 ? `${active.length} live now · ${upcoming.length} scheduled`
-                : `${upcoming.length} scheduled · ${schedulableRooms.length} ${schedulableRooms.length === 1 ? "room" : "rooms"} with a weekday cadence`}
+                : `${upcoming.length} scheduled · ${schedules.length} ${schedules.length === 1 ? "room" : "rooms"} with weekday stand-ups`}
             </p>
           </div>
           <Button
@@ -368,19 +394,13 @@ export function MeetingsView({
             <InlineAlert tone="danger">{error}</InlineAlert>
           </div>
         ) : null}
-        {notice ? (
-          <div className="mt-4">
-            <InlineAlert tone="success">{notice}</InlineAlert>
-          </div>
-        ) : null}
-
         {showForm ? (
           <form
             action={submitMeeting}
             className="mt-5 border border-line bg-panel p-4 sm:p-5"
           >
             <div className="flex flex-wrap items-center gap-2">
-              <p className="mr-2 font-mono text-[10px] text-faint">new meeting</p>
+              <p className="mr-2 font-mono text-[11px] text-faint">new meeting</p>
               <div className="flex gap-1">
                 {(
                   [
@@ -394,7 +414,7 @@ export function MeetingsView({
                     onClick={() => setFormMode(option.key)}
                     aria-pressed={formMode === option.key}
                     className={cn(
-                      "rounded-sm px-2 py-1 font-mono text-[10px]",
+                      "rounded-sm px-2 py-1 font-mono text-[11px]",
                       formMode === option.key
                         ? "bg-raised text-text"
                         : "text-muted hover:text-text",
@@ -450,16 +470,15 @@ export function MeetingsView({
                       name="startsAt"
                       type="datetime-local"
                       required
-                      min={new Date(Date.now() + 5 * 60_000).toISOString().slice(0, 16)}
+                      min={toDateTimeLocalValue(new Date(Date.now() + 5 * 60_000))}
                     />
                   </Field>
                 ) : null}
               </div>
             </div>
             <div className="mt-4 flex flex-wrap items-center gap-3 border-t border-line pt-4">
-              <p className="max-w-[46ch] font-mono text-[10px] leading-relaxed text-faint">
-                Starting a meeting posts one host message that mentions every agent in the room.
-                Turn order and breakers still apply.
+              <p className="max-w-[46ch] font-mono text-[11px] leading-relaxed text-faint">
+                Every agent in the room is asked to reply, one at a time, using your API credits.
               </p>
               <Button
                 type="submit"
@@ -480,10 +499,10 @@ export function MeetingsView({
                 <h2 id="live-heading" className="text-[15px] font-medium">
                   Live now
                 </h2>
-                <span className="font-mono text-[10px] text-faint">agents take turns</span>
+                <span className="font-mono text-[11px] text-faint">agents reply one at a time</span>
               </div>
               {active.length === 0 ? (
-                <p className="mt-3 border-l-2 border-line-strong pl-3 font-mono text-[11px] leading-relaxed text-faint">
+                <p className="mt-3 border-l-2 border-line-strong pl-3 font-mono text-[12px] leading-relaxed text-faint">
                   No meeting is running. The scheduled ones start themselves on weekdays.
                 </p>
               ) : (
@@ -506,11 +525,11 @@ export function MeetingsView({
                 <h2 id="upcoming-heading" className="text-[15px] font-medium">
                   Upcoming
                 </h2>
-                <span className="font-mono text-[10px] text-faint">next 8</span>
+                <span className="font-mono text-[11px] text-faint">next 8</span>
               </div>
               {upcoming.length === 0 ? (
-                <p className="mt-3 border-l-2 border-line-strong pl-3 font-mono text-[11px] leading-relaxed text-faint">
-                  Nothing scheduled ahead. The weekday cadence below still runs.
+                <p className="mt-3 border-l-2 border-line-strong pl-3 font-mono text-[12px] leading-relaxed text-faint">
+                  Nothing extra scheduled. Weekday stand-ups still run.
                 </p>
               ) : (
                 <ul className="mt-3 space-y-2">
@@ -532,10 +551,10 @@ export function MeetingsView({
                 <h2 id="recent-heading" className="text-[15px] font-medium">
                   Recently ended
                 </h2>
-                <span className="font-mono text-[10px] text-faint">last 7 days</span>
+                <span className="font-mono text-[11px] text-faint">last 7 days</span>
               </div>
               {recent.length === 0 ? (
-                <p className="mt-3 border-l-2 border-line-strong pl-3 font-mono text-[11px] leading-relaxed text-faint">
+                <p className="mt-3 border-l-2 border-line-strong pl-3 font-mono text-[12px] leading-relaxed text-faint">
                   No meetings have ended yet.
                 </p>
               ) : (
@@ -545,11 +564,11 @@ export function MeetingsView({
                       <span className="text-[12px] text-muted">{meeting.title}</span>
                       <Link
                         href={`/${orgSlug}/r/${meeting.roomId}`}
-                        className="font-mono text-[10px] text-faint hover:text-text"
+                        className="font-mono text-[11px] text-faint hover:text-text"
                       >
                         {meeting.roomName}
                       </Link>
-                      <span className="ml-auto font-mono text-[10px] text-faint">
+                      <span className="ml-auto font-mono text-[11px] text-faint">
                         {formatMeetingTime(meeting.startsAt)}
                       </span>
                     </li>
@@ -561,18 +580,18 @@ export function MeetingsView({
 
           <aside className="border-t border-line pt-6 lg:border-l lg:border-t-0 lg:pl-8 lg:pt-0">
             <div className="flex items-baseline justify-between">
-              <h2 className="text-[13px] font-medium">Weekday cadence</h2>
-              <span className="font-mono text-[10px] text-faint">auto</span>
+              <h2 className="text-[13px] font-medium">Weekday stand-ups</h2>
+              <span className="font-mono text-[11px] text-faint">auto</span>
             </div>
             <p className="mt-2 max-w-[38ch] text-[12px] leading-relaxed text-muted">
-              Each room runs two weekday meetings and optional check-ins in its own time zone.
-              Nothing starts on weekends.
+              Each room runs two stand-ups every weekday, plus optional check-ins, in its own time
+              zone. Agents reply using your API credits. Nothing runs on weekends.
             </p>
             {schedulableRooms.length === 0 ? (
               <div className="mt-5">
                 <EmptyState
                   title="No rooms yet"
-                  body="Create a room first, then give it a meeting cadence."
+                  body="Create a room first, then set its stand-up times."
                 />
               </div>
             ) : (
@@ -591,8 +610,8 @@ export function MeetingsView({
                   ))}
               </ul>
             )}
-            <p className="mt-4 font-mono text-[10px] leading-relaxed text-faint">
-              Check-ins stop at the last start time. Ending a meeting cancels its current run.
+            <p className="mt-4 font-mono text-[11px] leading-relaxed text-faint">
+              Ending a meeting stops any agent reply in progress.
             </p>
           </aside>
         </div>

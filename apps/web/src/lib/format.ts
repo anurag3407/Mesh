@@ -85,7 +85,13 @@ export const ROOM_KIND_LABELS: Record<string, string> = {
 }
 
 export const TURN_MODE_LABELS: Record<string, string> = {
-  mentions: "mentions",
+  mentions: "Reply when @mentioned",
+  debate: "Debate: agents take set roles",
+  moderated: "Moderated: one agent picks who speaks",
+}
+
+export const TURN_MODE_SHORT: Record<string, string> = {
+  mentions: "agents reply when mentioned",
   debate: "debate",
   moderated: "moderated",
 }

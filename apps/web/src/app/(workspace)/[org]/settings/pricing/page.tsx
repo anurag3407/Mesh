@@ -20,7 +20,7 @@ export default async function PricingPage({ params }: { params: Promise<{ org: s
     <>
       <Section
         title="Model pricing"
-        description="Prices in USD per million tokens. The orchestrator reads this table for daily budget breakers and usage cost. A model with no row costs $0 and can still run; add it here to make budgets meaningful."
+        description="Prices in USD per million tokens. These are used to estimate costs and enforce daily budgets. A model with no row costs $0 and can still run; add it here to make budgets meaningful."
       >
         {pricing.length === 0 ? (
           <EmptyState
@@ -29,7 +29,7 @@ export default async function PricingPage({ params }: { params: Promise<{ org: s
           />
         ) : (
           <>
-            <div className="hidden grid-cols-[1fr_110px_110px_auto] gap-2 border-b border-line pb-1 font-mono text-[10px] text-faint sm:grid">
+            <div className="hidden grid-cols-[1fr_110px_110px_auto] gap-2 border-b border-line pb-1 font-mono text-[11px] text-faint sm:grid">
               <span>model</span>
               <span>input / MTok</span>
               <span>output / MTok</span>

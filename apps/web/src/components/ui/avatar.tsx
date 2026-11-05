@@ -15,7 +15,7 @@ export function Avatar({
   className?: string
 }) {
   const dimension =
-    size === "sm" ? "h-6 w-6 text-[9px]" : size === "lg" ? "h-10 w-10 text-[13px]" : "h-7 w-7 text-[10px]"
+    size === "sm" ? "h-6 w-6 text-[11px]" : size === "lg" ? "h-10 w-10 text-[13px]" : "h-7 w-7 text-[11px]"
   if (kind === "system") {
     return (
       <span
@@ -91,7 +91,7 @@ export function AvatarStack({
         </span>
       ))}
       {rest > 0 ? (
-        <span className="-ml-1.5 grid h-6 w-6 place-items-center rounded-full border border-line bg-panel font-mono text-[9px] text-muted ring-2 ring-panel">
+        <span className="-ml-1.5 grid h-6 w-6 place-items-center rounded-full border border-line bg-panel font-mono text-[11px] text-muted ring-2 ring-panel">
           +{rest}
         </span>
       ) : null}
@@ -115,5 +115,5 @@ export function PresenceLine({
   else if (others.length === 0) text = "only you here"
   else if (others.length === 1) text = `${others[0]!.name} is here`
   else text = `${others.length} others here`
-  return <span className="font-mono text-[11px] text-faint">{text}</span>
+  return <span className="font-mono text-[12px] text-faint">{text}</span>
 }
