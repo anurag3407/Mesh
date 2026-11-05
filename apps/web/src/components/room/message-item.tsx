@@ -17,6 +17,7 @@ export function MessageItem({
   threadReplyCount,
   onOpenThread,
   inThread = false,
+  avatarUrl = null,
 }: {
   message: MessageView
   toolCalls: ToolCallView[]
@@ -25,6 +26,7 @@ export function MessageItem({
   threadReplyCount?: number
   onOpenThread?: (message: MessageView) => void
   inThread?: boolean
+  avatarUrl?: string | null
 }) {
   if (message.senderType === "system") {
     return (
@@ -82,7 +84,7 @@ export function MessageItem({
           name={message.senderName}
           kind={message.senderType}
           size="sm"
-          src={message.senderAvatarUrl}
+          src={avatarUrl}
           className="mt-0.5"
         />
       </div>

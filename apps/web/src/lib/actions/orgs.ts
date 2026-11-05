@@ -106,7 +106,7 @@ export async function inviteMember(
       `http://${headerList.get("host") ?? "localhost:3000"}`
     ).replace(/\/+$/, "")
     const { data, error } = await admin.auth.admin.inviteUserByEmail(email, {
-      redirectTo: `${origin}/auth/callback?next=/${orgSlug}`,
+      redirectTo: `${origin}/auth/complete?next=/${orgSlug}`,
     })
     if (error || !data.user) {
       return fail(error?.message ?? "Could not invite that address")

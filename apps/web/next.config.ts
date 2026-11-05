@@ -5,7 +5,7 @@ const withSerwist = withSerwistInit({
   swSrc: "src/sw.ts",
   swDest: "public/sw.js",
   disable: process.env.NODE_ENV === "development",
-  cacheOnNavigation: true,
+  cacheOnNavigation: false,
   reloadOnOnline: true,
   additionalPrecacheEntries: ["/offline", "/icon.svg", "/manifest.webmanifest"].map((url) => ({
     url,
@@ -21,6 +21,22 @@ const nextConfig: NextConfig = {
   serverExternalPackages: ["pg", "pg-boss", "@e2b/code-interpreter"],
   poweredByHeader: false,
   turbopack: {},
+  async headers() {
+    return [
+      {
+        source: "/:path*",
+        headers: [
+          { key: "X-Content-Type-Options", value: "nosniff" },
+          { key: "X-Frame-Options", value: "DENY" },
+          { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+          {
+            key: "Permissions-Policy",
+            value: "camera=(), microphone=(), geolocation=(), payment=()",
+          },
+        ],
+      },
+    ]
+  },
 }
 
 export default withSerwist(nextConfig)

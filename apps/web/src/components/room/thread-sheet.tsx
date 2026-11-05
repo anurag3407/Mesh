@@ -20,6 +20,7 @@ export function ThreadSheet({
   roomName,
   roomAgents,
   canAdmin,
+  memberAvatars,
   mergeHistory,
   onTyping,
   onClose,
@@ -32,6 +33,7 @@ export function ThreadSheet({
   roomName: string
   roomAgents: RoomAgentView[]
   canAdmin: boolean
+  memberAvatars: Record<string, string>
   mergeHistory: (rows: RawMessageRow[]) => void
   onTyping: () => void
   onClose: () => void
@@ -123,6 +125,7 @@ export function ThreadSheet({
               orgSlug={orgSlug}
               canAdmin={canAdmin}
               inThread
+              avatarUrl={message.senderId ? memberAvatars[message.senderId] : null}
             />
           ))}
           {!loading && !error && threadMessages.length <= 1 ? (

@@ -70,11 +70,13 @@ an agent, add the agent to a room, and mention it with `@handle`.
    auth profile trigger, the realtime publication entries and private-channel policies.
 3. Run `pnpm db:seed` to add starter model prices. Edit them under Settings, Pricing.
 4. In Supabase Auth, set the Site URL to your app URL and add
-   `<app>/auth/callback` to the redirect allow list.
+   `<app>/auth/callback` and `<app>/auth/complete` to the redirect allow list.
 5. Email and password sign-up is on by default. The sign-up flow also asks for a
    six-digit code: edit the Supabase **Confirm signup** email template so it includes
-   `{{ .Token }}` (the token, not only `{{ .ConfirmationURL }}`). SMTP must be configured
-   for the code email to arrive.
+   `{{ .Token }}` alongside the confirmation link. SMTP must be configured for the code
+   email to arrive. The link itself is handled by `/auth/complete`; if you prefer custom
+   templates, point them at `/auth/callback?token_hash={{ .TokenHash }}&type=signup&next=/onboarding`
+   (and `invite` or `recovery` for those templates).
 6. Google login is optional: enable the provider in Supabase and set
    `NEXT_PUBLIC_GOOGLE_AUTH_ENABLED=true`. GitHub login is optional in the same way with
    `NEXT_PUBLIC_GITHUB_AUTH_ENABLED=true`.

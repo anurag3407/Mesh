@@ -20,10 +20,10 @@ export async function updateProfileAction(
   }
   if (!["all", "mentions", "off"].includes(mode)) return fail("Choose a notification option")
   if (photo) {
-    if (!/^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/.test(photo)) {
-      return fail("Use a PNG, JPEG or WebP image")
-    }
-    if (photo.length > 300_000) return fail("That image is too large. Pick a smaller one.")
+    const dataUrl = /^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/.test(photo)
+    const remoteUrl = /^https:\/\/[^\s"'<>]{1,500}$/.test(photo)
+    if (!dataUrl && !remoteUrl) return fail("Use a PNG, JPEG or WebP image")
+    if (dataUrl && photo.length > 300_000) return fail("That image is too large. Pick a smaller one.")
   }
   const admin = createAdminClient()
   const { data: profile } = await admin

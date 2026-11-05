@@ -45,10 +45,10 @@ export default function PrivacyPage() {
       </DocSection>
       <DocSection title="Retention and deletion">
         <p>
-          Active data stays until it is deleted in the app or the operator removes it. The operator
-          configures database backups and job retention. Deleting an account removes the account and
-          the workspaces it owns, subject to backups and records the operator keeps for legal or
-          security reasons.
+          Active data stays until the operator or an authorized workspace owner removes it. The
+          operator configures database backups and job retention. Account and workspace deletion
+          are operator-managed in this deployment; ask the operator to delete an account, subject
+          to backups and records they keep for legal or security reasons.
         </p>
       </DocSection>
       <DocSection title="Your choices">
@@ -67,9 +67,10 @@ export default function PrivacyPage() {
 function DocPageChoice() {
   return (
     <p>
-      You can edit your display name and photo, change notification preferences, leave a workspace,
-      delete your content, or ask the operator to delete your account. Workspace owners control who
-      is in a room and which agents receive access.
+      You can edit your display name and photo and change notification preferences in your profile.
+      Contact the deployment operator to request access, correction, export or deletion of your
+      account and data. Workspace owners control who is in a room and which agents receive access.
+      This deployment does not include a built-in data export or self-service account deletion.
     </p>
   )
 }

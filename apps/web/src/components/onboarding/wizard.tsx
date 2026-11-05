@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/button"
 import { Field, HelpText, Input, Select, Textarea } from "@/components/ui/field"
 import { InlineAlert } from "@/components/ui/empty"
 import { cn } from "@/lib/format"
+import { readAvatarFile } from "@/lib/image-avatar"
 import type { ActionResult } from "@/lib/types"
 
 const STEP_TITLES = [
@@ -35,7 +36,7 @@ const NOTIFICATION_OPTIONS = [
   {
     value: "mentions",
     label: "Only what needs me",
-    detail: "Mentions and requests assigned to you.",
+    detail: "Messages that mention you. Requests still wait in the Inbox.",
   },
   { value: "off", label: "Nothing", detail: "Keep the inbox quiet. You can still browse." },
 ] as const
@@ -138,6 +139,7 @@ export function OnboardingWizard({
   const [roomName, setRoomName] = useState("")
   const [timezone, setTimezone] = useState(defaultTimeZone)
   const [photo, setPhoto] = useState<string | null>(null)
+  const [photoTouched, setPhotoTouched] = useState(false)
   const [notificationMode, setNotificationMode] = useState<NotificationMode>("all")
   const [sound, setSound] = useState(true)
   const [morningStart, setMorningStart] = useState("09:00")
@@ -198,10 +200,12 @@ export function OnboardingWizard({
         return
       }
       if (step === 1) {
-        const form = new FormData()
-        form.set("photo", photo ?? "")
-        const result = await saveOnboardingPhotoAction(null, form)
-        if (!showError(result)) return
+        if (photo || photoTouched) {
+          const form = new FormData()
+          form.set("photo", photo ?? "")
+          const result = await saveOnboardingPhotoAction(null, form)
+          if (!showError(result)) return
+        }
         setStep(2)
         return
       }
@@ -272,25 +276,17 @@ export function OnboardingWizard({
     setStep(step - 1)
   }
 
-  function onPhotoChange(event: React.ChangeEvent<HTMLInputElement>) {
+  async function onPhotoChange(event: React.ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0]
     if (!file) return
-    if (!["image/png", "image/jpeg", "image/webp"].includes(file.type)) {
-      setError("Use a PNG, JPEG or WebP image")
-      return
-    }
-    const reader = new FileReader()
-    reader.onload = () => {
-      const result = typeof reader.result === "string" ? reader.result : ""
-      if (result.length > 300_000) {
-        setError("That image is too large. Pick one under about 200 KB.")
-        return
-      }
+    try {
       setError(null)
+      const result = await readAvatarFile(file)
       setPhoto(result)
+      setPhotoTouched(true)
+    } catch (error) {
+      setError(error instanceof Error ? error.message : "That image could not be read")
     }
-    reader.onerror = () => setError("That image could not be read")
-    reader.readAsDataURL(file)
   }
 
   const steps = [
@@ -312,6 +308,7 @@ export function OnboardingWizard({
       onPick={() => fileInput.current?.click()}
       onRemove={() => {
         setPhoto(null)
+        setPhotoTouched(true)
         if (fileInput.current) fileInput.current.value = ""
       }}
     />,
@@ -513,7 +510,8 @@ function StepPhoto({
   return (
     <div className="space-y-6">
       <p className="max-w-[52ch] text-[13px] leading-relaxed text-muted">
-        Your room gets a face. This shows up in the chat list and on messages you send. Optional.
+        This is your profile photo, not the room&apos;s. It appears on messages you send and in the
+        workspace footer. Optional.
       </p>
       <div className="flex items-center gap-5">
         <div className="grid h-20 w-20 shrink-0 place-items-center overflow-hidden rounded-full border border-line bg-panel">
@@ -539,8 +537,8 @@ function StepPhoto({
       </div>
       <div className="rounded-sm border border-line bg-panel p-4">
         <p className="text-[12px] leading-relaxed text-muted">
-          Prefer keeping your own face out of it? A room mark, a color tile or a small illustration
-          works just as well. You can also skip this and add one later.
+          Prefer keeping your own face out of it? A small illustration or a color tile works just as
+          well. You can also skip this and change it later from your profile.
         </p>
       </div>
     </div>

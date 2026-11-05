@@ -2,7 +2,7 @@ import type { MessageView, ToolCallView } from "@/lib/types"
 
 export interface PersonLookup {
   agents: Map<string, { displayName: string; handle: string }>
-  members: Map<string, { displayName: string; avatarUrl: string | null }>
+  members: Map<string, { displayName: string }>
 }
 
 export interface RawMessageRow {
@@ -39,7 +39,6 @@ export function messageFromRow(row: RawMessageRow, lookup: PersonLookup): Messag
         ? "system"
         : agent?.displayName ?? member?.displayName ?? "unknown",
     senderHandle: agent?.handle ?? null,
-    senderAvatarUrl: agent ? null : (member?.avatarUrl ?? null),
   }
 }
 

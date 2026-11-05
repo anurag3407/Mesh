@@ -6,7 +6,7 @@ export const profiles = pgTable("profiles", {
   displayName: text("display_name").notNull().default(""),
   avatarUrl: text("avatar_url"),
   preferences: jsonb("preferences")
-    .$type<{ notifications?: "all" | "mentions" | "off"; sound?: boolean }>()
+    .$type<{ notifications?: "all" | "mentions" | "off"; sound?: boolean; timezone?: string }>()
     .notNull()
     .default({}),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),

@@ -70,6 +70,7 @@ export function RoomWorkspace({
       turnState={realtime.turnState}
       roomAgents={data.roomAgents}
       canAdmin={data.canAdmin}
+      memberAvatars={data.memberAvatars}
       connection={realtime.connection}
       threadCounts={realtime.threadCounts}
       onOpenThread={(message) => setThreadRootId(message.id)}
@@ -187,6 +188,7 @@ export function RoomWorkspace({
         roomName={data.room.name}
         roomAgents={data.roomAgents}
         canAdmin={data.canAdmin}
+        memberAvatars={data.memberAvatars}
         mergeHistory={realtime.mergeHistory}
         onTyping={realtime.trackTyping}
         onClose={() => setThreadRootId(null)}

@@ -204,8 +204,8 @@ function VerifyForm({
         <p className="font-mono text-[11px] text-accent">verify your email</p>
         <h2 className="mt-2 text-xl font-medium tracking-[-0.01em]">Check your inbox</h2>
         <p className="mt-2 text-[13px] leading-relaxed text-muted">
-          We sent a 6-digit code to <span className="text-text">{email}</span>. It is good for 15
-          minutes.
+          We sent a 6-digit code to <span className="text-text">{email}</span>. Use it before it
+          expires.
         </p>
       </div>
       <form action={action} className="space-y-4">

@@ -1,5 +1,5 @@
 import { toolCalls } from "@mesh/db"
-import { eq } from "drizzle-orm"
+import { and, eq, lt } from "drizzle-orm"
 import type { PoolClient } from "pg"
 import { getDb, getPool } from "../db"
 
@@ -15,6 +15,19 @@ let listener: PoolClient | null = null
 
 export async function startApprovalListener(): Promise<void> {
   if (listener) return
+  await getDb()
+    .update(toolCalls)
+    .set({
+      status: "rejected",
+      resolvedAt: new Date(),
+      error: "Approval expired before the orchestrator restarted",
+    })
+    .where(
+      and(
+        eq(toolCalls.status, "pending_approval"),
+        lt(toolCalls.createdAt, new Date(Date.now() - APPROVAL_TIMEOUT_MS)),
+      ),
+    )
   const client = await getPool().connect()
   listener = client
   client.on("notification", (msg) => {

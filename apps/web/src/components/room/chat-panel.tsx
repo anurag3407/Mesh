@@ -37,6 +37,7 @@ export function ChatPanel({
   turnState,
   roomAgents,
   canAdmin,
+  memberAvatars,
   connection,
   threadCounts,
   onOpenThread,
@@ -52,6 +53,7 @@ export function ChatPanel({
   turnState: TurnStateView | null
   roomAgents: RoomAgentView[]
   canAdmin: boolean
+  memberAvatars: Record<string, string>
   connection: "connecting" | "connected" | "error" | "offline"
   threadCounts: Record<string, number>
   onOpenThread: (message: MessageView) => void
@@ -168,6 +170,7 @@ export function ChatPanel({
                     canAdmin={canAdmin}
                     threadReplyCount={threadCounts[message.id] ?? 0}
                     onOpenThread={onOpenThread}
+                    avatarUrl={message.senderId ? memberAvatars[message.senderId] : null}
                   />
                 </div>
               )

@@ -214,6 +214,7 @@ async function scanOnce(): Promise<void> {
     .from(roomSchedules)
     .innerJoin(rooms, eq(rooms.id, roomSchedules.roomId))
   for (const { schedule, room } of schedules) {
+    if (room.kind === "dm") continue
     const hasAgents = await roomHasAgents(room.id)
     if (!hasAgents) continue
     const timeZone = schedule.timezone || room.timezone || "UTC"

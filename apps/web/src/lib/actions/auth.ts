@@ -6,6 +6,7 @@ import { z } from "zod"
 import { createSupabaseServerClient } from "@/lib/supabase/server"
 import { getCurrentUser } from "@/lib/auth"
 import { fail, field, ok } from "@/lib/actions/shared"
+import { safeNextPath } from "@/lib/safe-next"
 import type { ActionResult } from "@/lib/types"
 
 const emailSchema = z.string().trim().email()
@@ -13,7 +14,7 @@ const passwordSchema = z.string().min(8).max(72)
 const nameSchema = z.string().trim().min(1).max(60)
 
 function safeNext(value: string): string {
-  return value.startsWith("/") && !value.startsWith("//") ? value : "/"
+  return safeNextPath(value)
 }
 
 async function requestOrigin(): Promise<string> {
@@ -26,7 +27,7 @@ async function requestOrigin(): Promise<string> {
 }
 
 async function callbackUrl(next: string): Promise<string> {
-  return `${await requestOrigin()}/auth/callback?next=${encodeURIComponent(safeNext(next))}`
+  return `${await requestOrigin()}/auth/complete?next=${encodeURIComponent(safeNext(next))}`
 }
 
 export async function signUpAction(

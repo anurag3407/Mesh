@@ -1,6 +1,7 @@
 import type { Metadata } from "next"
 import Link from "next/link"
 import { requireOrgAccess } from "@/lib/auth"
+import { humanHandle } from "@/lib/human-handle"
 import { ProfileForm } from "@/components/settings/profile-form"
 
 export const metadata: Metadata = { title: "Your profile" }
@@ -18,6 +19,9 @@ export default async function AccountPage({ params }: { params: Promise<{ org: s
           / profile
         </p>
         <h1 className="mt-1 text-2xl font-medium tracking-[-0.02em]">Your profile</h1>
+        <p className="mt-1 font-mono text-[11px] text-muted">
+          @{humanHandle(access.user.displayName)}
+        </p>
         <p className="mt-2 max-w-[62ch] text-[13px] leading-relaxed text-muted">
           How you appear in rooms, to agents and in mentions, plus the alerts this browser may
           show. Your email and password are managed by the sign-in provider.
@@ -32,8 +36,8 @@ export default async function AccountPage({ params }: { params: Promise<{ org: s
           />
         </div>
         <p className="mt-8 font-mono text-[10px] leading-relaxed text-faint">
-          Changing your display name changes your generated @handle for future mentions. Existing
-          messages keep the name they were sent with.
+          Changing your display name changes your generated @handle and the name shown on your
+          messages. Message text and authorship records are unchanged.
         </p>
       </div>
     </div>

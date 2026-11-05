@@ -71,6 +71,14 @@ grant select on public.meetings, public.room_schedules, public.tasks, public.tas
   to authenticated;
 grant select, insert, update, delete on public.room_reads to authenticated;
 
+-- Rooms that predate this migration still get a usable meeting cadence.
+-- Direct chats are intentionally excluded: a bot DM should never run stand-ups.
+insert into public.room_schedules (room_id, timezone)
+select r.id, coalesce(nullif(r.timezone, ''), 'UTC')
+from public.rooms r
+where r.kind <> 'dm'
+on conflict (room_id) do nothing;
+
 do $$
 declare
   t text;

@@ -87,6 +87,7 @@ export async function startMeetingNowAction(
   const agenda = field(formData, "agenda")
   const duration = z.coerce.number().int().min(5).max(240).safeParse(field(formData, "durationMinutes") || "15")
   if (title.length > 80) return fail("Keep the meeting title under 80 characters")
+  if (agenda.length > 4_000) return fail("Keep the agenda under 4,000 characters")
   if (!duration.success) return fail("Choose a meeting length between 5 and 240 minutes")
   const now = new Date()
   const endsAt = new Date(now.getTime() + duration.data * 60_000)
@@ -147,12 +148,15 @@ export async function startScheduledMeetingAction(
   if ("error" in check) return fail(check.error)
   if (meeting.status !== "scheduled") return fail("This meeting is no longer scheduled")
   const now = new Date()
-  const { error } = await admin
+  const { data: claimed, error } = await admin
     .from("meetings")
     .update({ status: "active", starts_at: now.toISOString() })
     .eq("id", meetingId)
     .eq("status", "scheduled")
+    .select("id")
+    .maybeSingle()
   if (error) return fail(errorMessage(error))
+  if (!claimed) return fail("This meeting has already started or was canceled")
   try {
     const prompt = await postMeetingPrompt({
       orgSlug,
@@ -181,11 +185,15 @@ export async function endMeetingAction(orgSlug: string, meetingId: string): Prom
   const check = await adminRoomAccess(orgSlug, meeting.room_id)
   if ("error" in check) return fail(check.error)
   const now = new Date()
-  const { error } = await admin
+  const { data: ended, error } = await admin
     .from("meetings")
     .update({ status: "ended", ends_at: now.toISOString() })
     .eq("id", meetingId)
+    .eq("status", "active")
+    .select("id")
+    .maybeSingle()
   if (error) return fail(errorMessage(error))
+  if (!ended) return fail("This meeting is not active")
   await admin.from("messages").insert({
     room_id: meeting.room_id,
     sender_type: "system",
@@ -242,6 +250,7 @@ export async function scheduleMeetingAction(
   const when = field(formData, "startsAt")
   const duration = z.coerce.number().int().min(5).max(240).safeParse(field(formData, "durationMinutes") || "15")
   if (title.length < 2 || title.length > 80) return fail("Give the meeting a short title")
+  if (agenda.length > 4_000) return fail("Keep the agenda under 4,000 characters")
   if (!duration.success) return fail("Choose a meeting length between 5 and 240 minutes")
   const startsAt = new Date(when)
   if (Number.isNaN(startsAt.getTime())) return fail("Choose a start date and time")

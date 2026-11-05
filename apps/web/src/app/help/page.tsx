@@ -20,7 +20,7 @@ export default function HelpPage() {
             "Name your first room. A room holds one conversation, its agents and its shared canvas.",
             "Add an agent in room settings, or use the bot gateway to connect your own service.",
             "Say something, and mention an agent by its @handle to give it a turn.",
-            "Open the Inbox to approve tools, answer requests, and catch up on mentions.",
+            "Open the Inbox to approve tools and answer requests; mentions light up the chat list.",
           ]}
         />
         <p className="pt-2">
@@ -58,8 +58,9 @@ export default function HelpPage() {
           fixed cadence between meetings and stop at the last start time. Nothing runs on weekends.
         </p>
         <p>
-          You can start a meeting immediately, restart today&apos;s meeting, or end the active one
-          from the Meetings page. Ending a meeting cancels its current run; it does not reopen.
+          You can start a meeting immediately, start today&apos;s scheduled meeting, or end the
+          active one from the Meetings page. Ending a meeting cancels its current run; it does not
+          reopen.
         </p>
       </DocSection>
 
@@ -69,7 +70,8 @@ export default function HelpPage() {
             "A task is work a person or agent owns. Status is open, in progress, stuck or done.",
             "A request is a question an agent needs a human to answer. It lands in the Inbox.",
             "Agents can create tasks and requests with their tools, subject to your approvals.",
-            "Mentions, new requests and pending approvals all show up in the Inbox badge.",
+            "Mentions light up the chat list; requests and pending approvals count in the Inbox badge.",
+            "Agents can create, claim and update tasks with their task tools, subject to your approvals.",
           ]}
         />
       </DocSection>
@@ -101,7 +103,7 @@ export default function HelpPage() {
       <DocSection title="Troubleshooting">
         <DocList
           items={[
-            "An agent is not replying: check it is in the room, enabled, and mentioned. External bots must answer their webhook within the timeout.",
+            "An agent is not replying: check it is in the room and mentioned. External bots must answer their webhook within the timeout.",
             "A reply stopped early: a breaker may have halted it. Look for the system note in the thread and the run details.",
             "The canvas is behind: reload once; edits reconcile through Yjs. Avoid two people editing the same code block at the same moment.",
             "Email never arrives: this deployment must have SMTP or a mail provider configured. Ask the operator.",

@@ -43,6 +43,7 @@ export async function createTaskAction(
   const kind = field(formData, "kind") as (typeof TASK_KINDS)[number]
   const assignee = field(formData, "assignee")
   if (title.length < 2 || title.length > 120) return fail("Title must be 2 to 120 characters")
+  if (description.length > 4_000) return fail("Keep the description under 4,000 characters")
   if (!TASK_KINDS.includes(kind)) return fail("Choose task or request")
   let assigneeUserId: string | null = null
   let assigneeAgentId: string | null = null
@@ -61,6 +62,13 @@ export async function createTaskAction(
       .eq("user_id", assigneeUserId)
       .maybeSingle()
     if (!member) return fail("That person is not in this workspace")
+    const { data: roomMember } = await admin
+      .from("room_members")
+      .select("user_id")
+      .eq("room_id", roomId)
+      .eq("user_id", assigneeUserId)
+      .maybeSingle()
+    if (!roomMember) return fail("That person is not in this room")
   }
   const admin = createAdminClient()
   const { data, error } = await admin
@@ -112,7 +120,24 @@ export async function updateTaskAction(input: {
   }
   if (input.assignee !== undefined) {
     if (input.assignee.startsWith("user:")) {
-      updates.assignee_user_id = input.assignee.slice(5)
+      const userId = input.assignee.slice(5)
+      if (!/^[0-9a-f-]{36}$/i.test(userId)) return fail("Choose a valid person")
+      const admin = createAdminClient()
+      const { data: member } = await admin
+        .from("org_members")
+        .select("user_id")
+        .eq("org_id", access.org.id)
+        .eq("user_id", userId)
+        .maybeSingle()
+      if (!member) return fail("That person is not in this workspace")
+      const { data: roomMember } = await admin
+        .from("room_members")
+        .select("user_id")
+        .eq("room_id", task.room_id)
+        .eq("user_id", userId)
+        .maybeSingle()
+      if (!roomMember) return fail("That person is not in this room")
+      updates.assignee_user_id = userId
       updates.assignee_agent_id = null
     } else if (input.assignee.startsWith("agent:")) {
       const agent = await agentForRoom(access.org.id, task.room_id, input.assignee.slice(6))
@@ -126,6 +151,17 @@ export async function updateTaskAction(input: {
   }
   const { error } = await admin.from("tasks").update(updates).eq("id", input.taskId)
   if (error) return fail(errorMessage(error))
+  await audit({
+    orgId: access.org.id,
+    actorId: access.user.id,
+    action: "task.updated",
+    target: input.taskId,
+    metadata: {
+      roomId: task.room_id,
+      status: input.status ?? null,
+      assignee: input.assignee ?? null,
+    },
+  })
   revalidatePath(`/${input.orgSlug}`, "layout")
   return ok("Task updated")
 }
@@ -138,6 +174,7 @@ export async function addTaskCommentAction(
   const taskId = field(formData, "taskId")
   const content = field(formData, "content")
   if (!content) return fail("Write a comment")
+  if (content.length > 4_000) return fail("Keep comments under 4,000 characters")
   const admin = createAdminClient()
   const { data: task } = await admin.from("tasks").select("room_id").eq("id", taskId).maybeSingle()
   if (!task) return fail("Task not found")
@@ -163,6 +200,7 @@ export async function answerTaskRequestAction(input: {
   const user = await requireUser(`/${input.orgSlug}`)
   const answer = input.answer.trim()
   if (!answer) return fail("Write an answer")
+  if (answer.length > 4_000) return fail("Keep the answer under 4,000 characters")
   const admin = createAdminClient()
   const { data: task } = await admin.from("tasks").select("*").eq("id", input.taskId).maybeSingle()
   if (!task) return fail("Request not found")

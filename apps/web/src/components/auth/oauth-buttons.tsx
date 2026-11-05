@@ -1,5 +1,6 @@
 "use client"
 
+import Link from "next/link"
 import { useState } from "react"
 import { createSupabaseBrowserClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
@@ -69,6 +70,17 @@ export function OAuthButtons({
           {error}
         </p>
       ) : null}
+      <p className="text-center font-mono text-[9px] leading-relaxed text-faint">
+        Continuing with a provider means you agree to the{" "}
+        <Link href="/terms" className="underline underline-offset-2 hover:text-text">
+          Terms
+        </Link>{" "}
+        and{" "}
+        <Link href="/privacy" className="underline underline-offset-2 hover:text-text">
+          Privacy Policy
+        </Link>
+        .
+      </p>
     </div>
   )
 }

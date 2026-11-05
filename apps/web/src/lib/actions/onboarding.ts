@@ -104,6 +104,20 @@ export async function setupWorkspaceAction(
       { room_id: room.id, timezone },
       { onConflict: "room_id" },
     )
+    const { data: profile } = await admin
+      .from("profiles")
+      .select("preferences")
+      .eq("id", user.id)
+      .maybeSingle()
+    await admin
+      .from("profiles")
+      .update({
+        preferences: {
+          ...((profile?.preferences as Record<string, unknown>) ?? {}),
+          timezone,
+        },
+      })
+      .eq("id", user.id)
     await admin.from("canvases").insert({
       room_id: room.id,
       kind: "markdown",
@@ -183,6 +197,9 @@ export async function saveRoomScheduleAction(
   const roomId = field(formData, "roomId")
   const check = await adminRoomAccess(orgSlug, roomId)
   if ("error" in check) return fail(check.error)
+  if (check.access.room.kind === "dm") {
+    return fail("Direct chats do not run meetings or check-ins")
+  }
   const timezone = field(formData, "timezone") || "UTC"
   if (!validTimeZone(timezone)) return fail("Choose a valid time zone")
   const morningStart = parseTimeToMinutes(field(formData, "morningStart") || "09:00")

@@ -505,7 +505,7 @@ export function TasksView({
                   ))}
                 </Select>
               </Field>
-              <Field label="assignee" htmlFor="new-task-assignee" hint="optional">
+              <Field label="assignee" htmlFor="new-task-assignee" hint="must be in the room">
                 <Select id="new-task-assignee" name="assignee" defaultValue="">
                   <option value="">Unassigned</option>
                   <optgroup label="People">

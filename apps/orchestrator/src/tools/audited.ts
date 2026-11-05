@@ -110,7 +110,7 @@ export function toAuditedTools(specs: ToolSpec[], runtime: ToolRuntime): ToolSet
               .set({
                 status: "rejected",
                 resolvedAt: new Date(),
-                error: signal?.aborted ? "Run stopped while awaiting approval" : "Rejected by a room admin",
+                error: signal?.aborted ? "Run stopped while awaiting approval" : "Approval expired or was rejected",
               })
               .where(eq(toolCalls.id, row.id))
             return {

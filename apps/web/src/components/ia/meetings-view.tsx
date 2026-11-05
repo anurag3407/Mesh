@@ -350,7 +350,7 @@ export function MeetingsView({
             <p className="mt-1.5 max-w-[62ch] font-mono text-[11px] leading-relaxed text-muted">
               {active.length
                 ? `${active.length} live now · ${upcoming.length} scheduled`
-                : `${upcoming.length} scheduled · ${rooms.length} ${rooms.length === 1 ? "room" : "rooms"} with a weekday cadence`}
+                : `${upcoming.length} scheduled · ${schedulableRooms.length} ${schedulableRooms.length === 1 ? "room" : "rooms"} with a weekday cadence`}
             </p>
           </div>
           <Button
@@ -568,7 +568,7 @@ export function MeetingsView({
               Each room runs two weekday meetings and optional check-ins in its own time zone.
               Nothing starts on weekends.
             </p>
-            {rooms.length === 0 ? (
+            {schedulableRooms.length === 0 ? (
               <div className="mt-5">
                 <EmptyState
                   title="No rooms yet"

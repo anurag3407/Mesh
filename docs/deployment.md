@@ -35,10 +35,15 @@ streams, LISTEN connections and the canvas WebSocket, so it needs a long-running
 5. Auth settings:
    - Site URL: `https://<web-host>`
    - Redirect allow list: `https://<web-host>/auth/callback`,
-     `http://localhost:3000/auth/callback`
-   - Configure SMTP and include `{{ .Token }}` in the Confirm signup email template.
-     The sign-up and code screens read the six-digit token; a template with only
-     `{{ .ConfirmationURL }}` cannot complete them.
+     `https://<web-host>/auth/complete`, `http://localhost:3000/auth/callback`,
+     `http://localhost:3000/auth/complete`
+   - Configure SMTP and include `{{ .Token }}` in the Confirm signup email template
+     alongside the link. The sign-up and code screens read the six-digit token; a
+     template with only `{{ .ConfirmationURL }}` cannot complete them.
+   - Email links land on `/auth/complete`, which handles both `?code=` and the
+     `#access_token` fragment used by invites and admin-generated links. Custom templates
+     can instead use `token_hash={{ .TokenHash }}&type=invite` (or `signup`, `recovery`)
+     on `/auth/callback`; both forms are verified server-side.
    - Email/password is enabled by default. Optional Google OAuth, then set
      `NEXT_PUBLIC_GOOGLE_AUTH_ENABLED=true`. Optional GitHub OAuth, then set
      `NEXT_PUBLIC_GITHUB_AUTH_ENABLED=true`.
@@ -173,13 +178,14 @@ Playwright:
 - The global setup creates the org, two private rooms, two agents (dev fallback model) and
   two pending tool approvals. It deletes prior e2e rooms and agents first.
 - The orchestrator must have `DEV_OPENAI_COMPAT_*` set so the seeded agents can answer.
-- Sign-in uses admin-generated magic links for the seeded e2e accounts. The product UI
-  also supports password, six-digit email code and Google. Add the app callback URL to
-  Supabase's redirect allow list.
+- Sign-in uses admin-generated magic links for the seeded e2e accounts, routed through
+  `/auth/complete`. The product UI also supports password, six-digit email code and
+  Google. Add both app callback URLs to Supabase's redirect allow list.
 - Run `pnpm exec playwright install chromium` once, then `pnpm e2e`.
 
-If magic-link generation redirects with an implicit-flow fragment instead of a `code`,
-switch the Supabase project's auth flow to PKCE (the SSR client expects PKCE).
+If a direct `/auth/callback` link arrives with an implicit-flow fragment instead of a `code`,
+route it through `/auth/complete`, which handles the fragment. The callback route itself expects
+`code` or `token_hash` and the SSR client expects PKCE.
 
 ## 7. Meetings and check-ins
 

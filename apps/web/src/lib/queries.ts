@@ -14,6 +14,7 @@ import type {
   ProviderKeyView,
   RoomAgentView,
   RoomPageData,
+  RoomRole,
   RoomView,
   SessionView,
   ToolCallView,
@@ -244,9 +245,16 @@ export async function loadRoomPageData(access: RoomAccess): Promise<RoomPageData
           ? "system"
           : agent?.displayName ?? human?.displayName ?? extraHuman?.displayName ?? "unknown",
       senderHandle: agent?.handle ?? null,
-      senderAvatarUrl: agent ? null : (human?.avatarUrl ?? extraHuman?.avatarUrl ?? null),
     }
   })
+
+  const memberAvatars: Record<string, string> = {}
+  for (const member of members) {
+    if (member.avatarUrl) memberAvatars[member.userId] = member.avatarUrl
+  }
+  for (const [id, human] of extraHumans) {
+    if (human.avatarUrl) memberAvatars[id] = human.avatarUrl
+  }
 
   const toolCalls: ToolCallView[] = ((toolsRes.data ?? []) as unknown as {
     id: string
@@ -361,7 +369,8 @@ export async function loadRoomPageData(access: RoomAccess): Promise<RoomPageData
     toolCalls,
     roomAgents,
     canvases,
-    members,
+    members: members.map((member) => ({ ...member, avatarUrl: null })),
+    memberAvatars,
     activeSession,
     threadCounts,
     meeting,
@@ -635,8 +644,21 @@ export async function listPricing(): Promise<PricingView[]> {
   }))
 }
 
-export async function listMemberViews(orgId: string): Promise<MemberView[]> {
+export async function listRoomMemberRows(
+  roomId: string,
+): Promise<{ userId: string; role: RoomRole }[]> {
   const supabase = await createSupabaseServerClient()
+  const { data } = await supabase
+    .from("room_members")
+    .select("user_id, role")
+    .eq("room_id", roomId)
+  return ((data ?? []) as { user_id: string; role: RoomRole }[]).map((row) => ({
+    userId: row.user_id,
+    role: row.role,
+  }))
+}
+
+export async function listMemberViews(orgId: string): Promise<MemberView[]> {  const supabase = await createSupabaseServerClient()
   const { data } = await supabase
     .from("org_members")
     .select("user_id, role, profiles!inner(display_name, avatar_url)")

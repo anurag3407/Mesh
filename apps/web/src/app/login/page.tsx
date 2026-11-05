@@ -4,6 +4,7 @@ import { getCurrentUser, listUserOrgs } from "@/lib/auth"
 import { githubAuthEnabled, googleAuthEnabled } from "@/lib/env"
 import { PublicShell } from "@/components/public/public-shell"
 import { AuthPanel } from "@/components/auth/auth-panel"
+import { safeNextPath } from "@/lib/safe-next"
 
 export const metadata: Metadata = { title: "Sign in · Mesh" }
 
@@ -18,10 +19,7 @@ export default async function LoginPage({
     const orgs = await listUserOrgs(user.id)
     redirect(orgs.length ? `/${orgs[0]!.slug}` : "/onboarding")
   }
-  const next =
-    params.next && params.next.startsWith("/") && !params.next.startsWith("//")
-      ? params.next
-      : "/"
+  const next = safeNextPath(params.next)
 
   return (
     <PublicShell>

@@ -84,10 +84,7 @@ export function useRoomRealtime(args: {
         ]),
       ),
       members: new Map(
-        args.members.map((member) => [
-          member.userId,
-          { displayName: member.displayName, avatarUrl: member.avatarUrl },
-        ]),
+        args.members.map((member) => [member.userId, { displayName: member.displayName }]),
       ),
     }),
     [args.roomAgents, args.members],
@@ -213,7 +210,6 @@ export function useRoomRealtime(args: {
                 createdAt: new Date().toISOString(),
                 senderName: "agent",
                 senderHandle: null,
-                senderAvatarUrl: null,
               },
             ])
           }

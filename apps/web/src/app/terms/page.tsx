@@ -45,8 +45,9 @@ export default function TermsPage() {
         <p>
           You keep ownership of the content you post. You grant the operator a limited licence to
           store, process and display that content only as needed to run, secure and support the
-          deployment. Deleting content or an account removes it from the active database, subject to
-          the operator's backup and retention configuration.
+          deployment. Content and account deletion are handled by the operator or an authorized
+          workspace owner and remove data from the active database, subject to the operator's backup
+          and retention configuration.
         </p>
       </DocSection>
       <DocSection title="6. Acceptable use">

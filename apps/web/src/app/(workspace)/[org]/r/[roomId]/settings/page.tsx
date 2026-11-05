@@ -2,9 +2,20 @@ import type { Metadata } from "next"
 import Link from "next/link"
 import { redirect } from "next/navigation"
 import { requireRoomAccess } from "@/lib/auth"
-import { listOrgAgents, listRoomAgents } from "@/lib/queries"
+import {
+  listMemberViews,
+  listOrgAgents,
+  listRoomAgents,
+  listRoomMemberRows,
+} from "@/lib/queries"
 import { loadRoomSchedule } from "@/lib/queries-ia"
-import { addAgentToRoom, removeAgentFromRoom, updateRoomSettings } from "@/lib/actions/rooms"
+import {
+  addAgentToRoom,
+  addRoomMember,
+  removeAgentFromRoom,
+  removeRoomMember,
+  updateRoomSettings,
+} from "@/lib/actions/rooms"
 import { ActionForm } from "@/components/ui/action-form"
 import { Field, HelpText, Input, Select, Textarea } from "@/components/ui/field"
 import { EmptyState } from "@/components/ui/empty"
@@ -24,11 +35,16 @@ export default async function RoomSettingsPage({
   const access = await requireRoomAccess(orgSlug, roomId)
   if (!access.canAdmin) redirect(`/${orgSlug}/r/${roomId}`)
 
-  const [roomAgents, orgAgents, schedule] = await Promise.all([
+  const [roomAgents, orgAgents, schedule, orgMembers, roomMembers] = await Promise.all([
     listRoomAgents(roomId),
     listOrgAgents(access.org.id),
     loadRoomSchedule(roomId),
+    listMemberViews(access.org.id),
+    listRoomMemberRows(roomId),
   ])
+  const roomMemberIds = new Set(roomMembers.map((member) => member.userId))
+  const memberNames = new Map(orgMembers.map((member) => [member.userId, member.displayName]))
+  const availableMembers = orgMembers.filter((member) => !roomMemberIds.has(member.userId))
   const roomAgentIds = new Set(roomAgents.map(({ agent }) => agent.id))
   const availableAgents = orgAgents.filter((agent) => !roomAgentIds.has(agent.id))
   const roomAgentOptions = roomAgents.map(({ agent }) => ({
@@ -154,16 +170,73 @@ export default async function RoomSettingsPage({
             </ActionForm>
           </Section>
 
+          {access.room.kind !== "dm" ? (
+            <Section
+              title="Meetings & check-ins"
+              description="Two weekday meetings and optional check-ins run in this room's time zone. A host message mentions every agent; turn order still applies."
+            >
+              <RoomScheduleForm
+                orgSlug={orgSlug}
+                roomId={roomId}
+                timezone={access.room.timezone}
+                schedule={schedule}
+              />
+            </Section>
+          ) : null}
+
           <Section
-            title="Meetings & check-ins"
-            description="Two weekday meetings and optional check-ins run in this room's time zone. A host message mentions every agent; turn order still applies."
+            title="People in this room"
+            description="A private room is readable only by its members. Org roles do not grant room access; add teammates here, then they see the room in Chats."
           >
-            <RoomScheduleForm
-              orgSlug={orgSlug}
-              roomId={roomId}
-              timezone={access.room.timezone}
-              schedule={schedule}
-            />
+            <ul className="divide-y divide-line border-y border-line">
+              {roomMembers.map((member) => (
+                <li key={member.userId} className="flex flex-wrap items-center gap-2 py-2.5">
+                  <span className="text-[13px] text-text">
+                    {memberNames.get(member.userId) ?? "Someone"}
+                    {member.userId === access.user.id ? " (you)" : ""}
+                  </span>
+                  <span className="font-mono text-[10px] text-faint">{member.role}</span>
+                  {member.userId !== access.user.id ? (
+                    <div className="ml-auto">
+                      <ActionForm
+                        action={removeRoomMember}
+                        submitLabel="remove"
+                        submitVariant="danger"
+                      >
+                        <input type="hidden" name="orgSlug" value={orgSlug} />
+                        <input type="hidden" name="roomId" value={roomId} />
+                        <input type="hidden" name="memberId" value={member.userId} />
+                      </ActionForm>
+                    </div>
+                  ) : null}
+                </li>
+              ))}
+            </ul>
+
+            <div className="mt-5 border-t border-line pt-5">
+              {availableMembers.length === 0 ? (
+                <p className="text-[13px] text-muted">
+                  Everyone in this workspace is already in the room.
+                </p>
+              ) : (
+                <ActionForm action={addRoomMember} submitLabel="Add person" resetOnSuccess>
+                  <input type="hidden" name="orgSlug" value={orgSlug} />
+                  <input type="hidden" name="roomId" value={roomId} />
+                  <Field label="person" htmlFor="add-room-member">
+                    <Select id="add-room-member" name="memberId" required defaultValue="">
+                      <option value="" disabled>
+                        Choose a workspace member
+                      </option>
+                      {availableMembers.map((member) => (
+                        <option key={member.userId} value={member.userId}>
+                          {member.displayName} · {member.role}
+                        </option>
+                      ))}
+                    </Select>
+                  </Field>
+                </ActionForm>
+              )}
+            </div>
           </Section>
 
           <Section

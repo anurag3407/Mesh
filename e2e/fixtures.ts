@@ -38,7 +38,7 @@ function admin() {
 /** Signs in by generating a magic link with the admin API, then visiting it. */
 export async function signIn(page: Page, email: string): Promise<void> {
   const client = admin()
-  const redirectTo = `${state().baseURL}/auth/callback`
+  const redirectTo = `${state().baseURL}/auth/complete`
   const { data, error } = await client.auth.admin.generateLink({
     type: "magiclink",
     email,

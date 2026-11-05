@@ -95,7 +95,6 @@ export interface MessageView {
   createdAt: string
   senderName: string
   senderHandle: string | null
-  senderAvatarUrl: string | null
 }
 
 export interface ToolCallView {
@@ -362,6 +361,7 @@ export interface RoomPageData {
   roomAgents: RoomAgentView[]
   canvases: CanvasView[]
   members: MemberView[]
+  memberAvatars: Record<string, string>
   activeSession: SessionView | null
   threadCounts: Record<string, number>
   meeting: MeetingView | null

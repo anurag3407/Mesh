@@ -58,6 +58,20 @@ export async function createRoom(
     if (!member) return fail("That person is not in this organization")
   }
 
+  const { data: profile } = await admin
+    .from("profiles")
+    .select("preferences")
+    .eq("id", user.id)
+    .maybeSingle()
+  const preferredZone =
+    typeof profile?.preferences?.timezone === "string" ? profile.preferences.timezone : null
+  let timezone = preferredZone ?? "UTC"
+  try {
+    new Intl.DateTimeFormat("en-US", { timeZone: timezone }).format(new Date())
+  } catch {
+    timezone = "UTC"
+  }
+
   const { data: room, error } = await admin
     .from("rooms")
     .insert({
@@ -65,6 +79,7 @@ export async function createRoom(
       name,
       kind,
       turn_mode: "mentions",
+      timezone,
       created_by: user.id,
     })
     .select("id")
@@ -80,7 +95,9 @@ export async function createRoom(
     await admin.from("rooms").delete().eq("id", room.id)
     return fail("Could not add room members")
   }
-  await admin.from("room_schedules").insert({ room_id: room.id, timezone: "UTC" })
+  if (kind !== "dm") {
+    await admin.from("room_schedules").insert({ room_id: room.id, timezone })
+  }
   await admin.from("room_reads").insert(
     memberRows.map((member) => ({
       room_id: room.id,
@@ -113,6 +130,7 @@ export async function updateRoomSettings(
   const turnCapParsed = z.coerce.number().int().min(1).max(10).safeParse(field(formData, "turnCap"))
   const rpmRaw = optionalField(formData, "rpmLimit")
   const budgetRaw = optionalField(formData, "dailyBudgetUsd")
+  const directive = optionalField(formData, "systemDirective")
   const rpmParsed = rpmRaw ? z.coerce.number().int().min(1).max(1000).safeParse(rpmRaw) : null
   const budgetParsed = budgetRaw
     ? z.coerce.number().min(0).max(1_000_000).safeParse(budgetRaw)
@@ -122,6 +140,9 @@ export async function updateRoomSettings(
   if (!turnCapParsed.success) return fail("Turn cap must be between 1 and 10")
   if (rpmParsed && !rpmParsed.success) return fail("RPM limit must be between 1 and 1000")
   if (budgetParsed && !budgetParsed.success) return fail("Budget must be a non-negative number")
+  if (directive && directive.length > 4_000) {
+    return fail("Keep the room directive under 4,000 characters")
+  }
 
   const admin = createAdminClient()
   const { data: roomAgents } = await admin
@@ -152,7 +173,7 @@ export async function updateRoomSettings(
     .update({
       name,
       turn_mode: turnModeParsed.data,
-      system_directive: optionalField(formData, "systemDirective"),
+      system_directive: directive,
       turn_cap: turnCapParsed.data,
       rpm_limit: rpmParsed?.success ? rpmParsed.data : null,
       daily_budget_usd: budgetParsed?.success ? budgetParsed.data : null,
@@ -170,6 +191,94 @@ export async function updateRoomSettings(
   })
   revalidateOrg(orgSlug)
   return ok("Room settings saved")
+}
+
+export async function addRoomMember(
+  _prev: ActionResult | null,
+  formData: FormData,
+): Promise<ActionResult> {
+  const orgSlug = field(formData, "orgSlug")
+  const roomId = field(formData, "roomId")
+  const memberId = field(formData, "memberId")
+  const check = await adminRoomAccess(orgSlug, roomId)
+  if ("error" in check) return fail(check.error)
+  if (!z.string().uuid().safeParse(memberId).success) return fail("Choose a person")
+  const admin = createAdminClient()
+  const { data: member } = await admin
+    .from("org_members")
+    .select("user_id")
+    .eq("org_id", check.access.org.id)
+    .eq("user_id", memberId)
+    .maybeSingle()
+  if (!member) return fail("That person is not in this workspace")
+  const { data: existing } = await admin
+    .from("room_members")
+    .select("user_id")
+    .eq("room_id", roomId)
+    .eq("user_id", memberId)
+    .maybeSingle()
+  if (existing) return fail("That person is already in the room")
+  const { error } = await admin
+    .from("room_members")
+    .insert({ room_id: roomId, user_id: memberId, role: "member" })
+  if (error) return fail(errorMessage(error))
+  await admin.from("room_reads").upsert(
+    { user_id: memberId, room_id: roomId, last_read_at: new Date().toISOString() },
+    { onConflict: "user_id,room_id" },
+  )
+  await audit({
+    orgId: check.access.org.id,
+    actorId: check.access.user.id,
+    action: "room.member_added",
+    target: roomId,
+    metadata: { memberId },
+  })
+  revalidateOrg(orgSlug)
+  return ok("Person added to the room")
+}
+
+export async function removeRoomMember(
+  _prev: ActionResult | null,
+  formData: FormData,
+): Promise<ActionResult> {
+  const orgSlug = field(formData, "orgSlug")
+  const roomId = field(formData, "roomId")
+  const memberId = field(formData, "memberId")
+  const check = await adminRoomAccess(orgSlug, roomId)
+  if ("error" in check) return fail(check.error)
+  if (!z.string().uuid().safeParse(memberId).success) return fail("Choose a person")
+  const admin = createAdminClient()
+  const { data: target } = await admin
+    .from("room_members")
+    .select("user_id, role")
+    .eq("room_id", roomId)
+    .eq("user_id", memberId)
+    .maybeSingle()
+  if (!target) return fail("That person is not in the room")
+  if (target.role === "admin") {
+    const { count } = await admin
+      .from("room_members")
+      .select("user_id", { count: "exact", head: true })
+      .eq("room_id", roomId)
+      .eq("role", "admin")
+    if ((count ?? 0) <= 1) return fail("Add another room admin before removing this one")
+  }
+  const { error } = await admin
+    .from("room_members")
+    .delete()
+    .eq("room_id", roomId)
+    .eq("user_id", memberId)
+  if (error) return fail(errorMessage(error))
+  await admin.from("room_reads").delete().eq("room_id", roomId).eq("user_id", memberId)
+  await audit({
+    orgId: check.access.org.id,
+    actorId: check.access.user.id,
+    action: "room.member_removed",
+    target: roomId,
+    metadata: { memberId },
+  })
+  revalidateOrg(orgSlug)
+  return ok("Person removed from the room")
 }
 
 export async function addAgentToRoom(

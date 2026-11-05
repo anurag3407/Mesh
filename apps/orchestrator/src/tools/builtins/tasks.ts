@@ -107,7 +107,14 @@ export function taskTools(args: { roomId: string; orgId: string; agentId: string
         const [row] = await getDb()
           .update(tasks)
           .set(updates)
-          .where(and(eq(tasks.id, input.task_id), eq(tasks.roomId, args.roomId), ne(tasks.status, "done")))
+          .where(
+            and(
+              eq(tasks.id, input.task_id),
+              eq(tasks.roomId, args.roomId),
+              eq(tasks.kind, "task"),
+              ne(tasks.status, "done"),
+            ),
+          )
           .returning({ id: tasks.id, number: tasks.number, status: tasks.status, title: tasks.title })
         if (!row) throw new Error("task not found in this room")
         return row

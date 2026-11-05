@@ -7,11 +7,12 @@ import { Button } from "@/components/ui/button"
 import { Field, HelpText, Input } from "@/components/ui/field"
 import { InlineAlert } from "@/components/ui/empty"
 import { cn } from "@/lib/format"
+import { readAvatarFile } from "@/lib/image-avatar"
 import type { ActionResult } from "@/lib/types"
 
 const MODES = [
   { value: "all", label: "Everything" },
-  { value: "mentions", label: "Only mentions and requests" },
+  { value: "mentions", label: "Only messages that mention me" },
   { value: "off", label: "Nothing" },
 ] as const
 
@@ -39,25 +40,16 @@ export function ProfileForm({
   const [soundOn, setSoundOn] = useState(sound)
   const fileInput = useRef<HTMLInputElement>(null)
 
-  function onPhotoChange(event: React.ChangeEvent<HTMLInputElement>) {
+  async function onPhotoChange(event: React.ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0]
     if (!file) return
-    if (!["image/png", "image/jpeg", "image/webp"].includes(file.type)) {
-      setError("Use a PNG, JPEG or WebP image")
-      return
-    }
-    const reader = new FileReader()
-    reader.onload = () => {
-      const result = typeof reader.result === "string" ? reader.result : ""
-      if (result.length > 300_000) {
-        setError("That image is too large. Pick one under about 200 KB.")
-        return
-      }
+    try {
       setError(null)
+      const result = await readAvatarFile(file)
       setPhoto(result)
+    } catch (error) {
+      setError(error instanceof Error ? error.message : "That image could not be read")
     }
-    reader.onerror = () => setError("That image could not be read")
-    reader.readAsDataURL(file)
   }
 
   return (
