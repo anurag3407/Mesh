@@ -1,7 +1,5 @@
 import type { Metadata } from "next"
 import { redirect } from "next/navigation"
-import "@fontsource/instrument-serif/400.css"
-import "@fontsource/instrument-serif/400-italic.css"
 import "@/components/landing/landing.css"
 import { getCurrentUser, listUserOrgs } from "@/lib/auth"
 import { githubAuthEnabled, googleAuthEnabled } from "@/lib/env"

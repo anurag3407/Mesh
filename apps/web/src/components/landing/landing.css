@@ -49,10 +49,10 @@
   font-weight: 500;
 }
 .l-serif {
-  font-family: var(--font-serif);
-  font-style: italic;
-  font-weight: 400;
-  letter-spacing: -0.02em;
+  font-family: var(--font-sans);
+  font-style: normal;
+  font-weight: 600;
+  letter-spacing: -0.035em;
 }
 .l-lead {
   font-size: clamp(1.0625rem, 1.35vw, 1.25rem);

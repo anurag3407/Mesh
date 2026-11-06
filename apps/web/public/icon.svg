@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
   <rect width="64" height="64" fill="#0b0e0c"/>
   <rect x="12" y="12" width="40" height="40" fill="none" stroke="#232b25" stroke-width="1"/>
-  <text x="32" y="43" text-anchor="middle" font-family="'IBM Plex Mono', ui-monospace, monospace" font-size="30" font-weight="500" fill="#e9e5d8">m</text>
+  <text x="32" y="43" text-anchor="middle" font-family="'Geist Mono Variable', 'Geist Mono', ui-monospace, monospace" font-size="30" font-weight="500" fill="#e9e5d8">s</text>
   <rect x="46" y="18" width="8" height="8" fill="#ff7a45"/>
 </svg>
