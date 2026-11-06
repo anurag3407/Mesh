@@ -8,6 +8,7 @@ import { openBotDmAction } from "@/lib/actions/room-state"
 import { cn } from "@/lib/format"
 import { Avatar } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
+import { SayabotMark } from "@/components/landing/mesh-mark"
 import { useWorkspaceActivity } from "@/components/use-workspace-activity"
 import {
   AgentsIcon,
@@ -210,10 +211,8 @@ function SidebarContent({
   return (
     <div className="flex h-full min-h-0 flex-col bg-ink">
       <div className="flex items-center gap-2.5 border-b border-line px-4 py-3.5">
-        <span className="grid h-6 w-6 place-items-center bg-accent font-mono text-[13px] font-medium text-void">
-          s
-        </span>
-        <span className="font-mono text-sm text-text">sayabot</span>
+        <SayabotMark className="h-6 w-6 shrink-0" />
+        <span className="font-mono text-sm font-medium text-text">sayabot</span>
         <Link
           href={`${base}/search`}
           onClick={onNavigate}

@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256">
+  <title>Sayabot — The Handoff</title>
+  <g fill="#000000">
+    <!-- Top-left to center gesture: Human node -->
+    <circle cx="84" cy="74" r="30" />
+    <path d="M 84 104 C 84 124 100 140 120 140 L 172 140 C 183 140 192 131 192 120 C 192 109 183 100 172 100 L 120 100 C 111.2 100 104 92.8 104 84 L 104 74 Z" />
+    <!-- Bottom-right to center gesture: Agent node -->
+    <circle cx="172" cy="182" r="30" />
+    <path d="M 172 152 C 172 132 156 116 136 116 L 84 116 C 73 116 64 125 64 136 C 64 147 73 156 84 156 L 136 156 C 144.8 156 152 163.2 152 172 L 152 182 Z" />
+  </g>
+</svg>

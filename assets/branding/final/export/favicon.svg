@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256"><title>Sayabot</title><g transform="translate(-17.66 3.96) scale(1.138)">
+  
+  <g fill="#ff7a45">
+    <circle cx="128" cy="26" r="16" />
+    <rect x="123" y="36" width="10" height="22" rx="5" />
+    <rect x="20" y="96" width="24" height="52" rx="12" />
+    <rect x="212" y="96" width="24" height="52" rx="12" />
+    <rect x="34" y="52" width="188" height="156" rx="62" />
+  </g>
+  <rect x="50" y="68" width="156" height="124" rx="46" fill="#0b0e0c" />
+  <g fill="#ffffff">
+    <ellipse cx="94" cy="122" rx="18" ry="24" />
+    <ellipse cx="162" cy="122" rx="18" ry="24" />
+    <path d="M 116 144 Q 128 158 140 144" fill="none" stroke="#ffffff" stroke-width="7" stroke-linecap="round" />
+  </g>
+  <g fill="#ffffff">
+    <circle cx="100" cy="114" r="8" />
+    <circle cx="168" cy="114" r="8" />
+  </g>
+</g></svg>

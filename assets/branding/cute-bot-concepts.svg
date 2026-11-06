@@ -1,0 +1,530 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="1600" height="984" viewBox="0 0 1600 984"><rect width="1600" height="984" fill="#f7f7f4"/><text x="60" y="78" font-family="system-ui,-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="40" font-weight="700" fill="#161616">Sayabot — Cute Bot Logo Concepts</text><text x="60" y="116" font-family="system-ui,-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="20" fill="#6b6b6b">Friendly AI companion &amp; mascot identity exploration</text><rect x="60" y="150" width="474.667" height="774" rx="18" fill="#fff" stroke="#161616" stroke-width="2"/><g><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" x="90" y="190" width="414.667" height="300" preserveAspectRatio="xMidYMid meet">
+  <title>Sayabot — The Pocket Saya</title>
+  <g fill="#000000">
+    <!-- Top antenna orb and stem -->
+    <circle cx="128" cy="26" r="14" />
+    <rect x="124" y="36" width="8" height="22" rx="4" />
+    <!-- Left headphone pod -->
+    <rect x="22" y="98" width="22" height="48" rx="11" />
+    <!-- Right headphone pod -->
+    <rect x="212" y="98" width="22" height="48" rx="11" />
+    <!-- Head chassis -->
+    <rect x="36" y="54" width="184" height="152" rx="60" />
+  </g>
+  <!-- Face visor plate -->
+  <rect x="52" y="70" width="152" height="120" rx="44" fill="#ffffff" />
+  <!-- Facial expression -->
+  <g fill="#000000">
+    <!-- Left eye -->
+    <ellipse cx="94" cy="122" rx="16" ry="22" />
+    <!-- Right eye -->
+    <ellipse cx="162" cy="122" rx="16" ry="22" />
+    <!-- Smile -->
+    <path d="M 118 144 Q 128 156 138 144" fill="none" stroke="#000000" stroke-width="6" stroke-linecap="round" />
+  </g>
+  <!-- Eye glints -->
+  <g fill="#ffffff">
+    <circle cx="99" cy="115" r="7" />
+    <circle cx="90" cy="129" r="3.5" />
+    <circle cx="167" cy="115" r="7" />
+    <circle cx="158" cy="129" r="3.5" />
+  </g>
+</svg></g><g><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 256" x="90" y="514" width="414.667" height="120" preserveAspectRatio="xMidYMid meet">
+  <title>The Pocket Saya — Lockup</title>
+  <!-- Mascot Symbol on the left -->
+  <g transform="translate(44, 26) scale(0.80)">
+    
+  <title>Sayabot — The Pocket Saya</title>
+  <g fill="#000000">
+    <!-- Top antenna orb and stem -->
+    <circle cx="128" cy="26" r="14" />
+    <rect x="124" y="36" width="8" height="22" rx="4" />
+    <!-- Left headphone pod -->
+    <rect x="22" y="98" width="22" height="48" rx="11" />
+    <!-- Right headphone pod -->
+    <rect x="212" y="98" width="22" height="48" rx="11" />
+    <!-- Head chassis -->
+    <rect x="36" y="54" width="184" height="152" rx="60" />
+  </g>
+  <!-- Face visor plate -->
+  <rect x="52" y="70" width="152" height="120" rx="44" fill="#ffffff" />
+  <!-- Facial expression -->
+  <g fill="#000000">
+    <!-- Left eye -->
+    <ellipse cx="94" cy="122" rx="16" ry="22" />
+    <!-- Right eye -->
+    <ellipse cx="162" cy="122" rx="16" ry="22" />
+    <!-- Smile -->
+    <path d="M 118 144 Q 128 156 138 144" fill="none" stroke="#000000" stroke-width="6" stroke-linecap="round" />
+  </g>
+  <!-- Eye glints -->
+  <g fill="#ffffff">
+    <circle cx="99" cy="115" r="7" />
+    <circle cx="90" cy="129" r="3.5" />
+    <circle cx="167" cy="115" r="7" />
+    <circle cx="158" cy="129" r="3.5" />
+  </g>
+
+  </g>
+  <!-- Bespoke clean geometric wordmark "sayabot" -->
+  <g fill="#000000">
+    <!-- s (x=276..330) -->
+    <path d="M 326 114 C 326 102 316 94 300 94 C 282 94 270 104 270 120 C 270 134 280 142 298 146 L 306 148 C 316 150 322 155 322 162 C 322 170 314 176 300 176 C 286 176 276 169 274 159 L 256 162 C 259 180 276 192 300 192 C 326 192 340 179 340 161 C 340 146 330 137 310 133 L 302 131 C 292 129 288 125 288 119 C 288 112 294 109 302 109 C 311 109 318 113 319 120 Z" />
+    <!-- a (x=346..398) -->
+    <path d="M 396 140 C 396 112 377 94 356 94 C 335 94 320 110 320 132 L 336 132 C 336 120 344 110 356 110 C 369 110 379 120 379 136 L 379 142 C 350 142 330 151 330 169 C 330 183 342 192 356 192 C 369 192 378 184 381 175 L 381 190 L 396 190 Z M 380 156 C 380 168 371 176 358 176 C 348 176 342 170 342 162 C 342 151 354 145 380 145 Z" />
+    <!-- y (x=412..466) -->
+    <path d="M 466 96 L 444 156 L 424 96 L 406 96 L 436 174 L 426 200 C 422 210 415 214 405 214 L 398 214 L 398 228 C 402 229 408 229 412 229 C 426 229 437 221 444 202 L 484 96 Z" />
+    <!-- a (x=482..534) -->
+    <path d="M 532 140 C 532 112 513 94 492 94 C 471 94 456 110 456 132 L 472 132 C 472 120 480 110 492 110 C 505 110 515 120 515 136 L 515 142 C 486 142 466 151 466 169 C 466 183 478 192 492 192 C 505 192 514 184 517 175 L 517 190 L 532 190 Z M 516 156 C 516 168 507 176 494 176 C 484 176 478 170 478 162 C 478 151 490 145 516 145 Z" />
+    <!-- b (x=548..604) -->
+    <path d="M 548 66 L 565 66 L 565 108 C 571 99 581 94 594 94 C 616 94 632 112 632 143 C 632 174 615 192 594 192 C 581 192 571 187 565 178 L 565 190 L 548 190 Z M 590 110 C 576 110 565 122 565 143 C 565 164 576 176 590 176 C 604 176 615 164 615 143 C 615 122 604 110 590 110 Z" />
+    <!-- o (x=618..676) -->
+    <path d="M 660 94 C 635 94 618 113 618 143 C 618 173 635 192 660 192 C 685 192 702 173 702 143 C 702 113 685 94 660 94 Z M 660 110 C 674 110 685 123 685 143 C 685 163 674 176 660 176 C 646 176 635 163 635 143 C 635 123 646 110 660 110 Z" />
+    <!-- t (x=688..736) -->
+    <path d="M 714 76 L 729 76 L 729 96 L 746 96 L 746 111 L 729 111 L 729 164 C 729 171 733 175 740 175 L 746 175 L 746 190 L 736 190 C 721 190 714 181 714 166 L 714 111 L 705 111 L 705 96 L 714 96 Z" />
+  </g>
+</svg></g><g><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" x="90" y="660" width="64" height="64" preserveAspectRatio="xMidYMid meet">
+  <title>Sayabot — The Pocket Saya</title>
+  <g fill="#000000">
+    <!-- Top antenna orb and stem -->
+    <circle cx="128" cy="26" r="14" />
+    <rect x="124" y="36" width="8" height="22" rx="4" />
+    <!-- Left headphone pod -->
+    <rect x="22" y="98" width="22" height="48" rx="11" />
+    <!-- Right headphone pod -->
+    <rect x="212" y="98" width="22" height="48" rx="11" />
+    <!-- Head chassis -->
+    <rect x="36" y="54" width="184" height="152" rx="60" />
+  </g>
+  <!-- Face visor plate -->
+  <rect x="52" y="70" width="152" height="120" rx="44" fill="#ffffff" />
+  <!-- Facial expression -->
+  <g fill="#000000">
+    <!-- Left eye -->
+    <ellipse cx="94" cy="122" rx="16" ry="22" />
+    <!-- Right eye -->
+    <ellipse cx="162" cy="122" rx="16" ry="22" />
+    <!-- Smile -->
+    <path d="M 118 144 Q 128 156 138 144" fill="none" stroke="#000000" stroke-width="6" stroke-linecap="round" />
+  </g>
+  <!-- Eye glints -->
+  <g fill="#ffffff">
+    <circle cx="99" cy="115" r="7" />
+    <circle cx="90" cy="129" r="3.5" />
+    <circle cx="167" cy="115" r="7" />
+    <circle cx="158" cy="129" r="3.5" />
+  </g>
+</svg></g><text x="122" y="744" font-family="system-ui,-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="12" fill="#8a8a8a" text-anchor="middle">64px</text><g><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" x="180" y="692" width="32" height="32" preserveAspectRatio="xMidYMid meet">
+  <title>Sayabot — The Pocket Saya</title>
+  <g fill="#000000">
+    <!-- Top antenna orb and stem -->
+    <circle cx="128" cy="26" r="14" />
+    <rect x="124" y="36" width="8" height="22" rx="4" />
+    <!-- Left headphone pod -->
+    <rect x="22" y="98" width="22" height="48" rx="11" />
+    <!-- Right headphone pod -->
+    <rect x="212" y="98" width="22" height="48" rx="11" />
+    <!-- Head chassis -->
+    <rect x="36" y="54" width="184" height="152" rx="60" />
+  </g>
+  <!-- Face visor plate -->
+  <rect x="52" y="70" width="152" height="120" rx="44" fill="#ffffff" />
+  <!-- Facial expression -->
+  <g fill="#000000">
+    <!-- Left eye -->
+    <ellipse cx="94" cy="122" rx="16" ry="22" />
+    <!-- Right eye -->
+    <ellipse cx="162" cy="122" rx="16" ry="22" />
+    <!-- Smile -->
+    <path d="M 118 144 Q 128 156 138 144" fill="none" stroke="#000000" stroke-width="6" stroke-linecap="round" />
+  </g>
+  <!-- Eye glints -->
+  <g fill="#ffffff">
+    <circle cx="99" cy="115" r="7" />
+    <circle cx="90" cy="129" r="3.5" />
+    <circle cx="167" cy="115" r="7" />
+    <circle cx="158" cy="129" r="3.5" />
+  </g>
+</svg></g><text x="196" y="744" font-family="system-ui,-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="12" fill="#8a8a8a" text-anchor="middle">32px</text><g><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" x="238" y="708" width="16" height="16" preserveAspectRatio="xMidYMid meet">
+  <title>Sayabot — The Pocket Saya</title>
+  <g fill="#000000">
+    <!-- Top antenna orb and stem -->
+    <circle cx="128" cy="26" r="14" />
+    <rect x="124" y="36" width="8" height="22" rx="4" />
+    <!-- Left headphone pod -->
+    <rect x="22" y="98" width="22" height="48" rx="11" />
+    <!-- Right headphone pod -->
+    <rect x="212" y="98" width="22" height="48" rx="11" />
+    <!-- Head chassis -->
+    <rect x="36" y="54" width="184" height="152" rx="60" />
+  </g>
+  <!-- Face visor plate -->
+  <rect x="52" y="70" width="152" height="120" rx="44" fill="#ffffff" />
+  <!-- Facial expression -->
+  <g fill="#000000">
+    <!-- Left eye -->
+    <ellipse cx="94" cy="122" rx="16" ry="22" />
+    <!-- Right eye -->
+    <ellipse cx="162" cy="122" rx="16" ry="22" />
+    <!-- Smile -->
+    <path d="M 118 144 Q 128 156 138 144" fill="none" stroke="#000000" stroke-width="6" stroke-linecap="round" />
+  </g>
+  <!-- Eye glints -->
+  <g fill="#ffffff">
+    <circle cx="99" cy="115" r="7" />
+    <circle cx="90" cy="129" r="3.5" />
+    <circle cx="167" cy="115" r="7" />
+    <circle cx="158" cy="129" r="3.5" />
+  </g>
+</svg></g><text x="246" y="744" font-family="system-ui,-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="12" fill="#8a8a8a" text-anchor="middle">16px</text><text x="90.0" y="780" font-family="system-ui,-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="26" font-weight="700" fill="#161616">A · The Pocket Saya</text><text x="90.0" y="808" font-family="system-ui,-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="15" font-weight="700" fill="#161616" letter-spacing="1.5">RECOMMENDED</text><text x="90.0" y="842" font-family="system-ui,-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="19" fill="#555">Cheerful pill-bot with glowing antenna orb</text><text x="90.0" y="868" font-family="system-ui,-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="19" fill="#555">and sparkling anime eyes.</text><rect x="562.667" y="150" width="474.667" height="774" rx="18" fill="#fff" stroke="#e4e4e0" stroke-width="1"/><g><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" x="592.667" y="190" width="414.667" height="300" preserveAspectRatio="xMidYMid meet">
+  <title>Sayabot — The Monitor Roomie</title>
+  <g fill="#000000">
+    <!-- Left antenna -->
+    <rect x="64" y="16" width="14" height="42" rx="7" transform="rotate(-30 71 37)" />
+    <!-- Right antenna -->
+    <rect x="178" y="16" width="14" height="42" rx="7" transform="rotate(30 185 37)" />
+    <!-- Monitor chassis -->
+    <rect x="34" y="46" width="188" height="162" rx="52" />
+    <!-- Stand feet -->
+    <rect x="72" y="212" width="38" height="18" rx="9" />
+    <rect x="146" y="212" width="38" height="18" rx="9" />
+  </g>
+  <!-- Monitor screen plate -->
+  <rect x="52" y="64" width="152" height="126" rx="36" fill="#ffffff" />
+  <!-- Expressive cute pill eyes and smile -->
+  <g fill="#000000">
+    <!-- Left pill eye -->
+    <rect x="84" y="104" width="24" height="40" rx="12" />
+    <!-- Right pill eye -->
+    <rect x="148" y="104" width="24" height="40" rx="12" />
+    <!-- Little smile -->
+    <path d="M 120 148 Q 128 158 136 148" fill="none" stroke="#000000" stroke-width="5" stroke-linecap="round" />
+  </g>
+  <!-- Glints in pill eyes -->
+  <g fill="#ffffff">
+    <circle cx="92" cy="116" r="6" />
+    <circle cx="156" cy="116" r="6" />
+  </g>
+</svg></g><g><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 256" x="592.667" y="514" width="414.667" height="120" preserveAspectRatio="xMidYMid meet">
+  <title>The Monitor Roomie — Lockup</title>
+  <!-- Mascot Symbol on the left -->
+  <g transform="translate(44, 26) scale(0.80)">
+    
+  <title>Sayabot — The Monitor Roomie</title>
+  <g fill="#000000">
+    <!-- Left antenna -->
+    <rect x="64" y="16" width="14" height="42" rx="7" transform="rotate(-30 71 37)" />
+    <!-- Right antenna -->
+    <rect x="178" y="16" width="14" height="42" rx="7" transform="rotate(30 185 37)" />
+    <!-- Monitor chassis -->
+    <rect x="34" y="46" width="188" height="162" rx="52" />
+    <!-- Stand feet -->
+    <rect x="72" y="212" width="38" height="18" rx="9" />
+    <rect x="146" y="212" width="38" height="18" rx="9" />
+  </g>
+  <!-- Monitor screen plate -->
+  <rect x="52" y="64" width="152" height="126" rx="36" fill="#ffffff" />
+  <!-- Expressive cute pill eyes and smile -->
+  <g fill="#000000">
+    <!-- Left pill eye -->
+    <rect x="84" y="104" width="24" height="40" rx="12" />
+    <!-- Right pill eye -->
+    <rect x="148" y="104" width="24" height="40" rx="12" />
+    <!-- Little smile -->
+    <path d="M 120 148 Q 128 158 136 148" fill="none" stroke="#000000" stroke-width="5" stroke-linecap="round" />
+  </g>
+  <!-- Glints in pill eyes -->
+  <g fill="#ffffff">
+    <circle cx="92" cy="116" r="6" />
+    <circle cx="156" cy="116" r="6" />
+  </g>
+
+  </g>
+  <!-- Bespoke clean geometric wordmark "sayabot" -->
+  <g fill="#000000">
+    <!-- s (x=276..330) -->
+    <path d="M 326 114 C 326 102 316 94 300 94 C 282 94 270 104 270 120 C 270 134 280 142 298 146 L 306 148 C 316 150 322 155 322 162 C 322 170 314 176 300 176 C 286 176 276 169 274 159 L 256 162 C 259 180 276 192 300 192 C 326 192 340 179 340 161 C 340 146 330 137 310 133 L 302 131 C 292 129 288 125 288 119 C 288 112 294 109 302 109 C 311 109 318 113 319 120 Z" />
+    <!-- a (x=346..398) -->
+    <path d="M 396 140 C 396 112 377 94 356 94 C 335 94 320 110 320 132 L 336 132 C 336 120 344 110 356 110 C 369 110 379 120 379 136 L 379 142 C 350 142 330 151 330 169 C 330 183 342 192 356 192 C 369 192 378 184 381 175 L 381 190 L 396 190 Z M 380 156 C 380 168 371 176 358 176 C 348 176 342 170 342 162 C 342 151 354 145 380 145 Z" />
+    <!-- y (x=412..466) -->
+    <path d="M 466 96 L 444 156 L 424 96 L 406 96 L 436 174 L 426 200 C 422 210 415 214 405 214 L 398 214 L 398 228 C 402 229 408 229 412 229 C 426 229 437 221 444 202 L 484 96 Z" />
+    <!-- a (x=482..534) -->
+    <path d="M 532 140 C 532 112 513 94 492 94 C 471 94 456 110 456 132 L 472 132 C 472 120 480 110 492 110 C 505 110 515 120 515 136 L 515 142 C 486 142 466 151 466 169 C 466 183 478 192 492 192 C 505 192 514 184 517 175 L 517 190 L 532 190 Z M 516 156 C 516 168 507 176 494 176 C 484 176 478 170 478 162 C 478 151 490 145 516 145 Z" />
+    <!-- b (x=548..604) -->
+    <path d="M 548 66 L 565 66 L 565 108 C 571 99 581 94 594 94 C 616 94 632 112 632 143 C 632 174 615 192 594 192 C 581 192 571 187 565 178 L 565 190 L 548 190 Z M 590 110 C 576 110 565 122 565 143 C 565 164 576 176 590 176 C 604 176 615 164 615 143 C 615 122 604 110 590 110 Z" />
+    <!-- o (x=618..676) -->
+    <path d="M 660 94 C 635 94 618 113 618 143 C 618 173 635 192 660 192 C 685 192 702 173 702 143 C 702 113 685 94 660 94 Z M 660 110 C 674 110 685 123 685 143 C 685 163 674 176 660 176 C 646 176 635 163 635 143 C 635 123 646 110 660 110 Z" />
+    <!-- t (x=688..736) -->
+    <path d="M 714 76 L 729 76 L 729 96 L 746 96 L 746 111 L 729 111 L 729 164 C 729 171 733 175 740 175 L 746 175 L 746 190 L 736 190 C 721 190 714 181 714 166 L 714 111 L 705 111 L 705 96 L 714 96 Z" />
+  </g>
+</svg></g><g><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" x="592.667" y="660" width="64" height="64" preserveAspectRatio="xMidYMid meet">
+  <title>Sayabot — The Monitor Roomie</title>
+  <g fill="#000000">
+    <!-- Left antenna -->
+    <rect x="64" y="16" width="14" height="42" rx="7" transform="rotate(-30 71 37)" />
+    <!-- Right antenna -->
+    <rect x="178" y="16" width="14" height="42" rx="7" transform="rotate(30 185 37)" />
+    <!-- Monitor chassis -->
+    <rect x="34" y="46" width="188" height="162" rx="52" />
+    <!-- Stand feet -->
+    <rect x="72" y="212" width="38" height="18" rx="9" />
+    <rect x="146" y="212" width="38" height="18" rx="9" />
+  </g>
+  <!-- Monitor screen plate -->
+  <rect x="52" y="64" width="152" height="126" rx="36" fill="#ffffff" />
+  <!-- Expressive cute pill eyes and smile -->
+  <g fill="#000000">
+    <!-- Left pill eye -->
+    <rect x="84" y="104" width="24" height="40" rx="12" />
+    <!-- Right pill eye -->
+    <rect x="148" y="104" width="24" height="40" rx="12" />
+    <!-- Little smile -->
+    <path d="M 120 148 Q 128 158 136 148" fill="none" stroke="#000000" stroke-width="5" stroke-linecap="round" />
+  </g>
+  <!-- Glints in pill eyes -->
+  <g fill="#ffffff">
+    <circle cx="92" cy="116" r="6" />
+    <circle cx="156" cy="116" r="6" />
+  </g>
+</svg></g><text x="624.667" y="744" font-family="system-ui,-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="12" fill="#8a8a8a" text-anchor="middle">64px</text><g><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" x="682.667" y="692" width="32" height="32" preserveAspectRatio="xMidYMid meet">
+  <title>Sayabot — The Monitor Roomie</title>
+  <g fill="#000000">
+    <!-- Left antenna -->
+    <rect x="64" y="16" width="14" height="42" rx="7" transform="rotate(-30 71 37)" />
+    <!-- Right antenna -->
+    <rect x="178" y="16" width="14" height="42" rx="7" transform="rotate(30 185 37)" />
+    <!-- Monitor chassis -->
+    <rect x="34" y="46" width="188" height="162" rx="52" />
+    <!-- Stand feet -->
+    <rect x="72" y="212" width="38" height="18" rx="9" />
+    <rect x="146" y="212" width="38" height="18" rx="9" />
+  </g>
+  <!-- Monitor screen plate -->
+  <rect x="52" y="64" width="152" height="126" rx="36" fill="#ffffff" />
+  <!-- Expressive cute pill eyes and smile -->
+  <g fill="#000000">
+    <!-- Left pill eye -->
+    <rect x="84" y="104" width="24" height="40" rx="12" />
+    <!-- Right pill eye -->
+    <rect x="148" y="104" width="24" height="40" rx="12" />
+    <!-- Little smile -->
+    <path d="M 120 148 Q 128 158 136 148" fill="none" stroke="#000000" stroke-width="5" stroke-linecap="round" />
+  </g>
+  <!-- Glints in pill eyes -->
+  <g fill="#ffffff">
+    <circle cx="92" cy="116" r="6" />
+    <circle cx="156" cy="116" r="6" />
+  </g>
+</svg></g><text x="698.667" y="744" font-family="system-ui,-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="12" fill="#8a8a8a" text-anchor="middle">32px</text><g><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" x="740.667" y="708" width="16" height="16" preserveAspectRatio="xMidYMid meet">
+  <title>Sayabot — The Monitor Roomie</title>
+  <g fill="#000000">
+    <!-- Left antenna -->
+    <rect x="64" y="16" width="14" height="42" rx="7" transform="rotate(-30 71 37)" />
+    <!-- Right antenna -->
+    <rect x="178" y="16" width="14" height="42" rx="7" transform="rotate(30 185 37)" />
+    <!-- Monitor chassis -->
+    <rect x="34" y="46" width="188" height="162" rx="52" />
+    <!-- Stand feet -->
+    <rect x="72" y="212" width="38" height="18" rx="9" />
+    <rect x="146" y="212" width="38" height="18" rx="9" />
+  </g>
+  <!-- Monitor screen plate -->
+  <rect x="52" y="64" width="152" height="126" rx="36" fill="#ffffff" />
+  <!-- Expressive cute pill eyes and smile -->
+  <g fill="#000000">
+    <!-- Left pill eye -->
+    <rect x="84" y="104" width="24" height="40" rx="12" />
+    <!-- Right pill eye -->
+    <rect x="148" y="104" width="24" height="40" rx="12" />
+    <!-- Little smile -->
+    <path d="M 120 148 Q 128 158 136 148" fill="none" stroke="#000000" stroke-width="5" stroke-linecap="round" />
+  </g>
+  <!-- Glints in pill eyes -->
+  <g fill="#ffffff">
+    <circle cx="92" cy="116" r="6" />
+    <circle cx="156" cy="116" r="6" />
+  </g>
+</svg></g><text x="748.667" y="744" font-family="system-ui,-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="12" fill="#8a8a8a" text-anchor="middle">16px</text><text x="592.6666666666667" y="780" font-family="system-ui,-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="26" font-weight="700" fill="#161616">B · The Monitor Roomie</text><text x="592.6666666666667" y="814" font-family="system-ui,-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="19" fill="#555">Retro-modern desktop squircle bot with twin</text><text x="592.6666666666667" y="840" font-family="system-ui,-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="19" fill="#555">antennae and expressive pill eyes.</text><rect x="1065.33" y="150" width="474.667" height="774" rx="18" fill="#fff" stroke="#e4e4e0" stroke-width="1"/><g><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" x="1095.33" y="190" width="414.667" height="300" preserveAspectRatio="xMidYMid meet">
+  <title>Sayabot — The Astro Orb</title>
+  <g fill="#000000">
+    <!-- Top halo disc -->
+    <ellipse cx="128" cy="22" rx="26" ry="8" />
+    <rect x="124" y="24" width="8" height="18" rx="4" />
+    <!-- Left headphone pod -->
+    <rect x="20" y="98" width="24" height="52" rx="12" />
+    <!-- Right headphone pod -->
+    <rect x="212" y="98" width="24" height="52" rx="12" />
+    <!-- Orb body -->
+    <circle cx="128" cy="124" r="86" />
+    <!-- Floating cute hand paws -->
+    <circle cx="56" cy="208" r="18" />
+    <circle cx="200" cy="208" r="18" />
+  </g>
+  <!-- Curved panoramic faceplate -->
+  <path d="M 64 124 C 64 92 92 78 128 78 C 164 78 192 92 192 124 C 192 154 164 164 128 164 C 92 164 64 154 64 124 Z" fill="#ffffff" />
+  <!-- Cute expressive eyes in visor -->
+  <g fill="#000000">
+    <!-- Left big pill eye -->
+    <rect x="90" y="104" width="22" height="34" rx="11" />
+    <!-- Right big pill eye -->
+    <rect x="144" y="104" width="22" height="34" rx="11" />
+    <!-- Joyful mouth -->
+    <path d="M 120 144 Q 128 153 136 144" fill="none" stroke="#000000" stroke-width="5" stroke-linecap="round" />
+  </g>
+  <!-- Glints in eyes -->
+  <g fill="#ffffff">
+    <circle cx="97" cy="113" r="5.5" />
+    <circle cx="151" cy="113" r="5.5" />
+  </g>
+</svg></g><g><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 256" x="1095.33" y="514" width="414.667" height="120" preserveAspectRatio="xMidYMid meet">
+  <title>The Astro Orb — Lockup</title>
+  <!-- Mascot Symbol on the left -->
+  <g transform="translate(44, 26) scale(0.80)">
+    
+  <title>Sayabot — The Astro Orb</title>
+  <g fill="#000000">
+    <!-- Top halo disc -->
+    <ellipse cx="128" cy="22" rx="26" ry="8" />
+    <rect x="124" y="24" width="8" height="18" rx="4" />
+    <!-- Left headphone pod -->
+    <rect x="20" y="98" width="24" height="52" rx="12" />
+    <!-- Right headphone pod -->
+    <rect x="212" y="98" width="24" height="52" rx="12" />
+    <!-- Orb body -->
+    <circle cx="128" cy="124" r="86" />
+    <!-- Floating cute hand paws -->
+    <circle cx="56" cy="208" r="18" />
+    <circle cx="200" cy="208" r="18" />
+  </g>
+  <!-- Curved panoramic faceplate -->
+  <path d="M 64 124 C 64 92 92 78 128 78 C 164 78 192 92 192 124 C 192 154 164 164 128 164 C 92 164 64 154 64 124 Z" fill="#ffffff" />
+  <!-- Cute expressive eyes in visor -->
+  <g fill="#000000">
+    <!-- Left big pill eye -->
+    <rect x="90" y="104" width="22" height="34" rx="11" />
+    <!-- Right big pill eye -->
+    <rect x="144" y="104" width="22" height="34" rx="11" />
+    <!-- Joyful mouth -->
+    <path d="M 120 144 Q 128 153 136 144" fill="none" stroke="#000000" stroke-width="5" stroke-linecap="round" />
+  </g>
+  <!-- Glints in eyes -->
+  <g fill="#ffffff">
+    <circle cx="97" cy="113" r="5.5" />
+    <circle cx="151" cy="113" r="5.5" />
+  </g>
+
+  </g>
+  <!-- Bespoke clean geometric wordmark "sayabot" -->
+  <g fill="#000000">
+    <!-- s (x=276..330) -->
+    <path d="M 326 114 C 326 102 316 94 300 94 C 282 94 270 104 270 120 C 270 134 280 142 298 146 L 306 148 C 316 150 322 155 322 162 C 322 170 314 176 300 176 C 286 176 276 169 274 159 L 256 162 C 259 180 276 192 300 192 C 326 192 340 179 340 161 C 340 146 330 137 310 133 L 302 131 C 292 129 288 125 288 119 C 288 112 294 109 302 109 C 311 109 318 113 319 120 Z" />
+    <!-- a (x=346..398) -->
+    <path d="M 396 140 C 396 112 377 94 356 94 C 335 94 320 110 320 132 L 336 132 C 336 120 344 110 356 110 C 369 110 379 120 379 136 L 379 142 C 350 142 330 151 330 169 C 330 183 342 192 356 192 C 369 192 378 184 381 175 L 381 190 L 396 190 Z M 380 156 C 380 168 371 176 358 176 C 348 176 342 170 342 162 C 342 151 354 145 380 145 Z" />
+    <!-- y (x=412..466) -->
+    <path d="M 466 96 L 444 156 L 424 96 L 406 96 L 436 174 L 426 200 C 422 210 415 214 405 214 L 398 214 L 398 228 C 402 229 408 229 412 229 C 426 229 437 221 444 202 L 484 96 Z" />
+    <!-- a (x=482..534) -->
+    <path d="M 532 140 C 532 112 513 94 492 94 C 471 94 456 110 456 132 L 472 132 C 472 120 480 110 492 110 C 505 110 515 120 515 136 L 515 142 C 486 142 466 151 466 169 C 466 183 478 192 492 192 C 505 192 514 184 517 175 L 517 190 L 532 190 Z M 516 156 C 516 168 507 176 494 176 C 484 176 478 170 478 162 C 478 151 490 145 516 145 Z" />
+    <!-- b (x=548..604) -->
+    <path d="M 548 66 L 565 66 L 565 108 C 571 99 581 94 594 94 C 616 94 632 112 632 143 C 632 174 615 192 594 192 C 581 192 571 187 565 178 L 565 190 L 548 190 Z M 590 110 C 576 110 565 122 565 143 C 565 164 576 176 590 176 C 604 176 615 164 615 143 C 615 122 604 110 590 110 Z" />
+    <!-- o (x=618..676) -->
+    <path d="M 660 94 C 635 94 618 113 618 143 C 618 173 635 192 660 192 C 685 192 702 173 702 143 C 702 113 685 94 660 94 Z M 660 110 C 674 110 685 123 685 143 C 685 163 674 176 660 176 C 646 176 635 163 635 143 C 635 123 646 110 660 110 Z" />
+    <!-- t (x=688..736) -->
+    <path d="M 714 76 L 729 76 L 729 96 L 746 96 L 746 111 L 729 111 L 729 164 C 729 171 733 175 740 175 L 746 175 L 746 190 L 736 190 C 721 190 714 181 714 166 L 714 111 L 705 111 L 705 96 L 714 96 Z" />
+  </g>
+</svg></g><g><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" x="1095.33" y="660" width="64" height="64" preserveAspectRatio="xMidYMid meet">
+  <title>Sayabot — The Astro Orb</title>
+  <g fill="#000000">
+    <!-- Top halo disc -->
+    <ellipse cx="128" cy="22" rx="26" ry="8" />
+    <rect x="124" y="24" width="8" height="18" rx="4" />
+    <!-- Left headphone pod -->
+    <rect x="20" y="98" width="24" height="52" rx="12" />
+    <!-- Right headphone pod -->
+    <rect x="212" y="98" width="24" height="52" rx="12" />
+    <!-- Orb body -->
+    <circle cx="128" cy="124" r="86" />
+    <!-- Floating cute hand paws -->
+    <circle cx="56" cy="208" r="18" />
+    <circle cx="200" cy="208" r="18" />
+  </g>
+  <!-- Curved panoramic faceplate -->
+  <path d="M 64 124 C 64 92 92 78 128 78 C 164 78 192 92 192 124 C 192 154 164 164 128 164 C 92 164 64 154 64 124 Z" fill="#ffffff" />
+  <!-- Cute expressive eyes in visor -->
+  <g fill="#000000">
+    <!-- Left big pill eye -->
+    <rect x="90" y="104" width="22" height="34" rx="11" />
+    <!-- Right big pill eye -->
+    <rect x="144" y="104" width="22" height="34" rx="11" />
+    <!-- Joyful mouth -->
+    <path d="M 120 144 Q 128 153 136 144" fill="none" stroke="#000000" stroke-width="5" stroke-linecap="round" />
+  </g>
+  <!-- Glints in eyes -->
+  <g fill="#ffffff">
+    <circle cx="97" cy="113" r="5.5" />
+    <circle cx="151" cy="113" r="5.5" />
+  </g>
+</svg></g><text x="1127.33" y="744" font-family="system-ui,-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="12" fill="#8a8a8a" text-anchor="middle">64px</text><g><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" x="1185.33" y="692" width="32" height="32" preserveAspectRatio="xMidYMid meet">
+  <title>Sayabot — The Astro Orb</title>
+  <g fill="#000000">
+    <!-- Top halo disc -->
+    <ellipse cx="128" cy="22" rx="26" ry="8" />
+    <rect x="124" y="24" width="8" height="18" rx="4" />
+    <!-- Left headphone pod -->
+    <rect x="20" y="98" width="24" height="52" rx="12" />
+    <!-- Right headphone pod -->
+    <rect x="212" y="98" width="24" height="52" rx="12" />
+    <!-- Orb body -->
+    <circle cx="128" cy="124" r="86" />
+    <!-- Floating cute hand paws -->
+    <circle cx="56" cy="208" r="18" />
+    <circle cx="200" cy="208" r="18" />
+  </g>
+  <!-- Curved panoramic faceplate -->
+  <path d="M 64 124 C 64 92 92 78 128 78 C 164 78 192 92 192 124 C 192 154 164 164 128 164 C 92 164 64 154 64 124 Z" fill="#ffffff" />
+  <!-- Cute expressive eyes in visor -->
+  <g fill="#000000">
+    <!-- Left big pill eye -->
+    <rect x="90" y="104" width="22" height="34" rx="11" />
+    <!-- Right big pill eye -->
+    <rect x="144" y="104" width="22" height="34" rx="11" />
+    <!-- Joyful mouth -->
+    <path d="M 120 144 Q 128 153 136 144" fill="none" stroke="#000000" stroke-width="5" stroke-linecap="round" />
+  </g>
+  <!-- Glints in eyes -->
+  <g fill="#ffffff">
+    <circle cx="97" cy="113" r="5.5" />
+    <circle cx="151" cy="113" r="5.5" />
+  </g>
+</svg></g><text x="1201.33" y="744" font-family="system-ui,-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="12" fill="#8a8a8a" text-anchor="middle">32px</text><g><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" x="1243.33" y="708" width="16" height="16" preserveAspectRatio="xMidYMid meet">
+  <title>Sayabot — The Astro Orb</title>
+  <g fill="#000000">
+    <!-- Top halo disc -->
+    <ellipse cx="128" cy="22" rx="26" ry="8" />
+    <rect x="124" y="24" width="8" height="18" rx="4" />
+    <!-- Left headphone pod -->
+    <rect x="20" y="98" width="24" height="52" rx="12" />
+    <!-- Right headphone pod -->
+    <rect x="212" y="98" width="24" height="52" rx="12" />
+    <!-- Orb body -->
+    <circle cx="128" cy="124" r="86" />
+    <!-- Floating cute hand paws -->
+    <circle cx="56" cy="208" r="18" />
+    <circle cx="200" cy="208" r="18" />
+  </g>
+  <!-- Curved panoramic faceplate -->
+  <path d="M 64 124 C 64 92 92 78 128 78 C 164 78 192 92 192 124 C 192 154 164 164 128 164 C 92 164 64 154 64 124 Z" fill="#ffffff" />
+  <!-- Cute expressive eyes in visor -->
+  <g fill="#000000">
+    <!-- Left big pill eye -->
+    <rect x="90" y="104" width="22" height="34" rx="11" />
+    <!-- Right big pill eye -->
+    <rect x="144" y="104" width="22" height="34" rx="11" />
+    <!-- Joyful mouth -->
+    <path d="M 120 144 Q 128 153 136 144" fill="none" stroke="#000000" stroke-width="5" stroke-linecap="round" />
+  </g>
+  <!-- Glints in eyes -->
+  <g fill="#ffffff">
+    <circle cx="97" cy="113" r="5.5" />
+    <circle cx="151" cy="113" r="5.5" />
+  </g>
+</svg></g><text x="1251.33" y="744" font-family="system-ui,-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="12" fill="#8a8a8a" text-anchor="middle">16px</text><text x="1095.3333333333335" y="780" font-family="system-ui,-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="26" font-weight="700" fill="#161616">C · The Astro Orb</text><text x="1095.3333333333335" y="814" font-family="system-ui,-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="19" fill="#555">Spherical floating astronaut agent with</text><text x="1095.3333333333335" y="840" font-family="system-ui,-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="19" fill="#555">panoramic visor and magnetic paws.</text></svg>

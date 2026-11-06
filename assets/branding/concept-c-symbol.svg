@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256">
+  <title>Sayabot — The Room Portal</title>
+  <rect x="36" y="36" width="184" height="184" rx="52" fill="#000000" />
+  <g fill="none" stroke="#ffffff" stroke-width="26" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M 164 86 C 164 72 150 62 130 62 C 104 62 86 80 86 104 C 86 124 100 134 126 142 L 134 145" />
+    <path d="M 92 170 C 92 184 106 194 126 194 C 152 194 170 176 170 152 C 170 132 156 122 130 114 L 122 111" />
+  </g>
+</svg>

@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256">
+  <title>Sayabot — The Monitor Roomie</title>
+  <g fill="#000000">
+    <!-- Left antenna -->
+    <path d="M 78 48 L 56 18 C 53 14 56 8 62 8 C 65 8 68 10 71 14 L 96 46 Z" />
+    <!-- Right antenna -->
+    <path d="M 178 48 L 200 18 C 203 14 200 8 194 8 C 191 8 188 10 185 14 L 160 46 Z" />
+    <!-- Outer monitor head -->
+    <rect x="36" y="44" width="184" height="168" rx="52" />
+    <!-- Feet/stand -->
+    <rect x="74" y="212" width="36" height="18" rx="9" />
+    <rect x="146" y="212" width="36" height="18" rx="9" />
+  </g>
+  <!-- Screen cutout -->
+  <rect x="52" y="60" width="152" height="136" rx="38" fill="#ffffff" />
+  <!-- Expressive cute digital eyes (happy arched curved eyes) -->
+  <g fill="#000000">
+    <!-- Left curved eye (happy arc) -->
+    <path d="M 76 128 C 76 108 92 98 106 104 C 114 108 116 118 110 126 C 104 134 94 134 88 132 L 86 138 C 82 140 76 136 76 128 Z" />
+    <!-- Right curved eye (happy arc) -->
+    <path d="M 180 128 C 180 108 164 98 150 104 C 142 108 140 118 146 126 C 152 134 162 134 168 132 L 170 138 C 174 140 180 136 180 128 Z" />
+    <!-- Center interactive turn nose / dot -->
+    <circle cx="128" cy="136" r="6" />
+    <!-- Little smile -->
+    <path d="M 118 154 Q 128 164 138 154" fill="none" stroke="#000000" stroke-width="5" stroke-linecap="round" />
+  </g>
+</svg>

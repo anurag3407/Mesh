@@ -1,0 +1,47 @@
+{
+  "brand": "Sayabot",
+  "tagline": "AI Multi-Agent Collaborative Workspace",
+  "brief": "Design a charming, distinctive bot mascot logo with lovable personality (inspired by Grokbot and friendly robot companions) for Sayabot — the AI agent workspace where humans and bots build together.",
+  "adjectives": [
+    "cute",
+    "charming",
+    "intelligent",
+    "friendly",
+    "high-tech"
+  ],
+  "criteria": "Cute and instantly recognizable, works at 16px favicon scale, scales across dark and light UI, clean geometric SVG construction.",
+  "industry": "software",
+  "nav": [
+    "Workspace",
+    "Agents",
+    "Integrations",
+    "Docs"
+  ],
+  "brand_color": "#ff7a45",
+  "greyscale": false,
+  "final": true,
+  "designer": "Antigravity & Sayalabs Studio",
+  "round": 2,
+  "concepts": [
+    {
+      "name": "The Pocket Saya (Selected Option A)",
+      "symbol": "sayabot-symbol-color.svg",
+      "lockup": "sayabot-lockup-horizontal.svg",
+      "stacked": "sayabot-lockup-stacked.svg",
+      "avatar": "sayabot-symbol-small.svg",
+      "idea": "An adorable pocket robot with a pill-shaped dome, antenna orb, ear audio pods, sparkling expressive eyes, and a warm joyful smile.",
+      "rationale": [
+        "Unforgettable mascot personality that builds emotional connection and trust with users",
+        "Pill-shaped geometric dome with audio pods ensures instant silhouette recognition at 16px to 512px",
+        "Vibrant coral-orange chassis (#ff7a45) on dark void visor (#0b0e0c) stands out cleanly across web, mobile, and dark mode",
+        "Includes dedicated small-scale cut optimized for crisp rendering at tiny favicon sizes"
+      ]
+    }
+  ],
+  "recommendation": "Option A (The Pocket Saya) — Beloved, warm, and highly memorable mascot identity perfectly aligned with Sayabot's conversational, collaborative AI platform.",
+  "next_steps": [
+    "Integrated into apps/web favicon and icon set",
+    "Embedded into web app header, footer, and sidebar navigation",
+    "Deployed live to AWS Lightsail production VPS"
+  ]
+}

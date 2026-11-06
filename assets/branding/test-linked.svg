@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256">
+  <title>Sayabot — The Linked Nodes</title>
+  <g fill="none" stroke="#000000" stroke-width="36" stroke-linecap="round" stroke-linejoin="round">
+    <!-- Continuous S path connecting the two presence poles -->
+    <path d="M 174 68 
+             C 174 44 154 28 128 28 
+             C 88 28 62 60 62 98 
+             C 62 134 94 148 128 152 
+             C 162 156 194 170 194 206 
+             C 194 244 168 228 128 228 
+             C 102 228 82 212 82 188" />
+  </g>
+  <circle cx="174" cy="68" r="16" fill="#000000" />
+  <circle cx="82" cy="188" r="16" fill="#000000" />
+</svg>

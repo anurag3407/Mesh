@@ -1,0 +1,19 @@
+# Concept: The Bi-Orbital Room / Carved Circle S
+# A solid circle (r=96 at 128, 128) carved by a smooth diagonal S-river (width 28px)
+# Left half is human crescent, right half is agent crescent.
+# Together they form a sphere/room and an S in negative space.
+svg = '''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256">
+  <title>Sayabot — The Monolith S</title>
+  <!-- Compound path using evenodd rule: Outer circle minus S-river -->
+  <!-- Or two distinct solid crescents -->
+  <g fill="#000000">
+    <!-- Top-Left Crescent / Human half -->
+    <path d="M 128 32 C 75 32 32 75 32 128 C 32 165 53 197 84 213 C 78 185 86 155 106 135 L 142 99 C 158 83 162 58 152 35 C 144 33 136 32 128 32 Z" />
+    <!-- Bottom-Right Crescent / Agent half -->
+    <path d="M 128 224 C 181 224 224 181 224 128 C 224 91 203 59 172 43 C 178 71 170 101 150 121 L 114 157 C 98 173 94 198 104 221 C 112 223 120 224 128 224 Z" />
+  </g>
+</svg>'''
+
+with open("assets/branding/test-disc.svg", "w") as f:
+    f.write(svg)
+

@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256">
+  <title>Sayabot — The Pocket Saya (White)</title>
+  <g fill="#ffffff">
+    <circle cx="128" cy="26" r="14" />
+    <rect x="124" y="36" width="8" height="22" rx="4" />
+    <rect x="22" y="98" width="22" height="48" rx="11" />
+    <rect x="212" y="98" width="22" height="48" rx="11" />
+    <rect x="36" y="54" width="184" height="152" rx="60" />
+  </g>
+  <rect x="52" y="70" width="152" height="120" rx="44" fill="#070907" />
+  <g fill="#ffffff">
+    <ellipse cx="94" cy="122" rx="16" ry="22" />
+    <ellipse cx="162" cy="122" rx="16" ry="22" />
+    <path d="M 118 144 Q 128 156 138 144" fill="none" stroke="#ffffff" stroke-width="6" stroke-linecap="round" />
+  </g>
+  <g fill="#070907">
+    <circle cx="99" cy="115" r="6.5" />
+    <circle cx="90" cy="129" r="3.2" />
+    <circle cx="167" cy="115" r="6.5" />
+    <circle cx="158" cy="129" r="3.2" />
+  </g>
+</svg>

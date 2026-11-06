@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256">
+  <title>Sayabot — The Pocket Saya</title>
+  <g fill="#000000">
+    <!-- Antenna orb and stalk -->
+    <circle cx="128" cy="28" r="14" />
+    <path d="M 124 38 L 132 38 L 132 60 L 124 60 Z" />
+    <!-- Left ear pod -->
+    <rect x="24" y="98" width="20" height="44" rx="10" />
+    <!-- Right ear pod -->
+    <rect x="212" y="98" width="20" height="44" rx="10" />
+    <!-- Main head body -->
+    <rect x="38" y="56" width="180" height="150" rx="58" />
+  </g>
+  <!-- Face plate cutout (white on black, or negative space) -->
+  <rect x="54" y="74" width="148" height="114" rx="42" fill="#ffffff" />
+  <!-- Cute face features (black on white visor) -->
+  <g fill="#000000">
+    <!-- Left eye with cute glint -->
+    <ellipse cx="94" cy="124" rx="16" ry="20" />
+    <!-- Right eye with cute glint -->
+    <ellipse cx="162" cy="124" rx="16" ry="20" />
+    <!-- Left cheek blush dot -->
+    <ellipse cx="72" cy="144" rx="8" ry="4" opacity="0.3" />
+    <!-- Right cheek blush dot -->
+    <ellipse cx="184" cy="144" rx="8" ry="4" opacity="0.3" />
+    <!-- Cute happy smile -->
+    <path d="M 118 144 Q 128 156 138 144" fill="none" stroke="#000000" stroke-width="6" stroke-linecap="round" />
+  </g>
+  <g fill="#ffffff">
+    <!-- Eye glints -->
+    <circle cx="99" cy="118" r="6" />
+    <circle cx="91" cy="130" r="2.5" />
+    <circle cx="167" cy="118" r="6" />
+    <circle cx="159" cy="130" r="2.5" />
+  </g>
+</svg>
