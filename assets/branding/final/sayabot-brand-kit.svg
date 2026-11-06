@@ -1,0 +1,215 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 800" width="1200" height="800">
+  <defs>
+    <style>
+      .title { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; font-weight: 700; fill: #ffffff; }
+      .subtitle { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; font-weight: 400; fill: #889088; }
+      .section-label { font-family: ui-monospace, "SF Mono", monospace; font-size: 13px; font-weight: 600; fill: #ff7a45; letter-spacing: 0.08em; }
+      .caption { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; font-size: 13px; fill: #889088; }
+    </style>
+  </defs>
+
+  <!-- Dark Canvas Background -->
+  <rect width="1200" height="800" fill="#070907" />
+
+  <!-- Header -->
+  <text x="60" y="70" class="title" font-size="28">Sayabot — Pocket Saya Identity Kit</text>
+  <text x="60" y="98" class="subtitle" font-size="15">Production brand deliverables for sayabot.in &amp; mesh.sayalabs.in (Selected Option A)</text>
+
+  <!-- Card 1: Master Mascot Symbol -->
+  <rect x="60" y="140" width="340" height="300" rx="16" fill="#0f1410" stroke="#1f2921" stroke-width="1.5" />
+  <text x="84" y="174" class="section-label">MASTER SYMBOL</text>
+  <g transform="translate(130, 195) scale(0.78)">
+    <!-- Antenna orb & stem -->
+    <circle cx="128" cy="26" r="14" fill="#ff7a45" />
+    <circle cx="125" cy="22" r="4.5" fill="#ffa885" />
+    <rect x="124" y="36" width="8" height="22" rx="4" fill="#ff7a45" />
+    <!-- Audio pods -->
+    <rect x="22" y="98" width="22" height="48" rx="11" fill="#ff7a45" />
+    <rect x="212" y="98" width="22" height="48" rx="11" fill="#ff7a45" />
+    <!-- Head chassis -->
+    <rect x="36" y="54" width="184" height="152" rx="60" fill="#ff7a45" />
+    <!-- Visor -->
+    <rect x="52" y="70" width="152" height="120" rx="44" fill="#0b0e0c" />
+    <!-- Blushing cheeks -->
+    <ellipse cx="74" cy="142" rx="8" ry="4" fill="#ff7a45" opacity="0.45" />
+    <ellipse cx="182" cy="142" rx="8" ry="4" fill="#ff7a45" opacity="0.45" />
+    <!-- Cute eyes & warm smile -->
+    <ellipse cx="94" cy="122" rx="16" ry="22" fill="#ffffff" />
+    <ellipse cx="162" cy="122" rx="16" ry="22" fill="#ffffff" />
+    <path d="M 118 144 Q 128 156 138 144" fill="none" stroke="#ffffff" stroke-width="5.5" stroke-linecap="round" />
+    <circle cx="94" cy="122" r="9" fill="#0b0e0c" opacity="0.12" />
+    <circle cx="162" cy="122" r="9" fill="#0b0e0c" opacity="0.12" />
+    <circle cx="99" cy="115" r="6.5" fill="#ffffff" />
+    <circle cx="90" cy="129" r="3.2" fill="#ffffff" />
+    <circle cx="167" cy="115" r="6.5" fill="#ffffff" />
+    <circle cx="158" cy="129" r="3.2" fill="#ffffff" />
+  </g>
+  <text x="230" y="416" class="caption" text-anchor="middle">Primary Colorway (#ff7a45 / #0b0e0c)</text>
+
+  <!-- Card 2: Horizontal Lockup Dark -->
+  <rect x="424" y="140" width="716" height="140" rx="16" fill="#0f1410" stroke="#1f2921" stroke-width="1.5" />
+  <text x="448" y="174" class="section-label">HORIZONTAL LOCKUP (DARK MODE)</text>
+  <g transform="translate(436, 170) scale(0.68)">
+    <g transform="translate(20, 20) scale(0.64)">
+      <circle cx="128" cy="26" r="14" fill="#ff7a45" />
+      <circle cx="125" cy="22" r="4.5" fill="#ffa885" />
+      <rect x="124" y="36" width="8" height="22" rx="4" fill="#ff7a45" />
+      <rect x="22" y="98" width="22" height="48" rx="11" fill="#ff7a45" />
+      <rect x="212" y="98" width="22" height="48" rx="11" fill="#ff7a45" />
+      <rect x="36" y="54" width="184" height="152" rx="60" fill="#ff7a45" />
+      <rect x="52" y="70" width="152" height="120" rx="44" fill="#0b0e0c" />
+      <ellipse cx="74" cy="142" rx="8" ry="4" fill="#ff7a45" opacity="0.45" />
+      <ellipse cx="182" cy="142" rx="8" ry="4" fill="#ff7a45" opacity="0.45" />
+      <ellipse cx="94" cy="122" rx="16" ry="22" fill="#ffffff" />
+      <ellipse cx="162" cy="122" rx="16" ry="22" fill="#ffffff" />
+      <path d="M 118 144 Q 128 156 138 144" fill="none" stroke="#ffffff" stroke-width="5.5" stroke-linecap="round" />
+      <circle cx="99" cy="115" r="6.5" fill="#ffffff" />
+      <circle cx="90" cy="129" r="3.2" fill="#ffffff" />
+      <circle cx="167" cy="115" r="6.5" fill="#ffffff" />
+      <circle cx="158" cy="129" r="3.2" fill="#ffffff" />
+    </g>
+    <g fill="#e9e5d8" transform="translate(20, 0)">
+      <path d="M 326 114 C 326 102 316 94 300 94 C 282 94 270 104 270 120 C 270 134 280 142 298 146 L 306 148 C 316 150 322 155 322 162 C 322 170 314 176 300 176 C 286 176 276 169 274 159 L 256 162 C 259 180 276 192 300 192 C 326 192 340 179 340 161 C 340 146 330 137 310 133 L 302 131 C 292 129 288 125 288 119 C 288 112 294 109 302 109 C 311 109 318 113 319 120 Z" />
+      <path d="M 396 140 C 396 112 377 94 356 94 C 335 94 320 110 320 132 L 336 132 C 336 120 344 110 356 110 C 369 110 379 120 379 136 L 379 142 C 350 142 330 151 330 169 C 330 183 342 192 356 192 C 369 192 378 184 381 175 L 381 190 L 396 190 Z M 380 156 C 380 168 371 176 358 176 C 348 176 342 170 342 162 C 342 151 354 145 380 145 Z" />
+      <path d="M 466 96 L 444 156 L 424 96 L 406 96 L 436 174 L 426 200 C 422 210 415 214 405 214 L 398 214 L 398 228 C 402 229 408 229 412 229 C 426 229 437 221 444 202 L 484 96 Z" />
+      <path d="M 532 140 C 532 112 513 94 492 94 C 471 94 456 110 456 132 L 472 132 C 472 120 480 110 492 110 C 505 110 515 120 515 136 L 515 142 C 486 142 466 151 466 169 C 466 183 478 192 492 192 C 505 192 514 184 517 175 L 517 190 L 532 190 Z M 516 156 C 516 168 507 176 494 176 C 484 176 478 170 478 162 C 478 151 490 145 516 145 Z" />
+      <path d="M 548 66 L 565 66 L 565 108 C 571 99 581 94 594 94 C 616 94 632 112 632 143 C 632 174 615 192 594 192 C 581 192 571 187 565 178 L 565 190 L 548 190 Z M 590 110 C 576 110 565 122 565 143 C 565 164 576 176 590 176 C 604 176 615 164 615 143 C 615 122 604 110 590 110 Z" />
+      <path d="M 660 94 C 635 94 618 113 618 143 C 618 173 635 192 660 192 C 685 192 702 173 702 143 C 702 113 685 94 660 94 Z M 660 110 C 674 110 685 123 685 143 C 685 163 674 176 660 176 C 646 176 635 163 635 143 C 635 123 646 110 660 110 Z" />
+      <path d="M 714 76 L 729 76 L 729 96 L 746 96 L 746 111 L 729 111 L 729 164 C 729 171 733 175 740 175 L 746 175 L 746 190 L 736 190 C 721 190 714 181 714 166 L 714 111 L 705 111 L 705 96 L 714 96 Z" />
+    </g>
+  </g>
+
+  <!-- Card 3: Horizontal Lockup Light -->
+  <rect x="424" y="300" width="716" height="140" rx="16" fill="#f8f6f0" stroke="#e0ded6" stroke-width="1.5" />
+  <text x="448" y="334" class="section-label" fill="#ff7a45">HORIZONTAL LOCKUP (LIGHT MODE)</text>
+  <g transform="translate(436, 330) scale(0.68)">
+    <g transform="translate(20, 20) scale(0.64)">
+      <circle cx="128" cy="26" r="14" fill="#ff7a45" />
+      <circle cx="125" cy="22" r="4.5" fill="#ffa885" />
+      <rect x="124" y="36" width="8" height="22" rx="4" fill="#ff7a45" />
+      <rect x="22" y="98" width="22" height="48" rx="11" fill="#ff7a45" />
+      <rect x="212" y="98" width="22" height="48" rx="11" fill="#ff7a45" />
+      <rect x="36" y="54" width="184" height="152" rx="60" fill="#ff7a45" />
+      <rect x="52" y="70" width="152" height="120" rx="44" fill="#0b0e0c" />
+      <ellipse cx="74" cy="142" rx="8" ry="4" fill="#ff7a45" opacity="0.45" />
+      <ellipse cx="182" cy="142" rx="8" ry="4" fill="#ff7a45" opacity="0.45" />
+      <ellipse cx="94" cy="122" rx="16" ry="22" fill="#ffffff" />
+      <ellipse cx="162" cy="122" rx="16" ry="22" fill="#ffffff" />
+      <path d="M 118 144 Q 128 156 138 144" fill="none" stroke="#ffffff" stroke-width="5.5" stroke-linecap="round" />
+      <circle cx="99" cy="115" r="6.5" fill="#ffffff" />
+      <circle cx="90" cy="129" r="3.2" fill="#ffffff" />
+      <circle cx="167" cy="115" r="6.5" fill="#ffffff" />
+      <circle cx="158" cy="129" r="3.2" fill="#ffffff" />
+    </g>
+    <g fill="#070907" transform="translate(20, 0)">
+      <path d="M 326 114 C 326 102 316 94 300 94 C 282 94 270 104 270 120 C 270 134 280 142 298 146 L 306 148 C 316 150 322 155 322 162 C 322 170 314 176 300 176 C 286 176 276 169 274 159 L 256 162 C 259 180 276 192 300 192 C 326 192 340 179 340 161 C 340 146 330 137 310 133 L 302 131 C 292 129 288 125 288 119 C 288 112 294 109 302 109 C 311 109 318 113 319 120 Z" />
+      <path d="M 396 140 C 396 112 377 94 356 94 C 335 94 320 110 320 132 L 336 132 C 336 120 344 110 356 110 C 369 110 379 120 379 136 L 379 142 C 350 142 330 151 330 169 C 330 183 342 192 356 192 C 369 192 378 184 381 175 L 381 190 L 396 190 Z M 380 156 C 380 168 371 176 358 176 C 348 176 342 170 342 162 C 342 151 354 145 380 145 Z" />
+      <path d="M 466 96 L 444 156 L 424 96 L 406 96 L 436 174 L 426 200 C 422 210 415 214 405 214 L 398 214 L 398 228 C 402 229 408 229 412 229 C 426 229 437 221 444 202 L 484 96 Z" />
+      <path d="M 532 140 C 532 112 513 94 492 94 C 471 94 456 110 456 132 L 472 132 C 472 120 480 110 492 110 C 505 110 515 120 515 136 L 515 142 C 486 142 466 151 466 169 C 466 183 478 192 492 192 C 505 192 514 184 517 175 L 517 190 L 532 190 Z M 516 156 C 516 168 507 176 494 176 C 484 176 478 170 478 162 C 478 151 490 145 516 145 Z" />
+      <path d="M 548 66 L 565 66 L 565 108 C 571 99 581 94 594 94 C 616 94 632 112 632 143 C 632 174 615 192 594 192 C 581 192 571 187 565 178 L 565 190 L 548 190 Z M 590 110 C 576 110 565 122 565 143 C 565 164 576 176 590 176 C 604 176 615 164 615 143 C 615 122 604 110 590 110 Z" />
+      <path d="M 660 94 C 635 94 618 113 618 143 C 618 173 635 192 660 192 C 685 192 702 173 702 143 C 702 113 685 94 660 94 Z M 660 110 C 674 110 685 123 685 143 C 685 163 674 176 660 176 C 646 176 635 163 635 143 C 635 123 646 110 660 110 Z" />
+      <path d="M 714 76 L 729 76 L 729 96 L 746 96 L 746 111 L 729 111 L 729 164 C 729 171 733 175 740 175 L 746 175 L 746 190 L 736 190 C 721 190 714 181 714 166 L 714 111 L 705 111 L 705 96 L 714 96 Z" />
+    </g>
+  </g>
+
+  <!-- Card 4: Icon Scale Ladder (64px, 32px, 16px) & Favicon -->
+  <rect x="60" y="468" width="510" height="272" rx="16" fill="#0f1410" stroke="#1f2921" stroke-width="1.5" />
+  <text x="84" y="502" class="section-label">SCALE LADDER &amp; APP ICONS</text>
+
+  <!-- 80px App Tile -->
+  <rect x="84" y="525" width="80" height="80" rx="18" fill="#18221b" stroke="#2a382e" />
+  <g transform="translate(94, 535) scale(0.234)">
+    <circle cx="128" cy="26" r="14" fill="#ff7a45" />
+    <circle cx="125" cy="22" r="4.5" fill="#ffa885" />
+    <rect x="124" y="36" width="8" height="22" rx="4" fill="#ff7a45" />
+    <rect x="22" y="98" width="22" height="48" rx="11" fill="#ff7a45" />
+    <rect x="212" y="98" width="22" height="48" rx="11" fill="#ff7a45" />
+    <rect x="36" y="54" width="184" height="152" rx="60" fill="#ff7a45" />
+    <rect x="52" y="70" width="152" height="120" rx="44" fill="#0b0e0c" />
+    <ellipse cx="74" cy="142" rx="8" ry="4" fill="#ff7a45" opacity="0.45" />
+    <ellipse cx="182" cy="142" rx="8" ry="4" fill="#ff7a45" opacity="0.45" />
+    <ellipse cx="94" cy="122" rx="16" ry="22" fill="#ffffff" />
+    <ellipse cx="162" cy="122" rx="16" ry="22" fill="#ffffff" />
+    <path d="M 118 144 Q 128 156 138 144" fill="none" stroke="#ffffff" stroke-width="5.5" stroke-linecap="round" />
+  </g>
+  <text x="124" y="626" class="caption" text-anchor="middle">80px Tile</text>
+
+  <!-- 48px Favicon Tile -->
+  <rect x="194" y="541" width="48" height="48" rx="10" fill="#18221b" stroke="#2a382e" />
+  <g transform="translate(198, 545) scale(0.156)">
+    <circle cx="128" cy="26" r="16" fill="#ff7a45" />
+    <rect x="123" y="36" width="10" height="22" rx="5" fill="#ff7a45" />
+    <rect x="20" y="96" width="24" height="52" rx="12" fill="#ff7a45" />
+    <rect x="212" y="96" width="24" height="52" rx="12" fill="#ff7a45" />
+    <rect x="34" y="52" width="188" height="156" rx="62" fill="#ff7a45" />
+    <rect x="50" y="68" width="156" height="124" rx="46" fill="#0b0e0c" />
+    <ellipse cx="94" cy="122" rx="18" ry="24" fill="#ffffff" />
+    <ellipse cx="162" cy="122" rx="18" ry="24" fill="#ffffff" />
+    <circle cx="100" cy="114" r="8" fill="#ffffff" />
+    <circle cx="168" cy="114" r="8" fill="#ffffff" />
+  </g>
+  <text x="218" y="626" class="caption" text-anchor="middle">48px Cut</text>
+
+  <!-- 32px Cut -->
+  <rect x="272" y="549" width="32" height="32" rx="7" fill="#18221b" stroke="#2a382e" />
+  <g transform="translate(272, 549) scale(0.125)">
+    <circle cx="128" cy="26" r="16" fill="#ff7a45" />
+    <rect x="123" y="36" width="10" height="22" rx="5" fill="#ff7a45" />
+    <rect x="20" y="96" width="24" height="52" rx="12" fill="#ff7a45" />
+    <rect x="212" y="96" width="24" height="52" rx="12" fill="#ff7a45" />
+    <rect x="34" y="52" width="188" height="156" rx="62" fill="#ff7a45" />
+    <rect x="50" y="68" width="156" height="124" rx="46" fill="#0b0e0c" />
+    <ellipse cx="94" cy="122" rx="18" ry="24" fill="#ffffff" />
+    <ellipse cx="162" cy="122" rx="18" ry="24" fill="#ffffff" />
+  </g>
+  <text x="288" y="626" class="caption" text-anchor="middle">32px</text>
+
+  <!-- 16px Cut -->
+  <rect x="334" y="557" width="16" height="16" rx="4" fill="#18221b" stroke="#2a382e" />
+  <g transform="translate(334, 557) scale(0.0625)">
+    <circle cx="128" cy="26" r="16" fill="#ff7a45" />
+    <rect x="34" y="52" width="188" height="156" rx="62" fill="#ff7a45" />
+    <rect x="50" y="68" width="156" height="124" rx="46" fill="#0b0e0c" />
+    <ellipse cx="94" cy="122" rx="20" ry="26" fill="#ffffff" />
+    <ellipse cx="162" cy="122" rx="20" ry="26" fill="#ffffff" />
+  </g>
+  <text x="342" y="626" class="caption" text-anchor="middle">16px</text>
+
+  <!-- Browser Tab Mockup -->
+  <rect x="84" y="660" width="220" height="42" rx="8" fill="#1b241e" stroke="#2a382e" />
+  <g transform="translate(94, 671) scale(0.078)">
+    <circle cx="128" cy="26" r="16" fill="#ff7a45" />
+    <rect x="34" y="52" width="188" height="156" rx="62" fill="#ff7a45" />
+    <rect x="50" y="68" width="156" height="124" rx="46" fill="#0b0e0c" />
+    <ellipse cx="94" cy="122" rx="20" ry="26" fill="#ffffff" />
+    <ellipse cx="162" cy="122" rx="20" ry="26" fill="#ffffff" />
+  </g>
+  <text x="120" y="686" font-family="-apple-system, sans-serif" font-size="12" fill="#e9e5d8">Sayabot · Workspace</text>
+  <text x="290" y="686" font-family="-apple-system, sans-serif" font-size="12" fill="#889088">×</text>
+
+  <!-- Card 5: Color Palette & Production Specs -->
+  <rect x="590" y="468" width="550" height="272" rx="16" fill="#0f1410" stroke="#1f2921" stroke-width="1.5" />
+  <text x="614" y="502" class="section-label">BRAND COLOR PALETTE &amp; TOKENS</text>
+
+  <!-- Swatch 1: Coral Accent -->
+  <rect x="614" y="526" width="60" height="60" rx="12" fill="#ff7a45" />
+  <text x="686" y="550" class="title" font-size="15">#ff7a45</text>
+  <text x="686" y="570" class="caption">Coral Accent (Chassis &amp; Signal)</text>
+
+  <!-- Swatch 2: Void Black -->
+  <rect x="614" y="602" width="60" height="60" rx="12" fill="#0b0e0c" stroke="#2a382e" />
+  <text x="686" y="626" class="title" font-size="15">#0b0e0c / #070907</text>
+  <text x="686" y="646" class="caption">Void Black (Visor &amp; App Canvas)</text>
+
+  <!-- Swatch 3: Signal Peach -->
+  <rect x="880" y="526" width="60" height="60" rx="12" fill="#ffa885" />
+  <text x="952" y="550" class="title" font-size="15">#ffa885</text>
+  <text x="952" y="570" class="caption">Signal Peach (Highlight &amp; Glow)</text>
+
+  <!-- Swatch 4: Off-White -->
+  <rect x="880" y="602" width="60" height="60" rx="12" fill="#e9e5d8" />
+  <text x="952" y="626" class="title" font-size="15">#e9e5d8</text>
+  <text x="952" y="646" class="caption">Off-White (Eye Glares &amp; UI Text)</text>
+
+  <text x="614" y="700" class="caption" font-family="ui-monospace, monospace" font-size="11">Production Formats: SVG (vector) · ICO · Apple Touch · PNG 16/32/64/128/256/512 · WebManifest</text>
+</svg>
