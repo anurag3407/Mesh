@@ -116,6 +116,7 @@ export const agentReads = pgTable(
       .notNull()
       .references(() => rooms.id, { onDelete: "cascade" }),
     lastReadAt: timestamp("last_read_at", { withTimezone: true }).notNull().defaultNow(),
+    lastReportedAt: timestamp("last_reported_at", { withTimezone: true }),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [primaryKey({ columns: [t.agentId, t.roomId] })],

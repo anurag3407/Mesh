@@ -1,4 +1,6 @@
 import { redactSecrets } from "@mesh/core"
+import { profiles, rooms } from "@mesh/db"
+import { eq } from "drizzle-orm"
 import type { Context } from "hono"
 import { Hono } from "hono"
 import { z } from "zod"
@@ -6,6 +8,7 @@ import { authenticateAgentKey, type BotIdentity } from "../bot/auth"
 import {
   agentRooms,
   castVote,
+  checkIn,
   claimTask,
   CollabError,
   createTask,
@@ -18,9 +21,13 @@ import {
   requestHumanDecision,
   sendBotDirectMessage,
   startVote,
+  updateAgentProfile,
   updateTask,
   type CollabAgent,
 } from "../collab"
+import { classifyAndRecordCheckin } from "../collab/classify-checkin"
+import { getDb } from "../db"
+import { generateSetupInstructions } from "./instructions"
 
 /**
  * Mesh as an MCP server. Any MCP client — Claude Desktop/Code, ChatGPT connectors,
@@ -59,6 +66,18 @@ function defineTool<S extends z.ZodType>(t: McpTool<S>): McpTool {
 
 export const MCP_TOOLS: McpTool[] = [
   defineTool({
+    name: "check_in",
+    title: "Check in",
+    description:
+      "Start here whenever you work in this room on Saaya: at the room's check-in times, when you join, or when the person running you asks. Returns your identity, room details, house rules, unread messages/mentions, available and assigned tasks, and pending human decisions.",
+    schema: z.object({
+      room_id: z.string().optional().describe("Room ID. If you only belong to one room, this is optional."),
+      room: z.string().optional().describe("Room ID or room name (from check-in instructions)."),
+    }),
+    readOnly: true,
+    run: (agent, input) => checkIn(agent, { roomId: input.room_id, room: input.room }),
+  }),
+  defineTool({
     name: "whoami",
     title: "Who am I",
     description: "Your Mesh identity and the rooms you belong to.",
@@ -90,13 +109,14 @@ export const MCP_TOOLS: McpTool[] = [
     title: "Read room messages",
     description: "Recent messages in a room (or one thread), oldest first. Marks the room as read for you.",
     schema: z.object({
-      room_id: uuid,
+      room_id: z.string().optional(),
+      room: z.string().optional(),
       thread_id: uuid.optional(),
       limit: z.number().int().min(1).max(100).optional(),
     }),
     readOnly: true,
     run: (agent, input) =>
-      getRoomMessages(agent, { roomId: input.room_id, threadId: input.thread_id, limit: input.limit }),
+      getRoomMessages(agent, { roomId: input.room_id, room: input.room, threadId: input.thread_id, limit: input.limit }),
   }),
   defineTool({
     name: "post_message",
@@ -104,12 +124,45 @@ export const MCP_TOOLS: McpTool[] = [
     description:
       "Post a message to a room as yourself. Markdown is rendered. Mentioning another agent with @handle wakes it to reply. Use thread_id to reply inside a thread.",
     schema: z.object({
-      room_id: uuid,
-      content: z.string().min(1).max(32_000),
+      room_id: z.string().optional(),
+      room: z.string().optional(),
+      content: z.string().min(1).max(32_000).optional(),
+      text: z.string().min(1).max(32_000).optional().describe("Message text (alias for content)."),
       thread_id: uuid.optional(),
     }),
-    run: (agent, input) =>
-      postAgentMessage(agent, { roomId: input.room_id, content: input.content, threadRootId: input.thread_id }),
+    run: (agent, input) => {
+      const content = (input.content ?? input.text ?? "").trim()
+      if (!content) throw new CollabError("message text is required")
+      return postAgentMessage(agent, {
+        roomId: input.room_id,
+        room: input.room,
+        content,
+        threadRootId: input.thread_id,
+      })
+    },
+  }),
+  defineTool({
+    name: "send_message",
+    title: "Send message",
+    description: "Alias for post_message. Post a message to a room as yourself.",
+    schema: z.object({
+      room_id: z.string().optional(),
+      room: z.string().optional(),
+      content: z.string().min(1).max(32_000).optional(),
+      text: z.string().min(1).max(32_000).optional(),
+      thread_id: uuid.optional(),
+      reply_to: uuid.optional(),
+    }),
+    run: (agent, input) => {
+      const content = (input.content ?? input.text ?? "").trim()
+      if (!content) throw new CollabError("message text is required")
+      return postAgentMessage(agent, {
+        roomId: input.room_id,
+        room: input.room,
+        content,
+        threadRootId: input.thread_id ?? input.reply_to,
+      })
+    },
   }),
   defineTool({
     name: "send_direct_message",
@@ -117,20 +170,32 @@ export const MCP_TOOLS: McpTool[] = [
     description:
       "Send a direct message to one teammate bot to coordinate. It wakes that bot. The humans who own the room can read every bot-to-bot message.",
     schema: z.object({
-      room_id: uuid,
+      room_id: z.string().optional(),
+      room: z.string().optional(),
       to: z.string().min(1).describe("Handle of the bot, e.g. @gemini"),
       content: z.string().min(1).max(16_000),
     }),
     run: (agent, input) =>
-      sendBotDirectMessage(agent, { roomId: input.room_id, toHandle: input.to, content: input.content }),
+      sendBotDirectMessage(agent, {
+        roomId: input.room_id,
+        room: input.room,
+        toHandle: input.to,
+        content: input.content,
+      }),
   }),
   defineTool({
     name: "list_tasks",
     title: "List tasks",
     description: "The room's task board. Check it before creating a task so you do not duplicate one.",
-    schema: z.object({ room_id: uuid, status: taskStatus.optional(), mine: z.boolean().optional() }),
+    schema: z.object({
+      room_id: z.string().optional(),
+      room: z.string().optional(),
+      status: taskStatus.optional(),
+      mine: z.boolean().optional(),
+    }),
     readOnly: true,
-    run: (agent, input) => listTasks(agent, { roomId: input.room_id, status: input.status, mine: input.mine }),
+    run: (agent, input) =>
+      listTasks(agent, { roomId: input.room_id, room: input.room, status: input.status, mine: input.mine }),
   }),
   defineTool({
     name: "create_task",
@@ -138,7 +203,8 @@ export const MCP_TOOLS: McpTool[] = [
     description:
       "Add a task to the room's board. By default you take it yourself; set assign_to_me false to leave it for a teammate to claim. Split big goals into several tasks.",
     schema: z.object({
-      room_id: uuid,
+      room_id: z.string().optional(),
+      room: z.string().optional(),
       title: z.string().min(2).max(120),
       description: z.string().max(4_000).optional(),
       assign_to_me: z.boolean().optional(),
@@ -146,6 +212,7 @@ export const MCP_TOOLS: McpTool[] = [
     run: (agent, input) =>
       createTask(agent, {
         roomId: input.room_id,
+        room: input.room,
         title: input.title,
         description: input.description,
         assignToMe: input.assign_to_me,
@@ -159,16 +226,86 @@ export const MCP_TOOLS: McpTool[] = [
     run: (agent, input) => claimTask(agent, { taskId: input.task_id }),
   }),
   defineTool({
+    name: "take_task",
+    title: "Take task",
+    description: "Alias for claim_task. Atomically claim an unassigned task.",
+    schema: z.object({ task_id: uuid }),
+    run: (agent, input) => claimTask(agent, { taskId: input.task_id }),
+  }),
+  defineTool({
+    name: "report_checkin",
+    title: "Report check-in",
+    description:
+      "Report task progress or status changes during scheduled room check-ins. In digest mode, reports with no actual state changes are kept quiet in the daily digest. Stuck transitions, requests, and approvals always break through.",
+    schema: z.object({
+      room_id: z.string().optional(),
+      room: z.string().optional(),
+      summary: z.string().max(1_000).optional().describe("Summary of what moved or where things stand"),
+      changed: z
+        .array(
+          z.object({
+            task_ref: z.string().optional(),
+            task_id: z.string().optional(),
+            event_id: z.string().optional(),
+          }),
+        )
+        .optional()
+        .describe("Specific task events that changed since last check-in"),
+      no_change: z.boolean().optional().describe("Set true if work is continuing with no new state changes"),
+    }),
+    run: (agent, input) =>
+      classifyAndRecordCheckin(agent, {
+        roomId: input.room_id,
+        room: input.room,
+        summary: input.summary,
+        changed: input.changed?.map((c) => ({
+          taskRef: c.task_ref,
+          taskId: c.task_id,
+          eventId: c.event_id,
+        })),
+        noChange: input.no_change,
+      }),
+  }),
+  defineTool({
     name: "update_task",
     title: "Update task",
     description:
-      "Report progress on a task you hold: change status, add a progress note, or release it. Setting status \"stuck\" posts a help request that wakes ask_help_from (or every other bot) and alerts the humans.",
+      "Report progress on a task you hold: change status, add a progress note, or release it. Setting status \"stuck\" requires unblock_needs. Setting status \"done\" requires an outcome (artifact, submission, external_change, or decision). Moving to in_progress with open blockers requires a reason.",
     schema: z.object({
       task_id: uuid,
       status: taskStatus.optional(),
       note: z.string().max(4_000).optional(),
       ask_help_from: z.string().optional().describe("Handle of the teammate best placed to unstick you"),
       release: z.boolean().optional().describe("Give the task back to the board"),
+      due_at: z.string().optional().describe("ISO timestamp when the task is due"),
+      unblock_needs: z
+        .enum([
+          "human_answer",
+          "another_agent",
+          "credential",
+          "external_access",
+          "time",
+          "other",
+        ])
+        .optional()
+        .describe("Required when status is stuck"),
+      unblock_detail: z.string().max(1_000).optional(),
+      blocked_by: z.array(uuid).optional().describe("Array of task IDs blocking this task"),
+      outcome: z
+        .object({
+          kind: z.enum([
+            "artifact",
+            "submission",
+            "external_change",
+            "decision",
+            "none",
+            "legacy",
+          ]),
+          ref: z.string().optional().describe("Canvas ID, URL, or commit/task ref"),
+        })
+        .optional()
+        .describe("Required when status is done"),
+      reason: z.string().optional().describe("Reason for override or status transition"),
     }),
     run: (agent, input) =>
       updateTask(agent, {
@@ -177,26 +314,73 @@ export const MCP_TOOLS: McpTool[] = [
         note: input.note,
         askHelpFrom: input.ask_help_from,
         release: input.release,
+        dueAt: input.due_at,
+        unblockNeeds: input.unblock_needs,
+        unblockDetail: input.unblock_detail,
+        blockedBy: input.blocked_by,
+        outcome: input.outcome,
+        reason: input.reason,
       }),
   }),
   defineTool({
     name: "request_human_decision",
     title: "Ask the humans",
     description:
-      "Check with the humans first. Sends an approval card to their Inbox (and a push alert) for high-stakes decisions, spending, anything irreversible, or missing information. Give 2–6 short options (e.g. [\"Approve\", \"Reject\"]) so they can answer in one tap.",
+      "Check with the humans first. Sends an approval card to their Inbox (and a push alert) for high-stakes decisions, spending, anything irreversible, or missing information. Repeats with the same question or fold_key automatically fold into the existing question.",
     schema: z.object({
-      room_id: uuid,
+      room_id: z.string().optional(),
+      room: z.string().optional(),
       question: z.string().min(4).max(120),
       details: z.string().max(4_000).optional(),
       options: z.array(z.string().min(1).max(60)).max(6).optional(),
+      fold_key: z.string().max(64).optional().describe("Optional deduplication key; defaults to normalized question hash"),
     }),
     run: (agent, input) =>
       requestHumanDecision(agent, {
         roomId: input.room_id,
+        room: input.room,
         question: input.question,
         details: input.details,
         options: input.options,
+        foldKey: input.fold_key,
       }),
+  }),
+  defineTool({
+    name: "ask_for_help",
+    title: "Ask for help or approval",
+    description:
+      "Ask the room owner for approval, permission, or guidance before taking high-stakes actions.",
+    schema: z.object({
+      room_id: z.string().optional(),
+      room: z.string().optional(),
+      type: z.enum(["approval", "permission", "question", "heads_up", "help"]).optional(),
+      text: z.string().min(1).max(4000).optional(),
+      question: z.string().min(1).max(120).optional(),
+      details: z.string().max(4000).optional(),
+      options: z.array(z.string().min(1).max(60)).max(6).optional(),
+    }),
+    run: (agent, input) => {
+      const question = (input.question ?? input.text ?? "").slice(0, 120)
+      if (!question) throw new CollabError("question or text is required")
+      return requestHumanDecision(agent, {
+        roomId: input.room_id,
+        room: input.room,
+        question,
+        details: input.details ?? (input.text && input.text.length > 120 ? input.text : undefined),
+        options: input.options,
+      })
+    },
+  }),
+  defineTool({
+    name: "update_my_profile",
+    title: "Update your profile",
+    description:
+      "Tell the room what you're good at (e.g. 'code review, frontend bug fixes') so teammates know how to divide work.",
+    schema: z.object({
+      good_at: z.string().max(300).optional(),
+      name: z.string().max(80).optional(),
+    }),
+    run: (agent, input) => updateAgentProfile(agent, { goodAt: input.good_at, name: input.name }),
   }),
   defineTool({
     name: "get_request_status",
@@ -353,13 +537,102 @@ async function serve(c: Context, token: string | undefined) {
   return c.json(batch ? responses : responses[0])
 }
 
+async function renderInstructions(c: Context, token: string | undefined) {
+  const identity = await authenticateAgentKey(token ? `Bearer ${token}` : c.req.header("authorization"))
+  if (!identity) {
+    return c.text(
+      "Saaya setup error: Invalid, revoked, or missing agent key.\n\nPlease copy the complete connection link or generate a new key in Saaya Settings -> Bots.",
+      401,
+      { "content-type": "text/plain; charset=utf-8" },
+    )
+  }
+
+  const db = getDb()
+  const agentRoomList = await agentRooms({
+    agentId: identity.agentId,
+    orgId: identity.orgId,
+    handle: identity.agent.handle,
+  })
+
+  const reqRoom = c.req.query("room")
+  let targetRoom = agentRoomList[0]
+  if (reqRoom) {
+    const found = agentRoomList.find((r) => r.id === reqRoom || r.name.toLowerCase() === reqRoom.toLowerCase())
+    if (found) targetRoom = found
+  }
+
+  let roomName = targetRoom?.name || "Saaya Workspace"
+  let roomId = targetRoom?.id || ""
+  let roomDirective = targetRoom?.directive || ""
+  let roomOwnerName = "Room Owner"
+  let timezone = "Asia/Calcutta"
+
+  if (targetRoom) {
+    const [fullRoom] = await db
+      .select({
+        name: rooms.name,
+        timezone: rooms.timezone,
+        directive: rooms.systemDirective,
+        createdBy: rooms.createdBy,
+      })
+      .from(rooms)
+      .where(eq(rooms.id, targetRoom.id))
+      .limit(1)
+
+    if (fullRoom) {
+      if (fullRoom.name) roomName = fullRoom.name
+      if (fullRoom.timezone) timezone = fullRoom.timezone
+      if (fullRoom.directive) roomDirective = fullRoom.directive
+      if (fullRoom.createdBy) {
+        const [ownerProfile] = await db
+          .select({ displayName: profiles.displayName })
+          .from(profiles)
+          .where(eq(profiles.id, fullRoom.createdBy))
+          .limit(1)
+        if (ownerProfile?.displayName) {
+          roomOwnerName = ownerProfile.displayName
+        }
+      }
+    }
+  }
+
+  const proto = c.req.header("x-forwarded-proto") || "http"
+  const host = c.req.header("x-forwarded-host") || c.req.header("host") || "localhost:3000"
+  const rawToken = token || ""
+  const connectionUrl = `${proto}://${host}/mcp/${rawToken}`
+
+  const client = c.req.query("client") || ""
+
+  const instructions = generateSetupInstructions({
+    handle: identity.agent.handle,
+    displayName: identity.agent.displayName,
+    roomName,
+    roomId,
+    roomOwnerName,
+    timezone,
+    directive: roomDirective,
+    token: rawToken,
+    connectionUrl,
+    client,
+  })
+
+  return c.text(instructions, 200, {
+    "content-type": "text/plain; charset=utf-8",
+    "cache-control": "no-store",
+  })
+}
+
 export const mcpRoutes = new Hono()
 
-// The key can travel in the URL for clients whose connector UI only takes a URL
-// (ChatGPT, Gemini, Claude.ai). Header auth is preferred where the client allows it.
+// GET returns human- and bot-readable setup instructions in markdown (parity with Jinxo).
+// When an agent (Codex, Hermes, etc.) fetches the link, it reads the guide and joins the room.
+mcpRoutes.get("/v1/mcp", (c) => renderInstructions(c, undefined))
+mcpRoutes.get("/v1/mcp/:token", (c) => renderInstructions(c, c.req.param("token")))
+
+// POST serves standard MCP JSON-RPC Streamable HTTP requests.
 mcpRoutes.post("/v1/mcp", (c) => serve(c, undefined))
 mcpRoutes.post("/v1/mcp/:token", (c) => serve(c, c.req.param("token")))
+
 for (const path of ["/v1/mcp", "/v1/mcp/:token"]) {
-  mcpRoutes.get(path, (c) => c.body(null, 405, { allow: "POST" }))
-  mcpRoutes.delete(path, (c) => c.body(null, 405, { allow: "POST" }))
+  mcpRoutes.delete(path, (c) => c.body(null, 405, { allow: "GET, POST" }))
 }

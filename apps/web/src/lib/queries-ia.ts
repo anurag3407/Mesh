@@ -10,6 +10,8 @@ import type {
   InboxApprovalView,
   InboxDoneView,
   InboxRequestView,
+  DecisionPacketView,
+  TaskEventView,
   MeetingView,
   OrgAccess,
   RoomScheduleView,
@@ -70,10 +72,10 @@ export async function loadChatList(access: OrgAccess): Promise<{
       .eq("status", "pending_approval"),
     supabase
       .from("tasks")
-      .select("id", { count: "exact", head: true })
+      .select("id, fold_key, expires_at")
       .in("room_id", roomIds)
       .eq("kind", "request")
-      .neq("status", "done"),
+      .eq("status", "open"),
   ])
 
   const reads = new Map(
@@ -164,7 +166,12 @@ export async function loadChatList(access: OrgAccess): Promise<{
     if (a.pinned !== b.pinned) return a.pinned ? -1 : 1
     return (b.lastAt ?? "").localeCompare(a.lastAt ?? "")
   })
-  const inboxCount = (approvalsRes.count ?? 0) + (requestsRes.count ?? 0)
+  const nowIso = new Date().toISOString()
+  const activeRequests = (
+    (requestsRes.data ?? []) as { id: string; fold_key: string | null; expires_at: string | null }[]
+  ).filter((r) => !r.expires_at || r.expires_at > nowIso)
+  const distinctQuestions = new Set(activeRequests.map((r) => r.fold_key || r.id)).size
+  const inboxCount = (approvalsRes.count ?? 0) + distinctQuestions
   return { items, inboxCount, rooms }
 }
 
@@ -278,6 +285,17 @@ export async function loadTasks(access: OrgAccess): Promise<TaskView[]> {
     assignee_agent_id: string | null
     requested_by_agent_id: string | null
     requested_from_user_id: string | null
+    due_at: string | null
+    status_changed_at: string
+    completed_at: string | null
+    unblock_needs: string | null
+    unblock_detail: string | null
+    blocked_by: string[] | null
+    outcome_kind: string | null
+    outcome_ref: string | null
+    fold_key: string | null
+    asked_count: number
+    expires_at: string | null
     metadata: Record<string, unknown>
     created_at: string
     updated_at: string
@@ -285,14 +303,31 @@ export async function loadTasks(access: OrgAccess): Promise<TaskView[]> {
   const roomNames = new Map(rooms.map((room) => [room.id, room.name]))
   const agentsById = new Map(agents.map((agent) => [agent.id, agent]))
   const memberNames = new Map(members.map((member) => [member.userId, member.displayName]))
-  const commentsRes = taskRows.length
-    ? await supabase
-        .from("task_comments")
-        .select("id, task_id, author_type, author_id, content, created_at")
-        .in("task_id", taskRows.map((task) => task.id))
-        .order("created_at", { ascending: true })
-        .limit(500)
-    : { data: [] }
+  const [commentsRes, eventsRes, runsRes] = await Promise.all([
+    taskRows.length
+      ? supabase
+          .from("task_comments")
+          .select("id, task_id, author_type, author_id, content, created_at")
+          .in("task_id", taskRows.map((task) => task.id))
+          .order("created_at", { ascending: true })
+          .limit(500)
+      : Promise.resolve({ data: [] }),
+    taskRows.length
+      ? supabase
+          .from("task_events")
+          .select("id, task_id, actor_type, actor_id, from_status, to_status, reason, outcome_kind, outcome_ref, metadata, created_at")
+          .in("task_id", taskRows.map((task) => task.id))
+          .order("created_at", { ascending: true })
+          .limit(1000)
+      : Promise.resolve({ data: [] }),
+    taskRows.length
+      ? supabase
+          .from("agent_runs")
+          .select("task_id, cost_usd")
+          .in("task_id", taskRows.map((task) => task.id))
+      : Promise.resolve({ data: [] }),
+  ])
+
   const commentsByTask = new Map<string, TaskCommentView[]>()
   for (const row of (commentsRes.data ?? []) as {
     id: string
@@ -319,9 +354,57 @@ export async function loadTasks(access: OrgAccess): Promise<TaskView[]> {
     })
     commentsByTask.set(row.task_id, list)
   }
+
+  const eventsByTask = new Map<string, TaskEventView[]>()
+  for (const row of (eventsRes.data ?? []) as {
+    id: string
+    task_id: string
+    actor_type: "human" | "agent" | "system"
+    actor_id: string | null
+    from_status: string | null
+    to_status: string
+    reason: string | null
+    outcome_kind: string | null
+    outcome_ref: string | null
+    metadata: Record<string, unknown>
+    created_at: string
+  }[]) {
+    const list = eventsByTask.get(row.task_id) ?? []
+    list.push({
+      id: row.id,
+      taskId: row.task_id,
+      actorType: row.actor_type,
+      actorId: row.actor_id,
+      actorName:
+        row.actor_type === "agent" && row.actor_id
+          ? `@${agentsById.get(row.actor_id)?.handle ?? "agent"}`
+          : row.actor_id
+            ? memberNames.get(row.actor_id) ?? "Someone"
+            : "System",
+      fromStatus: row.from_status,
+      toStatus: row.to_status,
+      reason: row.reason,
+      outcomeKind: row.outcome_kind,
+      outcomeRef: row.outcome_ref,
+      metadata: row.metadata ?? {},
+      createdAt: row.created_at,
+    })
+    eventsByTask.set(row.task_id, list)
+  }
+
+  const taskStats = new Map<string, { runs: number; cost: number }>()
+  for (const run of (runsRes.data ?? []) as { task_id: string | null; cost_usd: number | string | null }[]) {
+    if (!run.task_id) continue
+    const curr = taskStats.get(run.task_id) ?? { runs: 0, cost: 0 }
+    curr.runs += 1
+    curr.cost += Number(run.cost_usd || 0)
+    taskStats.set(run.task_id, curr)
+  }
+
   return taskRows.map((row) => {
     const agent = row.assignee_agent_id ? agentsById.get(row.assignee_agent_id) : null
     const requester = row.requested_by_agent_id ? agentsById.get(row.requested_by_agent_id) : null
+    const stats = taskStats.get(row.id) ?? { runs: 0, cost: 0 }
     return {
       id: row.id,
       number: row.number,
@@ -339,10 +422,24 @@ export async function loadTasks(access: OrgAccess): Promise<TaskView[]> {
       requestedByAgentId: row.requested_by_agent_id,
       requestedByHandle: requester?.handle ?? null,
       requestedFromUserId: row.requested_from_user_id,
+      dueAt: row.due_at,
+      statusChangedAt: row.status_changed_at,
+      completedAt: row.completed_at,
+      unblockNeeds: row.unblock_needs,
+      unblockDetail: row.unblock_detail,
+      blockedBy: row.blocked_by ?? [],
+      outcomeKind: row.outcome_kind,
+      outcomeRef: row.outcome_ref,
+      foldKey: row.fold_key,
+      askedCount: row.asked_count ?? 1,
+      expiresAt: row.expires_at,
+      runsCount: stats.runs,
+      costUsd: stats.cost,
       metadata: row.metadata ?? {},
       createdAt: row.created_at,
       updatedAt: row.updated_at,
       comments: commentsByTask.get(row.id) ?? [],
+      events: eventsByTask.get(row.id) ?? [],
     }
   })
 }
@@ -350,12 +447,14 @@ export async function loadTasks(access: OrgAccess): Promise<TaskView[]> {
 export async function loadInbox(access: OrgAccess): Promise<{
   approvals: InboxApprovalView[]
   requests: InboxRequestView[]
+  packets: DecisionPacketView[]
+  agedStuck: TaskView[]
   done: InboxDoneView[]
 }> {
   const supabase = await createSupabaseServerClient()
   const rooms = await readableRooms(access.org.id)
   const roomIds = rooms.map((room) => room.id)
-  if (!roomIds.length) return { approvals: [], requests: [], done: [] }
+  if (!roomIds.length) return { approvals: [], requests: [], packets: [], agedStuck: [], done: [] }
   const roomNames = new Map(rooms.map((room) => [room.id, room.name]))
   const agents = await listOrgAgents(access.org.id)
   const agentsById = new Map(agents.map((agent) => [agent.id, agent]))
@@ -394,9 +493,40 @@ export async function loadInbox(access: OrgAccess): Promise<{
       agentName: agent?.displayName ?? null,
     }
   })
+
+  const nowIso = new Date().toISOString()
   const requests = tasks
-    .filter((task) => task.kind === "request" && task.status !== "done")
+    .filter((task) => task.kind === "request" && task.status !== "done" && (!task.expiresAt || task.expiresAt > nowIso))
     .map((task) => ({ task }))
+
+  // Group open requests into decision packets by room
+  const packetsMap = new Map<string, DecisionPacketView>()
+  for (const req of requests) {
+    let packet = packetsMap.get(req.task.roomId)
+    if (!packet) {
+      packet = {
+        id: `packet-${req.task.roomId}`,
+        roomId: req.task.roomId,
+        roomName: req.task.roomName,
+        requests: [],
+      }
+      packetsMap.set(req.task.roomId, packet)
+    }
+    packet.requests.push(req)
+  }
+  const packets = Array.from(packetsMap.values())
+
+  // Aged stuck tasks (>72 hours in stuck status)
+  const STUCK_ESCALATION_MS = 72 * 60 * 60 * 1000
+  const nowMs = Date.now()
+  const agedStuck = tasks.filter((task) => {
+    if (task.kind !== "task" || task.status !== "stuck") return false
+    const changedAt = task.statusChangedAt
+      ? new Date(task.statusChangedAt).getTime()
+      : new Date(task.updatedAt).getTime()
+    return nowMs - changedAt > STUCK_ESCALATION_MS
+  })
+
   const done: InboxDoneView[] = [
     ...((doneToolsRes.data ?? []) as {
       id: string
@@ -421,7 +551,8 @@ export async function loadInbox(access: OrgAccess): Promise<{
         resolvedAt: task.updatedAt,
       })),
   ].slice(0, 30)
-  return { approvals, requests, done }
+
+  return { approvals, requests, packets, agedStuck, done }
 }
 
 export async function loadFiles(access: OrgAccess): Promise<FileView[]> {

@@ -10,9 +10,26 @@ import {
   updateTask,
   type CollabAgent,
 } from "../../collab"
+import { classifyAndRecordCheckin } from "../../collab/classify-checkin"
 import type { ToolSpec } from "../audited"
 
 const statusSchema = z.enum(["open", "in_progress", "stuck", "done"])
+const unblockNeedsSchema = z.enum([
+  "human_answer",
+  "another_agent",
+  "credential",
+  "external_access",
+  "time",
+  "other",
+])
+const outcomeKindSchema = z.enum([
+  "artifact",
+  "submission",
+  "external_change",
+  "decision",
+  "none",
+  "legacy",
+])
 
 async function friendly<T>(run: () => Promise<T>): Promise<T | { error: string }> {
   try {
@@ -75,9 +92,46 @@ export function taskTools(args: {
       execute: (input: { task_id: string }) => friendly(() => claimTask(agent, { taskId: input.task_id })),
     },
     {
+      name: "report_checkin",
+      description:
+        "Report task progress or status changes during scheduled room check-ins. In digest mode, reports with no actual state changes are kept quiet in the daily digest. Stuck transitions, requests, and approvals always break through." +
+        handoff,
+      schema: z.object({
+        summary: z.string().max(1_000).optional(),
+        changed: z
+          .array(
+            z.object({
+              task_ref: z.string().optional(),
+              task_id: z.string().optional(),
+              event_id: z.string().optional(),
+            }),
+          )
+          .optional(),
+        no_change: z.boolean().optional(),
+      }),
+      dangerous: false,
+      execute: (input: {
+        summary?: string
+        changed?: Array<{ task_ref?: string; task_id?: string; event_id?: string }>
+        no_change?: boolean
+      }) =>
+        friendly(() =>
+          classifyAndRecordCheckin(agent, {
+            roomId: args.roomId,
+            summary: input.summary,
+            changed: input.changed?.map((c) => ({
+              taskRef: c.task_ref,
+              taskId: c.task_id,
+              eventId: c.event_id,
+            })),
+            noChange: input.no_change,
+          }),
+        ),
+    },
+    {
       name: "update_task",
       description:
-        "Report progress on a task you hold: status, a progress note, or release it. Status \"stuck\" posts a help request for ask_help_from (or all bots) and alerts the humans." +
+        "Report progress on a task you hold: status, a progress note, or release it. Done requires outcome (artifact, submission, external_change, or decision). Stuck requires unblock_needs. Moving to in_progress with open blockers requires reason." +
         handoff,
       schema: z.object({
         task_id: z.string().uuid(),
@@ -85,6 +139,17 @@ export function taskTools(args: {
         note: z.string().max(4_000).optional(),
         ask_help_from: z.string().optional(),
         release: z.boolean().optional(),
+        due_at: z.string().optional(),
+        unblock_needs: unblockNeedsSchema.optional(),
+        unblock_detail: z.string().max(1_000).optional(),
+        blocked_by: z.array(z.string().uuid()).optional(),
+        outcome: z
+          .object({
+            kind: outcomeKindSchema,
+            ref: z.string().optional(),
+          })
+          .optional(),
+        reason: z.string().optional(),
       }),
       dangerous: false,
       execute: (input: {
@@ -93,6 +158,15 @@ export function taskTools(args: {
         note?: string
         ask_help_from?: string
         release?: boolean
+        due_at?: string
+        unblock_needs?: z.infer<typeof unblockNeedsSchema>
+        unblock_detail?: string
+        blocked_by?: string[]
+        outcome?: {
+          kind: z.infer<typeof outcomeKindSchema>
+          ref?: string
+        }
+        reason?: string
       }) =>
         friendly(() =>
           updateTask(agent, {
@@ -101,21 +175,36 @@ export function taskTools(args: {
             note: input.note,
             askHelpFrom: input.ask_help_from,
             release: input.release,
+            dueAt: input.due_at,
+            unblockNeeds: input.unblock_needs,
+            unblockDetail: input.unblock_detail,
+            blockedBy: input.blocked_by,
+            outcome: input.outcome,
+            reason: input.reason,
           }),
         ),
     },
     {
       name: "request_human_decision",
       description:
-        "Check with the humans first. Puts a decision card in their Inbox for anything high-stakes, costly, irreversible or unclear. Give 2–6 short options so they can answer in one tap. Do not wait in this turn: continue with other work; the answer arrives as a message that mentions you.",
+        "Check with the humans first. Puts a decision card in their Inbox for anything high-stakes, costly, irreversible or unclear. Give 2–6 short options so they can answer in one tap. Repeats with same question or fold_key fold into the existing question.",
       schema: z.object({
         question: z.string().min(4).max(120),
         details: z.string().max(4_000).optional(),
         options: z.array(z.string().min(1).max(60)).max(6).optional(),
+        fold_key: z.string().max(64).optional(),
       }),
       dangerous: false,
-      execute: (input: { question: string; details?: string; options?: string[] }) =>
-        friendly(() => requestHumanDecision(agent, { roomId: args.roomId, ...input })),
+      execute: (input: { question: string; details?: string; options?: string[]; fold_key?: string }) =>
+        friendly(() =>
+          requestHumanDecision(agent, {
+            roomId: args.roomId,
+            question: input.question,
+            details: input.details,
+            options: input.options,
+            foldKey: input.fold_key,
+          }),
+        ),
     },
     {
       name: "start_vote",

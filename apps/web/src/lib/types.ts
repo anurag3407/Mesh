@@ -233,6 +233,8 @@ export interface RoomScheduleView {
   checkinStartMinutes: number
   checkinEndMinutes: number
   checkinDurationMinutes: number
+  checkinMode?: "stream" | "digest"
+  digestAt?: number | null
   lastCheckinAt: string | null
 }
 
@@ -280,6 +282,21 @@ export interface TaskCommentView {
   createdAt: string
 }
 
+export interface TaskEventView {
+  id: string
+  taskId: string
+  actorType: "human" | "agent" | "system"
+  actorId: string | null
+  actorName?: string | null
+  fromStatus: string | null
+  toStatus: string
+  reason: string | null
+  outcomeKind: string | null
+  outcomeRef: string | null
+  metadata: Record<string, unknown>
+  createdAt: string
+}
+
 export interface TaskView {
   id: string
   number: number
@@ -297,10 +314,24 @@ export interface TaskView {
   requestedByAgentId: string | null
   requestedByHandle: string | null
   requestedFromUserId: string | null
+  dueAt?: string | null
+  statusChangedAt?: string
+  completedAt?: string | null
+  unblockNeeds?: string | null
+  unblockDetail?: string | null
+  blockedBy?: string[]
+  outcomeKind?: string | null
+  outcomeRef?: string | null
+  foldKey?: string | null
+  askedCount?: number
+  expiresAt?: string | null
+  costUsd?: number
+  runsCount?: number
   metadata: Record<string, unknown>
   createdAt: string
   updatedAt: string
   comments: TaskCommentView[]
+  events?: TaskEventView[]
 }
 
 export interface InboxApprovalView {
@@ -312,6 +343,13 @@ export interface InboxApprovalView {
 
 export interface InboxRequestView {
   task: TaskView
+}
+
+export interface DecisionPacketView {
+  id: string
+  roomId: string
+  roomName: string
+  requests: InboxRequestView[]
 }
 
 export interface InboxDoneView {

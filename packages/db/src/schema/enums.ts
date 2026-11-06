@@ -63,3 +63,20 @@ export const meetingStatusEnum = pgEnum("meeting_status", [
 ])
 export const taskKindEnum = pgEnum("task_kind", ["task", "request"])
 export const taskStatusEnum = pgEnum("task_status", ["open", "in_progress", "stuck", "done"])
+export const unblockNeedsEnum = pgEnum("unblock_needs", [
+  "human_answer",
+  "another_agent",
+  "credential",
+  "external_access",
+  "time",
+  "other",
+])
+export const outcomeKindEnum = pgEnum("outcome_kind", [
+  "artifact",
+  "submission",
+  "external_change",
+  "decision",
+  "none",
+  "legacy",
+])
+export const checkinModeEnum = pgEnum("checkin_mode", ["stream", "digest"])

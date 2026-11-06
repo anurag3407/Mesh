@@ -14,11 +14,15 @@ export function IssueApiKey({
   agentId,
   mcpEndpoint,
   handle,
+  roomName,
+  timezone,
 }: {
   orgSlug: string
   agentId: string
   mcpEndpoint?: string
   handle?: string
+  roomName?: string
+  timezone?: string
 }) {
   const [label, setLabel] = useState("default")
   const [token, setToken] = useState<string | null>(null)
@@ -68,7 +72,13 @@ export function IssueApiKey({
           {mcpEndpoint && handle ? (
             <div className="mt-3 border-t border-line pt-3">
               <p className="mb-2 font-mono text-[11px] text-accent">connect your AI app</p>
-              <McpConnect endpoint={mcpEndpoint} token={token} handle={handle} />
+              <McpConnect
+                endpoint={mcpEndpoint}
+                token={token}
+                handle={handle}
+                roomName={roomName}
+                timezone={timezone}
+              />
             </div>
           ) : null}
         </div>

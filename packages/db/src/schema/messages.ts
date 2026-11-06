@@ -17,6 +17,7 @@ import {
 } from "./enums"
 import { agents } from "./agents"
 import { rooms } from "./rooms"
+import { tasks } from "./tasks"
 
 export interface TurnQueueItem {
   agentId: string
@@ -74,6 +75,7 @@ export const agentRuns = pgTable(
     roomId: uuid("room_id")
       .notNull()
       .references(() => rooms.id, { onDelete: "cascade" }),
+    taskId: uuid("task_id").references(() => tasks.id, { onDelete: "set null" }),
     agentId: uuid("agent_id").references(() => agents.id, { onDelete: "set null" }),
     messageId: uuid("message_id").references(() => messages.id, { onDelete: "set null" }),
     step: integer("step").notNull().default(0),
@@ -90,5 +92,6 @@ export const agentRuns = pgTable(
   (t) => [
     index("agent_runs_room_created_idx").on(t.roomId, t.createdAt),
     index("agent_runs_session_idx").on(t.sessionId),
+    index("agent_runs_task_idx").on(t.taskId),
   ],
 )

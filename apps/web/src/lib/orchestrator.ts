@@ -81,3 +81,43 @@ export function restoreCanvasInOrchestrator(canvasId: string, userId: string, sn
     30_000,
   )
 }
+
+export async function mutateTaskInOrchestrator(input: {
+  taskId: string
+  actor: { type: "human" | "agent" | "system"; id: string }
+  status?: string
+  title?: string
+  description?: string
+  assigneeUserId?: string | null
+  assigneeAgentId?: string | null
+  dueAt?: string | null
+  unblockNeeds?: string | null
+  unblockDetail?: string | null
+  blockedBy?: string[] | null
+  outcome?: { kind: string; ref?: string | null } | null
+  reason?: string | null
+  note?: string | null
+  metadata?: Record<string, unknown>
+}): Promise<{ ok: boolean; task?: unknown; event?: unknown; error?: string }> {
+  try {
+    const response = await fetch(`${getOrchestratorUrl()}/internal/tasks/mutate`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-internal-secret": getInternalSecret(),
+      },
+      body: JSON.stringify(input),
+      cache: "no-store",
+      signal: AbortSignal.timeout(15_000),
+    })
+    const data = (await response.json().catch(() => null)) as
+      | { ok?: boolean; task?: unknown; event?: unknown; error?: string }
+      | null
+    if (!response.ok || !data?.ok) {
+      return { ok: false, error: data?.error ?? `task mutation failed (${response.status})` }
+    }
+    return { ok: true, task: data.task, event: data.event }
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : String(error) }
+  }
+}

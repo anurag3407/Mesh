@@ -9,7 +9,13 @@ import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/field"
 import { InlineAlert } from "@/components/ui/empty"
 import { useWorkspaceChange } from "@/lib/use-workspace-change"
-import type { InboxApprovalView, InboxDoneView, InboxRequestView } from "@/lib/types"
+import type {
+  DecisionPacketView,
+  InboxApprovalView,
+  InboxDoneView,
+  InboxRequestView,
+  TaskView,
+} from "@/lib/types"
 
 function when(iso: string): string {
   const diff = Date.now() - new Date(iso).getTime()
@@ -62,9 +68,16 @@ function RequestCard({
     <li className="border border-line border-l-2 border-l-accent bg-panel p-4">
       <div className="flex flex-wrap items-start gap-2">
         <div className="min-w-0 flex-1">
-          <p className="font-mono text-[11px] text-accent">
-            {task.requestedByHandle ? `@${task.requestedByHandle} asks` : "agent request"}
-          </p>
+          <div className="flex items-center gap-2">
+            <p className="font-mono text-[11px] text-accent">
+              {task.requestedByHandle ? `@${task.requestedByHandle} asks` : "agent request"}
+            </p>
+            {task.askedCount && task.askedCount > 1 ? (
+              <span className="rounded-sm bg-accent/20 px-1.5 py-0.5 font-mono text-[10px] text-accent">
+                asked {task.askedCount}×
+              </span>
+            ) : null}
+          </div>
           <p className="mt-1 text-[14px] leading-snug text-text">{task.title}</p>
           {task.description ? (
             <p className="mt-1 line-clamp-3 whitespace-pre-wrap text-[12px] leading-relaxed text-muted">
@@ -144,10 +157,162 @@ function RequestCard({
   )
 }
 
+function PacketCard({
+  packet,
+  orgSlug,
+  onAnswered,
+}: {
+  packet: DecisionPacketView
+  orgSlug: string
+  onAnswered: () => void
+}) {
+  const [answers, setAnswers] = useState<Record<string, string>>({})
+  const [alsoPost, setAlsoPost] = useState(true)
+  const [pending, startTransition] = useTransition()
+  const [error, setError] = useState<string | null>(null)
+
+  function setAnswerFor(taskId: string, val: string) {
+    setAnswers((prev) => ({ ...prev, [taskId]: val }))
+  }
+
+  function submitPacket() {
+    setError(null)
+    const items = Object.entries(answers)
+      .filter(([_, ans]) => ans.trim().length > 0)
+      .map(([taskId, answer]) => ({ taskId, answer, alsoPost }))
+
+    if (items.length === 0) return
+
+    startTransition(async () => {
+      const result = await answerTaskRequestAction({
+        orgSlug,
+        packetId: packet.id,
+        answers: items,
+      })
+      if (!result.ok) {
+        setError(result.error ?? "Failed to submit answers")
+        return
+      }
+      onAnswered()
+    })
+  }
+
+  const answeredCount = Object.values(answers).filter((v) => v.trim().length > 0).length
+
+  return (
+    <div className="border border-line border-l-2 border-l-accent bg-panel p-4">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line pb-3">
+        <div>
+          <span className="font-mono text-[11px] uppercase tracking-wide text-accent">
+            Decision packet
+          </span>
+          <h3 className="mt-0.5 text-[14px] font-medium text-text">{packet.roomName}</h3>
+          <p className="font-mono text-[11px] text-faint">
+            {packet.requests.length} open questions · {answeredCount}/{packet.requests.length} ready
+          </p>
+        </div>
+        <Link
+          href={`/${orgSlug}/r/${packet.roomId}`}
+          className="inline-flex h-8 items-center rounded-sm px-2 font-mono text-[11px] text-muted hover:text-text"
+        >
+          room
+        </Link>
+      </div>
+
+      <div className="mt-4 space-y-4 divide-y divide-line/60">
+        {packet.requests.map((item, idx) => {
+          const task = item.task
+          const options = Array.isArray(task.metadata.options)
+            ? (task.metadata.options as unknown[]).filter((o): o is string => typeof o === "string")
+            : []
+          const currentAnswer = answers[task.id] || ""
+
+          return (
+            <div key={task.id} className={idx > 0 ? "pt-4" : ""}>
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2">
+                    <span className="font-mono text-[11px] text-accent">
+                      {task.requestedByHandle ? `@${task.requestedByHandle}` : "agent"}
+                    </span>
+                    <span className="font-mono text-[10px] text-faint">MESH-{task.number}</span>
+                    {task.askedCount && task.askedCount > 1 ? (
+                      <span className="rounded-sm bg-accent/20 px-1.5 py-0.5 font-mono text-[10px] text-accent">
+                        asked {task.askedCount}×
+                      </span>
+                    ) : null}
+                  </div>
+                  <p className="mt-1 text-[13px] font-medium text-text">{task.title}</p>
+                  {task.description ? (
+                    <p className="mt-0.5 text-[11px] leading-relaxed text-muted">{task.description}</p>
+                  ) : null}
+                </div>
+              </div>
+
+              {options.length > 0 ? (
+                <div className="mt-2.5 flex flex-wrap gap-1.5">
+                  {options.map((opt) => (
+                    <Button
+                      key={opt}
+                      size="sm"
+                      variant={currentAnswer === opt ? "primary" : "secondary"}
+                      onClick={() => setAnswerFor(task.id, opt)}
+                    >
+                      {opt}
+                    </Button>
+                  ))}
+                </div>
+              ) : null}
+
+              <div className="mt-2">
+                <Textarea
+                  value={currentAnswer}
+                  onChange={(e) => setAnswerFor(task.id, e.target.value)}
+                  rows={2}
+                  placeholder="Answer or decision for this question..."
+                />
+              </div>
+            </div>
+          )
+        })}
+      </div>
+
+      <div className="mt-4 border-t border-line pt-3">
+        <label className="flex items-start gap-2 text-[12px] leading-relaxed text-muted">
+          <input
+            type="checkbox"
+            checked={alsoPost}
+            onChange={(e) => setAlsoPost(e.target.checked)}
+            className="mt-0.5 h-3.5 w-3.5 accent-[var(--color-accent)]"
+          />
+          <span>Post answers in {packet.roomName}. Unchecked sends direct messages to each agent.</span>
+        </label>
+        {error ? (
+          <p role="alert" className="mt-2 text-[12px] text-danger">
+            {error}
+          </p>
+        ) : null}
+        <div className="mt-3 flex justify-end">
+          <Button
+            size="sm"
+            variant="primary"
+            disabled={pending || answeredCount === 0}
+            onClick={submitPacket}
+          >
+            {pending ? "Submitting…" : `Submit packet (${answeredCount} answered)`}
+          </Button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export function InboxView({
   orgSlug,
   approvals,
   requests,
+  packets = [],
+  agedStuck = [],
   done,
   orgAdmin,
   adminRoomIds,
@@ -155,6 +320,8 @@ export function InboxView({
   orgSlug: string
   approvals: InboxApprovalView[]
   requests: InboxRequestView[]
+  packets?: DecisionPacketView[]
+  agedStuck?: TaskView[]
   done: InboxDoneView[]
   orgAdmin: boolean
   adminRoomIds: string[]
@@ -164,6 +331,12 @@ export function InboxView({
   useWorkspaceChange(["tool_calls", "tasks"], refresh)
   const adminRooms = new Set(adminRoomIds)
   const canApproveAny = orgAdmin || adminRooms.size > 0
+
+  // Multi-question packets (>=2 questions)
+  const multiPackets = packets.filter((p) => p.requests.length >= 2)
+  const multiPacketRoomIds = new Set(multiPackets.map((p) => p.roomId))
+  // Single requests not handled in a multi-question packet
+  const standaloneRequests = requests.filter((r) => !multiPacketRoomIds.has(r.task.roomId))
 
   return (
     <div className="h-full overflow-y-auto">
@@ -178,6 +351,47 @@ export function InboxView({
         </header>
 
         <div className="mt-8 space-y-10">
+          {agedStuck.length > 0 ? (
+            <section aria-labelledby="aged-stuck-heading">
+              <div className="flex items-baseline justify-between">
+                <h2 id="aged-stuck-heading" className="text-[15px] font-medium text-danger">
+                  Aged stuck tasks (&gt;72h)
+                </h2>
+                <span className="font-mono text-[11px] text-danger">needs unblocking</span>
+              </div>
+              <p className="mt-1.5 max-w-[66ch] text-[12px] leading-relaxed text-muted">
+                These tasks have been marked stuck for more than 72 hours. Review the unblock needs or reassign.
+              </p>
+              <ul className="mt-4 space-y-3">
+                {agedStuck.map((task) => (
+                  <li key={task.id} className="border border-danger/30 bg-panel p-4">
+                    <div className="flex flex-wrap items-start justify-between gap-2">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="rounded-sm bg-danger/20 px-1.5 py-0.5 font-mono text-[10px] text-danger">
+                            {task.unblockNeeds || "stuck"}
+                          </span>
+                          <span className="font-mono text-[11px] text-faint">MESH-{task.number}</span>
+                          <span className="font-mono text-[11px] text-muted">{task.roomName}</span>
+                        </div>
+                        <p className="mt-1 text-[14px] font-medium text-text">{task.title}</p>
+                        {task.unblockDetail ? (
+                          <p className="mt-1 text-[12px] text-muted">{task.unblockDetail}</p>
+                        ) : null}
+                      </div>
+                      <Link
+                        href={`/${orgSlug}/r/${task.roomId}`}
+                        className="inline-flex h-8 items-center rounded-sm border border-line px-2 font-mono text-[11px] text-muted hover:text-text"
+                      >
+                        view in room
+                      </Link>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          ) : null}
+
           <section aria-labelledby="approvals-heading">
             <div className="flex items-baseline justify-between">
               <h2 id="approvals-heading" className="text-[15px] font-medium">
@@ -231,21 +445,34 @@ export function InboxView({
               An agent needs a decision from a person. Your answer is posted under your name, and the
               agent then continues.
             </p>
+
             {requests.length === 0 ? (
               <p className="mt-3 border-l-2 border-line-strong pl-3 font-mono text-[12px] leading-relaxed text-faint">
                 No agent is blocked on a question.
               </p>
             ) : (
-              <ul className="mt-4 space-y-2">
-                {requests.map((item) => (
-                  <RequestCard
-                    key={item.task.id}
-                    item={item}
+              <div className="mt-4 space-y-4">
+                {multiPackets.map((packet) => (
+                  <PacketCard
+                    key={packet.id}
+                    packet={packet}
                     orgSlug={orgSlug}
                     onAnswered={refresh}
                   />
                 ))}
-              </ul>
+                {standaloneRequests.length > 0 ? (
+                  <ul className="space-y-2">
+                    {standaloneRequests.map((item) => (
+                      <RequestCard
+                        key={item.task.id}
+                        item={item}
+                        orgSlug={orgSlug}
+                        onAnswered={refresh}
+                      />
+                    ))}
+                  </ul>
+                ) : null}
+              </div>
             )}
           </section>
 

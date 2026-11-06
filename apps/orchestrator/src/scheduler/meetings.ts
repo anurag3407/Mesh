@@ -6,8 +6,10 @@ import {
   roomAgents,
   roomSchedules,
   rooms,
+  taskEvents,
+  tasks,
 } from "@mesh/db"
-import { and, desc, eq, gt, isNull, lte, or } from "drizzle-orm"
+import { and, desc, eq, gt, gte, isNull, lte, or, sql } from "drizzle-orm"
 import { getDb, getPool } from "../db"
 import { enqueueRoomMessage } from "../jobs"
 import { loadTaskContext } from "../runner/context"
@@ -44,6 +46,51 @@ async function orgOwner(orgId: string): Promise<string | null> {
   return owner?.userId ?? null
 }
 
+async function loadEveningRollup(roomId: string): Promise<string> {
+  const db = getDb()
+  const todayStart = new Date()
+  todayStart.setHours(0, 0, 0, 0)
+  const [agentsRes, eventsRes, agedStuckRes, openQuestionsRes] = await Promise.all([
+    db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(roomAgents)
+      .where(eq(roomAgents.roomId, roomId)),
+    db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(taskEvents)
+      .innerJoin(tasks, eq(tasks.id, taskEvents.taskId))
+      .where(and(eq(tasks.roomId, roomId), gte(taskEvents.createdAt, todayStart))),
+    db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(tasks)
+      .where(
+        and(
+          eq(tasks.roomId, roomId),
+          eq(tasks.kind, "task"),
+          eq(tasks.status, "stuck"),
+          lte(tasks.statusChangedAt, new Date(Date.now() - 72 * 60 * 60 * 1000)),
+        ),
+      ),
+    db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(tasks)
+      .where(
+        and(
+          eq(tasks.roomId, roomId),
+          eq(tasks.kind, "request"),
+          eq(tasks.status, "open"),
+        ),
+      ),
+  ])
+
+  const agentCount = agentsRes[0]?.count ?? 0
+  const stateChanges = eventsRes[0]?.count ?? 0
+  const agedStuck = agedStuckRes[0]?.count ?? 0
+  const openQuestions = openQuestionsRes[0]?.count ?? 0
+
+  return `Evening rollup: ${agentCount} agent${agentCount === 1 ? "" : "s"}, ${stateChanges} state change${stateChanges === 1 ? "" : "s"}, ${agedStuck} aged-stuck, ${openQuestions} open question${openQuestions === 1 ? "" : "s"}.`
+}
+
 async function postMeetingPrompt(args: {
   meetingId: string
   room: RoomRow
@@ -71,17 +118,20 @@ async function postMeetingPrompt(args: {
     console.error(`[meetings] room ${args.room.id} has no host available`)
     return
   }
+  const isEvening = args.title.toLowerCase().includes("evening")
+  const eveningRollup = isEvening ? await loadEveningRollup(args.room.id).catch(() => "") : ""
   const lead = args.wake
     ? `Wake up: the meeting "${args.title}" is live.`
     : args.kind === "checkin"
       ? `Check-in: ${args.title}.`
       : `Meeting started: ${args.title}.`
   const agenda = args.agenda.trim() ? `\n\nAgenda: ${args.agenda.trim()}` : ""
+  const rollupSection = eveningRollup ? `\n\n${eveningRollup}` : ""
   const board = await loadTaskContext(args.room.id).catch(() => "")
   const boardSection = board
     ? `\n\nOpen board:\n${board}\n\nUpdate the tasks you hold with update_task. If something is stuck, say who can unstick it. Claim unowned work that fits you with claim_task.`
     : ""
-  const content = `${lead}${agenda}${boardSection}\n\nAgents: report what you have done, what you are doing next, and anything you need from the humans.`
+  const content = `${lead}${agenda}${rollupSection}${boardSection}\n\nAgents: report what you have done, what you are doing next, and anything you need from the humans.`
   const [message] = await db
     .insert(messages)
     .values({

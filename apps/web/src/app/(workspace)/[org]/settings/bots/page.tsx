@@ -1,7 +1,7 @@
 import type { Metadata } from "next"
 import Link from "next/link"
 import { requireOrgAccess } from "@/lib/auth"
-import { listOrgAgents, listAgentApiKeys, listWebhookDeliveries } from "@/lib/queries"
+import { listOrgAgents, listAgentApiKeys, listWebhookDeliveries, listRooms } from "@/lib/queries"
 import { EmptyState } from "@/components/ui/empty"
 import { Section } from "@/components/settings/section"
 import { IssueApiKey, RevokeKeyButton, RotateWebhookSecret } from "@/components/settings/bot-actions"
@@ -24,11 +24,15 @@ export default async function BotsPage({ params }: { params: Promise<{ org: stri
   const { org: orgSlug } = await params
   const access = await requireOrgAccess(orgSlug)
   const endpoint = await mcpEndpoint()
-  const [agents, keys, deliveries] = await Promise.all([
+  const [agents, keys, deliveries, orgRooms] = await Promise.all([
     listOrgAgents(access.org.id),
     listAgentApiKeys(access.org.id),
     listWebhookDeliveries(access.org.id),
+    listRooms(access.org.id),
   ])
+  const primaryRoom = orgRooms[0]
+  const roomName = primaryRoom?.name || "General"
+  const timezone = "Asia/Calcutta"
   const externalAgents = agents.filter((agent) => agent.kind === "external")
   const agentsById = new Map(agents.map((agent) => [agent.id, agent]))
   const keysByAgent = new Map<string, typeof keys>()
@@ -75,10 +79,16 @@ export default async function BotsPage({ params }: { params: Promise<{ org: stri
                   </p>
                   <details className="mt-2" open={!agent.webhookUrl && agentKeys.length === 0}>
                     <summary className="cursor-pointer font-mono text-[11px] text-muted hover:text-text">
-                      connect from ChatGPT, Claude, Gemini or Cursor
+                      connect from Codex, Hermes, Claude Code, Cursor or ChatGPT
                     </summary>
                     <div className="mt-2 max-w-2xl border-l border-line pl-3">
-                      <McpConnect endpoint={endpoint} token={null} handle={agent.handle} />
+                      <McpConnect
+                        endpoint={endpoint}
+                        token={null}
+                        handle={agent.handle}
+                        roomName={roomName}
+                        timezone={timezone}
+                      />
                     </div>
                   </details>
                   <details className="mt-2">
@@ -140,6 +150,8 @@ export default async function BotsPage({ params }: { params: Promise<{ org: stri
                           agentId={agent.id}
                           mcpEndpoint={endpoint}
                           handle={agent.handle}
+                          roomName={roomName}
+                          timezone={timezone}
                         />
                       </div>
                     </details>

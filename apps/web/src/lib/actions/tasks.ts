@@ -5,7 +5,7 @@ import { extractHandles } from "@mesh/core"
 import { getRoomAccess, requireUser } from "@/lib/auth"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { ensureBotDmRoom } from "@/lib/bot-dm"
-import { queueRoomMessage } from "@/lib/orchestrator"
+import { mutateTaskInOrchestrator, queueRoomMessage } from "@/lib/orchestrator"
 import { audit, errorMessage, fail, field, ok } from "@/lib/actions/shared"
 import type { ActionResult } from "@/lib/types"
 
@@ -107,22 +107,27 @@ export async function updateTaskAction(input: {
   taskId: string
   status?: (typeof TASK_STATUSES)[number]
   assignee?: string
+  dueAt?: string | null
+  unblockNeeds?: string | null
+  unblockDetail?: string | null
+  blockedBy?: string[] | null
+  outcome?: { kind: string; ref?: string | null } | null
+  reason?: string | null
+  note?: string | null
 }): Promise<ActionResult> {
   const admin = createAdminClient()
   const { data: task } = await admin.from("tasks").select("*").eq("id", input.taskId).maybeSingle()
   if (!task) return fail("Task not found")
   const access = await getRoomAccess(input.orgSlug, task.room_id)
   if (!access) return fail("Room not found")
-  const updates: Record<string, unknown> = { updated_at: new Date().toISOString() }
-  if (input.status) {
-    if (!TASK_STATUSES.includes(input.status)) return fail("Unknown status")
-    updates.status = input.status
-  }
+
+  let assigneeUserId: string | null | undefined = undefined
+  let assigneeAgentId: string | null | undefined = undefined
+
   if (input.assignee !== undefined) {
     if (input.assignee.startsWith("user:")) {
       const userId = input.assignee.slice(5)
       if (!/^[0-9a-f-]{36}$/i.test(userId)) return fail("Choose a valid person")
-      const admin = createAdminClient()
       const { data: member } = await admin
         .from("org_members")
         .select("user_id")
@@ -137,20 +142,39 @@ export async function updateTaskAction(input: {
         .eq("user_id", userId)
         .maybeSingle()
       if (!roomMember) return fail("That person is not in this room")
-      updates.assignee_user_id = userId
-      updates.assignee_agent_id = null
+      assigneeUserId = userId
+      assigneeAgentId = null
     } else if (input.assignee.startsWith("agent:")) {
       const agent = await agentForRoom(access.org.id, task.room_id, input.assignee.slice(6))
       if (!agent) return fail("That agent is not in this room")
-      updates.assignee_agent_id = agent.id
-      updates.assignee_user_id = null
+      assigneeAgentId = agent.id
+      assigneeUserId = null
     } else {
-      updates.assignee_user_id = null
-      updates.assignee_agent_id = null
+      assigneeUserId = null
+      assigneeAgentId = null
     }
   }
-  const { error } = await admin.from("tasks").update(updates).eq("id", input.taskId)
-  if (error) return fail(errorMessage(error))
+
+  // Mutate through orchestrator service layer enforcing task integrity & event recording
+  const mutation = await mutateTaskInOrchestrator({
+    taskId: input.taskId,
+    actor: { type: "human", id: access.user.id },
+    status: input.status,
+    assigneeUserId,
+    assigneeAgentId,
+    dueAt: input.dueAt,
+    unblockNeeds: input.unblockNeeds,
+    unblockDetail: input.unblockDetail,
+    blockedBy: input.blockedBy,
+    outcome: input.outcome,
+    reason: input.reason,
+    note: input.note,
+  })
+
+  if (!mutation.ok) {
+    return fail(mutation.error ?? "Failed to update task")
+  }
+
   await audit({
     orgId: access.org.id,
     actorId: access.user.id,
@@ -193,87 +217,115 @@ export async function addTaskCommentAction(
 
 export async function answerTaskRequestAction(input: {
   orgSlug: string
-  taskId: string
-  answer: string
-  alsoPost: boolean
+  taskId?: string
+  packetId?: string
+  answer?: string
+  alsoPost?: boolean
+  answers?: Array<{ taskId: string; answer: string; alsoPost?: boolean }>
 }): Promise<ActionResult> {
   const user = await requireUser(`/${input.orgSlug}`)
-  const answer = input.answer.trim()
-  if (!answer) return fail("Write an answer")
-  if (answer.length > 4_000) return fail("Keep the answer under 4,000 characters")
+  const items: Array<{ taskId: string; answer: string; alsoPost?: boolean }> = []
+  if (input.answers && input.answers.length > 0) {
+    for (const a of input.answers) {
+      const trimmed = a.answer?.trim()
+      if (trimmed) items.push({ taskId: a.taskId, answer: trimmed, alsoPost: a.alsoPost })
+    }
+  } else if (input.taskId && input.answer?.trim()) {
+    items.push({
+      taskId: input.taskId,
+      answer: input.answer.trim(),
+      alsoPost: input.alsoPost,
+    })
+  }
+
+  if (items.length === 0) return fail("Write an answer")
+
   const admin = createAdminClient()
-  const { data: task } = await admin.from("tasks").select("*").eq("id", input.taskId).maybeSingle()
-  if (!task) return fail("Request not found")
-  if (task.kind !== "request") return fail("That item is not a request")
-  if (task.status === "done") return fail("This request is already answered")
-  const access = await getRoomAccess(input.orgSlug, task.room_id)
-  if (!access) return fail("Room not found")
-  if (task.requested_from_user_id && task.requested_from_user_id !== user.id && !access.canAdmin) {
-    return fail("This request is for someone else")
-  }
-  const agent = task.requested_by_agent_id
-    ? (
-        await admin
-          .from("agents")
-          .select("id, handle, display_name")
-          .eq("id", task.requested_by_agent_id)
-          .maybeSingle()
-      ).data
-    : null
-  let targetRoomId = task.room_id
-  if (agent && !input.alsoPost) {
-    targetRoomId = await ensureBotDmRoom({
-      orgId: access.org.id,
-      userId: user.id,
-      agentId: agent.id,
-      agentName: agent.display_name,
-    })
-  }
-  const inGroup = targetRoomId === task.room_id
-  const content =
-    inGroup && agent ? `@${agent.handle} ${answer}` : answer
-  const { data: message, error } = await admin
-    .from("messages")
-    .insert({
-      room_id: targetRoomId,
-      sender_type: "human",
-      sender_id: user.id,
-      content,
-      status: "complete",
-      mentions: extractHandles(content),
-      metadata: { taskId: task.id, requestAnswer: true, alsoPost: input.alsoPost },
-    })
-    .select("id")
-    .single()
-  if (error || !message) return fail(errorMessage(error) || "Could not post the answer")
-  await queueRoomMessage(targetRoomId, message.id)
-  await admin
-    .from("tasks")
-    .update({
+
+  for (const item of items) {
+    if (item.answer.length > 4_000) return fail("Keep answers under 4,000 characters")
+    const { data: task } = await admin
+      .from("tasks")
+      .select("*")
+      .eq("id", item.taskId)
+      .maybeSingle()
+    if (!task) continue
+    if (task.kind !== "request") continue
+    if (task.status === "done") continue
+
+    const access = await getRoomAccess(input.orgSlug, task.room_id)
+    if (!access) continue
+    if (
+      task.requested_from_user_id &&
+      task.requested_from_user_id !== user.id &&
+      !access.canAdmin
+    ) {
+      continue
+    }
+
+    const agent = task.requested_by_agent_id
+      ? (
+          await admin
+            .from("agents")
+            .select("id, handle, display_name")
+            .eq("id", task.requested_by_agent_id)
+            .maybeSingle()
+        ).data
+      : null
+
+    let targetRoomId = task.room_id
+    if (agent && !item.alsoPost) {
+      targetRoomId = await ensureBotDmRoom({
+        orgId: access.org.id,
+        userId: user.id,
+        agentId: agent.id,
+        agentName: agent.display_name,
+      })
+    }
+    const inGroup = targetRoomId === task.room_id
+    const content = inGroup && agent ? `@${agent.handle} ${item.answer}` : item.answer
+    const { data: message, error } = await admin
+      .from("messages")
+      .insert({
+        room_id: targetRoomId,
+        sender_type: "human",
+        sender_id: user.id,
+        content,
+        status: "complete",
+        mentions: extractHandles(content),
+        metadata: { taskId: task.id, requestAnswer: true, alsoPost: item.alsoPost },
+      })
+      .select("id")
+      .single()
+
+    if (error || !message) return fail(errorMessage(error) || "Could not post the answer")
+    await queueRoomMessage(targetRoomId, message.id)
+
+    // Complete request through orchestrator service mutation
+    await mutateTaskInOrchestrator({
+      taskId: task.id,
+      actor: { type: "human", id: user.id },
       status: "done",
+      outcome: { kind: "decision", ref: message.id },
+      reason: "human answered request",
+      note: item.answer,
       metadata: {
-        ...(task.metadata as Record<string, unknown>),
-        answer,
+        answer: item.answer,
         answeredBy: user.id,
         answeredAt: new Date().toISOString(),
-        alsoPost: input.alsoPost,
+        alsoPost: item.alsoPost,
       },
-      updated_at: new Date().toISOString(),
     })
-    .eq("id", task.id)
-  await admin.from("task_comments").insert({
-    task_id: task.id,
-    author_type: "human",
-    author_id: user.id,
-    content: answer,
-  })
-  await audit({
-    orgId: access.org.id,
-    actorId: user.id,
-    action: "request.answered",
-    target: task.id,
-    metadata: { roomId: task.room_id, targetRoomId },
-  })
+
+    await audit({
+      orgId: access.org.id,
+      actorId: user.id,
+      action: "request.answered",
+      target: task.id,
+      metadata: { roomId: task.room_id, targetRoomId, packetId: input.packetId },
+    })
+  }
+
   revalidatePath(`/${input.orgSlug}`, "layout")
-  return ok("Answer sent")
+  return ok(items.length > 1 ? `${items.length} answers submitted` : "Answer sent")
 }

@@ -74,6 +74,11 @@ function TaskCard({
   onOpen: (task: TaskView) => void
   showRoom?: boolean
 }) {
+  const isOverdue =
+    task.dueAt && new Date(task.dueAt).getTime() < Date.now() && task.status !== "done"
+  const formattedCost = typeof task.costUsd === "number" ? `$${task.costUsd.toFixed(2)}` : "$0.00"
+  const runs = task.runsCount || 0
+
   return (
     <li>
       <button
@@ -84,10 +89,30 @@ function TaskCard({
           taskTone(task.status),
         )}
       >
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-1.5">
           <span className="font-mono text-[11px] text-faint">MESH-{task.number}</span>
           {task.kind === "request" ? (
             <span className="font-mono text-[11px] text-accent">request</span>
+          ) : null}
+          {task.status === "stuck" && task.unblockNeeds ? (
+            <span className="rounded-sm bg-danger/20 px-1 py-0.5 font-mono text-[10px] text-danger">
+              needs: {task.unblockNeeds}
+            </span>
+          ) : null}
+          {task.blockedBy && task.blockedBy.length > 0 && task.status !== "done" ? (
+            <span className="rounded-sm bg-line-strong px-1 py-0.5 font-mono text-[10px] text-muted">
+              {task.blockedBy.length} blocker{task.blockedBy.length > 1 ? "s" : ""}
+            </span>
+          ) : null}
+          {task.dueAt ? (
+            <span
+              className={cn(
+                "rounded-sm px-1 py-0.5 font-mono text-[10px]",
+                isOverdue ? "bg-danger/20 text-danger" : "bg-line text-muted",
+              )}
+            >
+              due {shortDate(task.dueAt)}
+            </span>
           ) : null}
           <span className="ml-auto font-mono text-[11px] text-faint">{shortDate(task.updatedAt)}</span>
         </div>
@@ -97,9 +122,16 @@ function TaskCard({
             {task.description}
           </p>
         ) : null}
+        {task.status === "done" && task.outcomeKind ? (
+          <div className="mt-2 rounded-sm bg-line/30 px-2 py-1 font-mono text-[11px] text-muted">
+            <span className="text-[var(--color-ok)]">outcome:</span> {task.outcomeKind}
+            {task.outcomeRef ? ` · ${task.outcomeRef}` : ""}
+          </div>
+        ) : null}
         <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 font-mono text-[11px] text-faint">
           {showRoom ? <span>{task.roomName}</span> : null}
           <span>· {assigneeLabel(task)}</span>
+          <span>· {formattedCost} · {runs} run{runs === 1 ? "" : "s"}</span>
           {task.comments.length ? <span>· {task.comments.length} comments</span> : null}
           {task.requestedByHandle ? <span>· asked by @{task.requestedByHandle}</span> : null}
         </div>
@@ -128,6 +160,12 @@ function TaskDetail({
   const [comment, setComment] = useState("")
   const [answer, setAnswer] = useState("")
   const [alsoPost, setAlsoPost] = useState(true)
+  const [pendingStatus, setPendingStatus] = useState<TaskView["status"] | null>(null)
+  const [outcomeKind, setOutcomeKind] = useState<string>(task.outcomeKind || "artifact")
+  const [outcomeRef, setOutcomeRef] = useState<string>(task.outcomeRef || "")
+  const [unblockNeeds, setUnblockNeeds] = useState<string>(task.unblockNeeds || "human_answer")
+  const [unblockDetail, setUnblockDetail] = useState<string>(task.unblockDetail || "")
+  const [reason, setReason] = useState<string>("")
   const dialogRef = useRef<HTMLDialogElement>(null)
 
   useEffect(() => {
@@ -135,7 +173,14 @@ function TaskDetail({
     if (dialog && !dialog.open) dialog.showModal()
   }, [])
 
-  function update(input: { status?: TaskView["status"]; assignee?: string }) {
+  function update(input: {
+    status?: TaskView["status"]
+    assignee?: string
+    outcome?: { kind: string; ref?: string | null } | null
+    unblockNeeds?: string | null
+    unblockDetail?: string | null
+    reason?: string | null
+  }) {
     setError(null)
     startTransition(async () => {
       const result = await updateTaskAction({ orgSlug, taskId: task.id, ...input })
@@ -144,8 +189,43 @@ function TaskDetail({
         return
       }
       showToast({ message: result.message ?? "Task updated", tone: "success" })
+      setPendingStatus(null)
       onChanged()
     })
+  }
+
+  function handleStatusChange(newStatus: TaskView["status"]) {
+    if (newStatus === task.status) return
+    if (
+      newStatus === "done" ||
+      newStatus === "stuck" ||
+      (newStatus === "in_progress" && (task.blockedBy?.length ?? 0) > 0)
+    ) {
+      setPendingStatus(newStatus)
+      return
+    }
+    update({ status: newStatus })
+  }
+
+  function confirmStatusTransition() {
+    if (!pendingStatus) return
+    if (pendingStatus === "done") {
+      update({
+        status: "done",
+        outcome: { kind: outcomeKind, ref: outcomeRef || null },
+      })
+    } else if (pendingStatus === "stuck") {
+      update({
+        status: "stuck",
+        unblockNeeds,
+        unblockDetail: unblockDetail || null,
+      })
+    } else if (pendingStatus === "in_progress") {
+      update({
+        status: "in_progress",
+        reason: reason || null,
+      })
+    }
   }
 
   function addComment() {
@@ -233,14 +313,32 @@ function TaskDetail({
             </p>
           ) : null}
 
+          <div className="flex flex-wrap items-center gap-2 border border-line bg-panel/50 px-3 py-2 font-mono text-[11px] text-muted">
+            <span>Cost: ${typeof task.costUsd === "number" ? task.costUsd.toFixed(2) : "0.00"}</span>
+            <span>· Runs: {task.runsCount || 0}</span>
+            {task.dueAt ? <span>· Due: {shortDate(task.dueAt)}</span> : null}
+            {task.statusChangedAt ? (
+              <span>· In status since: {shortDate(task.statusChangedAt)}</span>
+            ) : null}
+            {task.outcomeKind ? (
+              <span className="text-[var(--color-ok)]">
+                · Outcome: {task.outcomeKind}
+                {task.outcomeRef ? ` (${task.outcomeRef})` : ""}
+              </span>
+            ) : null}
+            {task.blockedBy && task.blockedBy.length > 0 ? (
+              <span className="text-danger">· Blockers: {task.blockedBy.length}</span>
+            ) : null}
+          </div>
+
           <div className="grid gap-3 border border-line bg-panel p-3 sm:grid-cols-2">
             <Field label="status" htmlFor="task-status">
               <Select
                 id="task-status"
-                value={task.status}
+                value={pendingStatus ?? task.status}
                 disabled={pending}
                 onChange={(event) =>
-                  update({ status: event.target.value as TaskView["status"] })
+                  handleStatusChange(event.target.value as TaskView["status"])
                 }
               >
                 {Object.entries(STATUS_LABELS).map(([value, label]) => (
@@ -275,6 +373,85 @@ function TaskDetail({
               </Select>
             </Field>
           </div>
+
+          {pendingStatus ? (
+            <div className="border border-line border-l-2 border-l-accent bg-panel p-3">
+              <h4 className="font-mono text-[11px] uppercase tracking-wide text-accent">
+                Confirm transition to {pendingStatus}
+              </h4>
+              {pendingStatus === "done" ? (
+                <div className="mt-2 space-y-2">
+                  <Field label="Outcome kind (required)" htmlFor="task-outcome-kind">
+                    <Select
+                      id="task-outcome-kind"
+                      value={outcomeKind}
+                      onChange={(e) => setOutcomeKind(e.target.value)}
+                    >
+                      <option value="artifact">artifact</option>
+                      <option value="submission">submission</option>
+                      <option value="external_change">external_change</option>
+                      <option value="decision">decision</option>
+                      <option value="none">none (human override only)</option>
+                    </Select>
+                  </Field>
+                  <Field label="Outcome reference (URL, Canvas ID, or ref)" htmlFor="task-outcome-ref">
+                    <Input
+                      id="task-outcome-ref"
+                      value={outcomeRef}
+                      onChange={(e) => setOutcomeRef(e.target.value)}
+                      placeholder="e.g. https://... or canvas-id"
+                    />
+                  </Field>
+                </div>
+              ) : null}
+              {pendingStatus === "stuck" ? (
+                <div className="mt-2 space-y-2">
+                  <Field label="Unblock needs (required)" htmlFor="task-unblock-needs">
+                    <Select
+                      id="task-unblock-needs"
+                      value={unblockNeeds}
+                      onChange={(e) => setUnblockNeeds(e.target.value)}
+                    >
+                      <option value="human_answer">human_answer</option>
+                      <option value="another_agent">another_agent</option>
+                      <option value="credential">credential</option>
+                      <option value="external_access">external_access</option>
+                      <option value="time">time</option>
+                      <option value="other">other</option>
+                    </Select>
+                  </Field>
+                  <Field label="Unblock detail" htmlFor="task-unblock-detail">
+                    <Input
+                      id="task-unblock-detail"
+                      value={unblockDetail}
+                      onChange={(e) => setUnblockDetail(e.target.value)}
+                      placeholder="What specific fact, answer, or access is needed?"
+                    />
+                  </Field>
+                </div>
+              ) : null}
+              {pendingStatus === "in_progress" && (task.blockedBy?.length ?? 0) > 0 ? (
+                <div className="mt-2">
+                  <Field label="Reason (required to proceed with blockers)" htmlFor="task-reason">
+                    <Input
+                      id="task-reason"
+                      value={reason}
+                      onChange={(e) => setReason(e.target.value)}
+                      placeholder="Why can this start while blockers are still unresolved?"
+                    />
+                  </Field>
+                </div>
+              ) : null}
+              <div className="mt-3 flex justify-end gap-2">
+                <Button size="sm" variant="ghost" onClick={() => setPendingStatus(null)}>
+                  Cancel
+                </Button>
+                <Button size="sm" variant="primary" disabled={pending} onClick={confirmStatusTransition}>
+                  {pending ? "Saving…" : "Save status"}
+                </Button>
+              </div>
+            </div>
+          ) : null}
 
           {error ? <InlineAlert tone="danger">{error}</InlineAlert> : null}
 
@@ -361,6 +538,42 @@ function TaskDetail({
                 </Button>
               </div>
             </div>
+          </section>
+
+          <section>
+            <div className="flex items-baseline justify-between">
+              <h3 className="text-[13px] font-medium">Audit Timeline</h3>
+              <span className="font-mono text-[11px] text-faint">
+                {task.events?.length || 0} events
+              </span>
+            </div>
+            {!task.events || task.events.length === 0 ? (
+              <p className="mt-2 border-l-2 border-line-strong pl-3 font-mono text-[11px] text-faint">
+                No recorded state changes yet.
+              </p>
+            ) : (
+              <ul className="mt-3 space-y-2.5">
+                {task.events.map((evt) => (
+                  <li key={evt.id} className="border-l-2 border-line pl-3">
+                    <p className="font-mono text-[11px] text-faint">
+                      <span className="text-text">{evt.actorName || evt.actorType}</span>{" "}
+                      {evt.fromStatus ? `${evt.fromStatus} → ` : "created as "}
+                      <span className="text-accent">{evt.toStatus}</span> ·{" "}
+                      {new Date(evt.createdAt).toLocaleString()}
+                    </p>
+                    {evt.reason ? (
+                      <p className="mt-0.5 text-[12px] text-muted">Reason: {evt.reason}</p>
+                    ) : null}
+                    {evt.outcomeKind ? (
+                      <p className="mt-0.5 font-mono text-[11px] text-[var(--color-ok)]">
+                        Outcome: {evt.outcomeKind}
+                        {evt.outcomeRef ? ` · ${evt.outcomeRef}` : ""}
+                      </p>
+                    ) : null}
+                  </li>
+                ))}
+              </ul>
+            )}
           </section>
 
           <div className="flex flex-wrap items-center gap-3 border-t border-line pt-3 font-mono text-[11px] text-faint">

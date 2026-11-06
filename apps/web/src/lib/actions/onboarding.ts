@@ -162,6 +162,7 @@ export async function saveRoomScheduleAction(
   }
   if (checkinStart === null || checkinEnd === null) return fail("Use valid check-in times")
   if (!interval.success || !duration.success) return fail("Choose a valid check-in interval and length")
+  const checkinMode = field(formData, "checkinMode") === "digest" ? "digest" : "stream"
   const admin = createAdminClient()
   const { error } = await admin.from("room_schedules").upsert(
     {
@@ -176,6 +177,7 @@ export async function saveRoomScheduleAction(
       checkin_start_minutes: checkinStart,
       checkin_end_minutes: checkinEnd,
       checkin_duration_minutes: duration.data,
+      checkin_mode: checkinMode,
       updated_at: new Date().toISOString(),
     },
     { onConflict: "room_id" },

@@ -1,13 +1,17 @@
-import { extractHandles, redactSecrets, resolveMentions } from "@mesh/core"
+import { computeFoldKey, extractHandles, redactSecrets, resolveMentions } from "@mesh/core"
 import {
   agentReads,
   agentRuns,
   agents,
   messages,
+  profiles,
   roomAgents,
   rooms,
   taskComments,
+  taskEvents,
   tasks,
+  type OutcomeKind,
+  type UnblockNeeds,
 } from "@mesh/db"
 import { and, asc, desc, eq, gt, gte, inArray, isNull, ne, or, sql } from "drizzle-orm"
 import { notifyBotReply } from "../bot-reply"
@@ -15,6 +19,9 @@ import { getDb } from "../db"
 import { notifyHumansNeeded } from "../push"
 import { broadcast } from "../realtime"
 import { loadConversation, loadRoomAgents, type ContextMessage } from "../runner/context"
+import { applyTaskMutation, CollabError } from "./tasks-service"
+
+export { CollabError }
 
 /**
  * Collaboration primitives shared by MCP-connected bots and built-in LLM agents:
@@ -27,8 +34,6 @@ export interface CollabAgent {
   orgId: string
   handle: string
 }
-
-export class CollabError extends Error {}
 
 /** Bot-to-bot chains started by agent posts are capped per room per 10 minutes. */
 const AGENT_TRIGGER_LIMIT = 8
@@ -70,6 +75,33 @@ export async function assertAgentRoom(agent: CollabAgent, roomId: string): Promi
   if (!row) throw new CollabError("you are not a member of this room")
 }
 
+export async function resolveAgentRoomId(
+  agent: CollabAgent,
+  roomIdOrName?: string | null,
+): Promise<string> {
+  const roomsList = await agentRooms(agent)
+  if (roomIdOrName) {
+    const trimmed = roomIdOrName.trim()
+    const match = roomsList.find(
+      (r) => r.id === trimmed || r.name.toLowerCase() === trimmed.toLowerCase(),
+    )
+    if (match) return match.id
+    if (/^[0-9a-f-]{36}$/i.test(trimmed)) {
+      await assertAgentRoom(agent, trimmed)
+      return trimmed
+    }
+  }
+  if (roomsList.length === 1 && roomsList[0]) {
+    return roomsList[0].id
+  }
+  if (roomsList.length === 0) {
+    throw new CollabError("You have not been added to any rooms yet. Ask the room owner to add you in Room Settings.")
+  }
+  throw new CollabError(
+    `Please specify room_id: you belong to multiple rooms (${roomsList.map((r) => `${r.name}: ${r.id}`).join(", ")})`,
+  )
+}
+
 async function markRead(agentId: string, roomId: string, at = new Date()): Promise<void> {
   await getDb()
     .insert(agentReads)
@@ -106,15 +138,15 @@ function compact(m: ContextMessage) {
 
 export async function getRoomMessages(
   agent: CollabAgent,
-  args: { roomId: string; threadId?: string | null; limit?: number; markAsRead?: boolean },
+  args: { roomId?: string; room?: string; threadId?: string | null; limit?: number; markAsRead?: boolean },
 ) {
-  await assertAgentRoom(agent, args.roomId)
+  const roomId = await resolveAgentRoomId(agent, args.roomId || args.room)
   const conversation = await loadConversation({
-    roomId: args.roomId,
+    roomId,
     threadRootId: args.threadId ?? null,
     limit: Math.min(Math.max(args.limit ?? 30, 1), 100),
   })
-  if (args.markAsRead !== false) await markRead(agent.agentId, args.roomId)
+  if (args.markAsRead !== false) await markRead(agent.agentId, roomId)
   return conversation.map(compact)
 }
 
@@ -299,28 +331,29 @@ async function recentAgentTriggers(roomId: string): Promise<number> {
 export async function postAgentMessage(
   agent: CollabAgent,
   args: {
-    roomId: string
+    roomId?: string
+    room?: string
     content: string
     threadRootId?: string | null
     metadata?: Record<string, unknown>
   },
 ) {
-  await assertAgentRoom(agent, args.roomId)
+  const roomId = await resolveAgentRoomId(agent, args.roomId || args.room)
   const content = redactSecrets(args.content).text.trim()
   if (!content) throw new CollabError("message is empty")
   if (content.length > 32_000) throw new CollabError("message is too long (32k characters max)")
 
   const mentions = extractHandles(content)
-  const roomAgentRows = await loadRoomAgents(args.roomId)
+  const roomAgentRows = await loadRoomAgents(roomId)
   const targets = resolveMentions(
     content,
     roomAgentRows.map(({ agent: a }) => ({ id: a.id, handle: a.handle, kind: a.kind })),
   ).filter((a) => a.id !== agent.agentId)
 
-  const inTurn = await agentIsTakingTurn(agent.agentId, args.roomId)
+  const inTurn = await agentIsTakingTurn(agent.agentId, roomId)
   let trigger = !inTurn && targets.length > 0
   let throttled = false
-  if (trigger && (await recentAgentTriggers(args.roomId)) >= AGENT_TRIGGER_LIMIT) {
+  if (trigger && (await recentAgentTriggers(roomId)) >= AGENT_TRIGGER_LIMIT) {
     trigger = false
     throttled = true
   }
@@ -328,7 +361,7 @@ export async function postAgentMessage(
   const [row] = await getDb()
     .insert(messages)
     .values({
-      roomId: args.roomId,
+      roomId,
       threadRootId: args.threadRootId ?? null,
       senderType: "agent",
       senderId: agent.agentId,
@@ -346,14 +379,14 @@ export async function postAgentMessage(
   if (!row) throw new CollabError("failed to store message")
 
   await notifyBotReply({
-    roomId: args.roomId,
+    roomId,
     agentId: agent.agentId,
     threadRootId: args.threadRootId ?? null,
     messageId: row.id,
   })
-  await broadcast(args.roomId, { type: "message.done", messageId: row.id, status: "complete" })
-  await markRead(agent.agentId, args.roomId, row.createdAt)
-  if (trigger && enqueueRoomMessage) await enqueueRoomMessage(args.roomId, row.id)
+  await broadcast(roomId, { type: "message.done", messageId: row.id, status: "complete" })
+  await markRead(agent.agentId, roomId, row.createdAt)
+  if (trigger && enqueueRoomMessage) await enqueueRoomMessage(roomId, row.id)
 
   return {
     message_id: row.id,
@@ -369,18 +402,18 @@ export async function postAgentMessage(
 /** A direct message to one teammate bot. Humans in the room can always read it. */
 export async function sendBotDirectMessage(
   agent: CollabAgent,
-  args: { roomId: string; toHandle: string; content: string },
+  args: { roomId?: string; room?: string; toHandle: string; content: string },
 ) {
-  await assertAgentRoom(agent, args.roomId)
+  const roomId = await resolveAgentRoomId(agent, args.roomId || args.room)
   const handle = args.toHandle.replace(/^@/, "").toLowerCase()
-  const roomAgentRows = await loadRoomAgents(args.roomId)
+  const roomAgentRows = await loadRoomAgents(roomId)
   const target = roomAgentRows.find(({ agent: a }) => a.handle.toLowerCase() === handle)?.agent
   if (!target) throw new CollabError(`@${handle} is not in this room`)
   if (target.id === agent.agentId) throw new CollabError("you cannot message yourself")
   const body = args.content.trim()
   const content = new RegExp(`(^|\\s)@${handle}\\b`, "i").test(body) ? body : `@${handle} ${body}`
   return postAgentMessage(agent, {
-    roomId: args.roomId,
+    roomId,
     content,
     metadata: { dmToAgentId: target.id, dmToHandle: target.handle, botDm: true },
   })
@@ -402,10 +435,10 @@ async function loadTaskInOrg(agent: CollabAgent, taskId: string) {
 
 export async function listTasks(
   agent: CollabAgent,
-  args: { roomId: string; status?: "open" | "in_progress" | "stuck" | "done"; mine?: boolean },
+  args: { roomId?: string; room?: string; status?: "open" | "in_progress" | "stuck" | "done"; mine?: boolean },
 ) {
-  await assertAgentRoom(agent, args.roomId)
-  const conditions = [eq(tasks.roomId, args.roomId)]
+  const roomId = await resolveAgentRoomId(agent, args.roomId || args.room)
+  const conditions = [eq(tasks.roomId, roomId)]
   if (args.status) conditions.push(eq(tasks.status, args.status))
   if (args.mine) conditions.push(eq(tasks.assigneeAgentId, agent.agentId))
   const rows = await getDb()
@@ -429,14 +462,14 @@ export async function listTasks(
 
 export async function createTask(
   agent: CollabAgent,
-  args: { roomId: string; title: string; description?: string; assignToMe?: boolean },
+  args: { roomId?: string; room?: string; title: string; description?: string; assignToMe?: boolean },
 ) {
-  await assertAgentRoom(agent, args.roomId)
+  const roomId = await resolveAgentRoomId(agent, args.roomId || args.room)
   const [row] = await getDb()
     .insert(tasks)
     .values({
       orgId: agent.orgId,
-      roomId: args.roomId,
+      roomId,
       kind: "task",
       title: args.title.slice(0, 120),
       description: (args.description ?? "").slice(0, 4_000),
@@ -495,6 +528,7 @@ export async function claimTask(agent: CollabAgent, args: { taskId: string }) {
 /**
  * Updates a task the agent holds. Marking it stuck posts a help request in the
  * room that wakes the chosen teammate (or every other bot) to unstick it.
+ * All mutations enforce task integrity invariants via applyTaskMutation.
  */
 export async function updateTask(
   agent: CollabAgent,
@@ -504,6 +538,15 @@ export async function updateTask(
     note?: string
     askHelpFrom?: string
     release?: boolean
+    dueAt?: string | null
+    unblockNeeds?: UnblockNeeds | null
+    unblockDetail?: string | null
+    blockedBy?: string[] | null
+    outcome?: {
+      kind: OutcomeKind
+      ref?: string | null
+    } | null
+    reason?: string | null
   },
 ) {
   const task = await loadTaskInOrg(agent, args.taskId)
@@ -512,36 +555,37 @@ export async function updateTask(
   if (task.assigneeAgentId && task.assigneeAgentId !== agent.agentId && task.status !== "stuck") {
     throw new CollabError("this task belongs to another agent; claim it first")
   }
-  const updates: Partial<typeof tasks.$inferInsert> = { updatedAt: new Date() }
-  if (args.status) updates.status = args.status
+
+  let assigneeAgentId: string | null | undefined = undefined
+  let targetStatus = args.status
   if (args.release) {
-    updates.assigneeAgentId = null
-    if (!args.status) updates.status = "open"
+    assigneeAgentId = null
+    if (!targetStatus) targetStatus = "open"
   }
-  const [row] = await getDb()
-    .update(tasks)
-    .set(updates)
-    .where(eq(tasks.id, task.id))
-    .returning({ id: tasks.id, number: tasks.number, status: tasks.status, title: tasks.title })
-  if (!row) throw new CollabError("task not found")
-  const note = args.note?.trim()
-  if (note) {
-    await getDb().insert(taskComments).values({
-      taskId: task.id,
-      authorType: "agent",
-      authorId: agent.agentId,
-      content: note.slice(0, 4_000),
-    })
-  }
+
+  const { task: row, event } = await applyTaskMutation({
+    taskId: task.id,
+    actor: { type: "agent", id: agent.agentId },
+    status: targetStatus,
+    assigneeAgentId,
+    dueAt: args.dueAt,
+    unblockNeeds: args.unblockNeeds,
+    unblockDetail: args.unblockDetail,
+    blockedBy: args.blockedBy,
+    outcome: args.outcome,
+    reason: args.reason,
+    note: args.note,
+  })
 
   let helpMessage: Awaited<ReturnType<typeof postAgentMessage>> | null = null
   if (args.status === "stuck") {
     const helper = args.askHelpFrom?.replace(/^@/, "").toLowerCase()
     const who = helper ? `@${helper}` : "@all_bots"
+    const note = args.note?.trim()
     helpMessage = await postAgentMessage(agent, {
       roomId: task.roomId,
-      content: `${who} I'm stuck on **MESH-${row.number}: ${row.title}**.${note ? `\n\n${note}` : ""}\n\nCan you take a look or suggest a way forward?`,
-      metadata: { taskId: task.id, stuckHelp: true },
+      content: `${who} I'm stuck on **MESH-${row.number}: ${row.title}** (${args.unblockNeeds || "needs help"}).${note ? `\n\n${note}` : ""}\n\nCan you take a look or suggest a way forward?`,
+      metadata: { taskId: task.id, stuckHelp: true, unblockNeeds: args.unblockNeeds },
     }).catch(() => null)
     notifyHumansNeeded({
       roomId: task.roomId,
@@ -554,6 +598,7 @@ export async function updateTask(
     id: row.id,
     ref: `MESH-${row.number}`,
     status: row.status,
+    eventId: event?.id,
     ...(helpMessage ? { asked_for_help: helpMessage.woke } : {}),
   }
 }
@@ -562,29 +607,96 @@ export async function updateTask(
 
 export async function requestHumanDecision(
   agent: CollabAgent,
-  args: { roomId: string; question: string; details?: string; options?: string[] },
+  args: {
+    roomId?: string
+    room?: string
+    question: string
+    details?: string
+    options?: string[]
+    foldKey?: string
+  },
 ) {
-  await assertAgentRoom(agent, args.roomId)
+  const roomId = await resolveAgentRoomId(agent, args.roomId || args.room)
   const options = [...new Set((args.options ?? []).map((o) => o.trim()).filter(Boolean))].slice(0, 6)
+  const effectiveFoldKey = computeFoldKey(args.question, args.foldKey)
+
+  // Deduplicate against still-open requests in the same room with same foldKey
+  const [existing] = await getDb()
+    .select()
+    .from(tasks)
+    .where(
+      and(
+        eq(tasks.roomId, roomId),
+        eq(tasks.kind, "request"),
+        eq(tasks.status, "open"),
+        eq(tasks.foldKey, effectiveFoldKey),
+      ),
+    )
+    .limit(1)
+
+  if (existing) {
+    const nextCount = (existing.askedCount || 1) + 1
+    await getDb()
+      .update(tasks)
+      .set({ askedCount: nextCount, updatedAt: new Date() })
+      .where(eq(tasks.id, existing.id))
+
+    await getDb().insert(taskEvents).values({
+      taskId: existing.id,
+      actorType: "agent",
+      actorId: agent.agentId,
+      fromStatus: "open",
+      toStatus: "open",
+      reason: "repeated ask folded into existing request",
+      metadata: { askedCount: nextCount, repeatedQuestion: args.question },
+    })
+
+    return {
+      request_id: existing.id,
+      ref: `MESH-${existing.number}`,
+      status: "waiting_for_human",
+      folded: true,
+      asked_count: nextCount,
+      next: "Repeated ask folded into existing open question. The answer arrives as a message mentioning you, and get_request_status returns it.",
+    }
+  }
+
   const [row] = await getDb()
     .insert(tasks)
     .values({
       orgId: agent.orgId,
-      roomId: args.roomId,
+      roomId,
       kind: "request",
       title: args.question.slice(0, 120),
       description: (args.details ?? "").slice(0, 4_000),
       status: "open",
       requestedByAgentId: agent.agentId,
+      foldKey: effectiveFoldKey,
+      askedCount: 1,
+      expiresAt: new Date(Date.now() + 72 * 60 * 60 * 1000),
       metadata: { source: "agent", createdByAgent: agent.agentId, options },
     })
     .returning({ id: tasks.id, number: tasks.number })
+
   if (!row) throw new CollabError("could not create the request")
-  notifyHumansNeeded({ roomId: args.roomId, agentId: agent.agentId, kind: "request", detail: args.question })
+
+  await getDb().insert(taskEvents).values({
+    taskId: row.id,
+    actorType: "agent",
+    actorId: agent.agentId,
+    fromStatus: null,
+    toStatus: "open",
+    reason: "human decision requested",
+    metadata: { foldKey: effectiveFoldKey, options },
+  })
+
+  notifyHumansNeeded({ roomId, agentId: agent.agentId, kind: "request", detail: args.question })
   return {
     request_id: row.id,
     ref: `MESH-${row.number}`,
     status: "waiting_for_human",
+    folded: false,
+    asked_count: 1,
     next: "Keep working on anything that does not depend on this. The answer arrives as a message mentioning you, and get_request_status returns it.",
   }
 }
@@ -689,4 +801,122 @@ export async function getVote(agent: CollabAgent, args: { voteId: string }) {
     ballots: Object.values(vote.ballots).map((b) => ({ by: `@${b.handle}`, option: b.option, reason: b.reason })),
     ...tally(vote),
   }
+}
+
+// ── check in & agent profile ──────────────────────────────────────────────
+
+export async function checkIn(
+  agent: CollabAgent,
+  args: { roomId?: string | null; room?: string | null } = {},
+) {
+  const db = getDb()
+  const agentRoomList = await agentRooms(agent)
+  let activeRoomId: string | null = null
+  let activeRoom: (typeof agentRoomList)[number] | null = null
+  let roomOwnerName = "Room Owner"
+
+  if (agentRoomList.length > 0) {
+    try {
+      activeRoomId = await resolveAgentRoomId(agent, args.roomId || args.room)
+      activeRoom = agentRoomList.find((r) => r.id === activeRoomId) || agentRoomList[0] || null
+    } catch {
+      activeRoom = agentRoomList[0] || null
+      activeRoomId = activeRoom ? activeRoom.id : null
+    }
+  }
+
+  let teammates: Array<{ handle: string; name: string; role: string }> = []
+  let roomMessages: unknown[] = []
+  let openTasks: unknown[] = []
+
+  if (activeRoomId) {
+    const [roomDetails] = await db
+      .select({
+        name: rooms.name,
+        timezone: rooms.timezone,
+        directive: rooms.systemDirective,
+        createdBy: rooms.createdBy,
+      })
+      .from(rooms)
+      .where(eq(rooms.id, activeRoomId))
+      .limit(1)
+
+    if (roomDetails?.createdBy) {
+      const [owner] = await db
+        .select({ displayName: profiles.displayName })
+        .from(profiles)
+        .where(eq(profiles.id, roomDetails.createdBy))
+        .limit(1)
+      if (owner?.displayName) roomOwnerName = owner.displayName
+    }
+
+    const roomAgentRows = await loadRoomAgents(activeRoomId)
+    teammates = roomAgentRows.map(({ agent: a }) => ({
+      handle: `@${a.handle}`,
+      name: a.displayName,
+      role: a.id === agent.agentId ? "you" : "bot",
+    }))
+
+    roomMessages = await getRoomMessages(agent, {
+      roomId: activeRoomId,
+      limit: 15,
+      markAsRead: true,
+    })
+
+    openTasks = await listTasks(agent, { roomId: activeRoomId })
+  }
+
+  const inbox = await getInbox(agent, { markAsRead: true })
+
+  return {
+    identity: {
+      handle: `@${agent.handle}`,
+      role: "bot",
+      room_owner: roomOwnerName,
+    },
+    current_room: activeRoom
+      ? {
+          id: activeRoom.id,
+          name: activeRoom.name,
+          directive: activeRoom.directive || "Collaborate on tasks and coordinate with the team.",
+        }
+      : null,
+    teammates,
+    unhandled_mentions: inbox.mentions,
+    tasks_assigned_or_available: openTasks,
+    answered_requests: inbox.answered_requests,
+    recent_messages: roomMessages,
+    house_rules: [
+      "1. Check in whenever you begin work in the room, and use report_checkin to report state changes (or no_change) rather than filler messages.",
+      "2. Read recent messages before posting to understand context.",
+      "3. Claim tasks with claim_task before starting work so teammates do not duplicate effort.",
+      "4. Update task progress with update_task (done requires an outcome with artifact/ref; stuck requires unblock_needs).",
+      "5. Always ask the room owner with request_human_decision before touching host files, spending money, or performing high-stakes actions outside Saaya.",
+      "6. Post updates and talk openly with teammate bots and the room owner.",
+    ],
+  }
+}
+
+export async function updateAgentProfile(
+  agent: CollabAgent,
+  args: { goodAt?: string; name?: string },
+) {
+  const db = getDb()
+  const updates: Record<string, unknown> = {}
+  if (args.name && args.name.trim()) {
+    updates.displayName = args.name.trim().slice(0, 80)
+  }
+  if (args.goodAt !== undefined) {
+    const [current] = await db
+      .select({ params: agents.params })
+      .from(agents)
+      .where(eq(agents.id, agent.agentId))
+      .limit(1)
+    const existingParams = (current?.params as Record<string, unknown>) || {}
+    updates.params = { ...existingParams, goodAt: args.goodAt.trim().slice(0, 300) }
+  }
+  if (Object.keys(updates).length > 0) {
+    await db.update(agents).set(updates).where(eq(agents.id, agent.agentId))
+  }
+  return { updated: true, handle: `@${agent.handle}` }
 }

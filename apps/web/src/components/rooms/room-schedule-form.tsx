@@ -169,6 +169,16 @@ export function RoomScheduleForm({
               ))}
             </Select>
           </Field>
+          <Field label="check-in mode" htmlFor="checkin-mode">
+            <Select
+              id="checkin-mode"
+              name="checkinMode"
+              defaultValue={schedule?.checkinMode ?? "stream"}
+            >
+              <option value="stream">stream (post messages, quiet collapses)</option>
+              <option value="digest">digest (quiet rollups only, no messages)</option>
+            </Select>
+          </Field>
         </div>
       </div>
 

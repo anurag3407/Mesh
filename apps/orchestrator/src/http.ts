@@ -17,10 +17,55 @@ import { isInternalRequest } from "./internal-auth"
 import { enqueueRoomMessage } from "./jobs"
 import { loadMessage } from "./runner/context"
 import { resolveAgentModel } from "./runner/llm"
+import { applyTaskMutation } from "./collab/tasks-service"
 
 const roomMessageSchema = z.object({
   roomId: z.string().uuid(),
   messageId: z.string().uuid(),
+})
+
+const taskMutateSchema = z.object({
+  taskId: z.string().uuid(),
+  actor: z.object({
+    type: z.enum(["human", "agent", "system"]),
+    id: z.string().uuid(),
+  }),
+  status: z.enum(["open", "in_progress", "stuck", "done"]).optional(),
+  title: z.string().optional(),
+  description: z.string().optional(),
+  assigneeUserId: z.string().uuid().nullable().optional(),
+  assigneeAgentId: z.string().uuid().nullable().optional(),
+  dueAt: z.string().nullable().optional(),
+  unblockNeeds: z
+    .enum([
+      "human_answer",
+      "another_agent",
+      "credential",
+      "external_access",
+      "time",
+      "other",
+    ])
+    .nullable()
+    .optional(),
+  unblockDetail: z.string().nullable().optional(),
+  blockedBy: z.array(z.string().uuid()).nullable().optional(),
+  outcome: z
+    .object({
+      kind: z.enum([
+        "artifact",
+        "submission",
+        "external_change",
+        "decision",
+        "none",
+        "legacy",
+      ]),
+      ref: z.string().nullable().optional(),
+    })
+    .nullable()
+    .optional(),
+  reason: z.string().nullable().optional(),
+  note: z.string().nullable().optional(),
+  metadata: z.record(z.string(), z.unknown()).optional(),
 })
 
 const restoreSchema = z.object({
@@ -71,6 +116,21 @@ export function createApp() {
     const stopped = abortRun(runId)
     await notify("mesh_stop_run", { runId }).catch(() => {})
     return c.json({ stopped, notified: true })
+  })
+
+  app.post("/internal/tasks/mutate", async (c) => {
+    const body = await c.req.json().catch(() => null)
+    const parsed = taskMutateSchema.safeParse(body)
+    if (!parsed.success) {
+      return c.json({ error: "invalid body", details: parsed.error.issues }, 400)
+    }
+    try {
+      const result = await applyTaskMutation(parsed.data)
+      return c.json({ ok: true, task: result.task, event: result.event })
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      return c.json({ error: message }, 400)
+    }
   })
 
   app.post("/internal/agents/:agentId/test", async (c) => {

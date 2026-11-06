@@ -27,6 +27,8 @@ export const roomSchedules = pgTable("room_schedules", {
   checkinStartMinutes: integer("checkin_start_minutes").notNull().default(540),
   checkinEndMinutes: integer("checkin_end_minutes").notNull().default(1050),
   checkinDurationMinutes: integer("checkin_duration_minutes").notNull().default(10),
+  checkinMode: text("checkin_mode").$type<"stream" | "digest">().notNull().default("stream"),
+  digestAt: integer("digest_at"),
   lastCheckinAt: timestamp("last_checkin_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
