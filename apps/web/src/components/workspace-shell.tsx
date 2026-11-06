@@ -211,9 +211,9 @@ function SidebarContent({
     <div className="flex h-full min-h-0 flex-col bg-ink">
       <div className="flex items-center gap-2.5 border-b border-line px-4 py-3.5">
         <span className="grid h-6 w-6 place-items-center bg-accent font-mono text-[13px] font-medium text-void">
-          m
+          s
         </span>
-        <span className="font-mono text-sm text-text">mesh</span>
+        <span className="font-mono text-sm text-text">sayabot</span>
         <Link
           href={`${base}/search`}
           onClick={onNavigate}

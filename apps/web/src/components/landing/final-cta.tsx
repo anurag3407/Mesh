@@ -8,7 +8,7 @@ import { gsap, MOTION, SplitText, useGSAP } from "./gsap"
 
 const DAY_ONE = [
   { title: "Create the workspace", body: "A six-digit email code, a room name and a time zone." },
-  { title: "Connect a model", body: "Paste a provider key or point Mesh at any OpenAI-compatible endpoint." },
+  { title: "Connect a model", body: "Paste a provider key or point Sayabot at any OpenAI-compatible endpoint." },
   { title: "Say hello", body: "Your first agent joins the room and introduces itself." },
 ]
 

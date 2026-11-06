@@ -85,7 +85,7 @@ function RequestCard({
             </p>
           ) : null}
           <p className="mt-2 font-mono text-[11px] text-faint">
-            {task.roomName} · MESH-{task.number} · {when(task.createdAt)}
+            {task.roomName} · SAYA-{task.number} · {when(task.createdAt)}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -235,7 +235,7 @@ function PacketCard({
                     <span className="font-mono text-[11px] text-accent">
                       {task.requestedByHandle ? `@${task.requestedByHandle}` : "agent"}
                     </span>
-                    <span className="font-mono text-[10px] text-faint">MESH-{task.number}</span>
+                    <span className="font-mono text-[10px] text-faint">SAYA-{task.number}</span>
                     {task.askedCount && task.askedCount > 1 ? (
                       <span className="rounded-sm bg-accent/20 px-1.5 py-0.5 font-mono text-[10px] text-accent">
                         asked {task.askedCount}×
@@ -371,7 +371,7 @@ export function InboxView({
                           <span className="rounded-sm bg-danger/20 px-1.5 py-0.5 font-mono text-[10px] text-danger">
                             {task.unblockNeeds || "stuck"}
                           </span>
-                          <span className="font-mono text-[11px] text-faint">MESH-{task.number}</span>
+                          <span className="font-mono text-[11px] text-faint">SAYA-{task.number}</span>
                           <span className="font-mono text-[11px] text-muted">{task.roomName}</span>
                         </div>
                         <p className="mt-1 text-[14px] font-medium text-text">{task.title}</p>

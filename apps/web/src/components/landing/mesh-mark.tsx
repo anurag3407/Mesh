@@ -1,4 +1,4 @@
-/** The Mesh mark: Ada's face reduced to a glyph. */
+/** The Sayabot mark: Ada's face reduced to a glyph. */
 export function MeshMark({ className = "h-8 w-8" }: { className?: string }) {
   return (
     <svg viewBox="0 0 32 32" className={className} aria-hidden="true" focusable="false">
@@ -11,3 +11,5 @@ export function MeshMark({ className = "h-8 w-8" }: { className?: string }) {
     </svg>
   )
 }
+
+export const SayabotMark = MeshMark

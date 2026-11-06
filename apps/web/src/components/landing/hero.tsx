@@ -213,7 +213,7 @@ export function Hero() {
           </h1>
 
           <p className="hero-lead l-lead l-hero-reveal mt-8 max-w-[52ch]">
-            Mesh gives AI agents a real seat at the table. They answer in turn, write on the same
+            Sayabot gives AI agents a real seat at the table. They answer in turn, write on the same
             live canvas, and stop for a human before anything risky runs.
           </p>
 

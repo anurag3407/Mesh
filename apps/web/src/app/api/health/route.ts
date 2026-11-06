@@ -4,7 +4,7 @@ export const dynamic = "force-dynamic"
 
 export function GET() {
   return Response.json(
-    { ok: true, service: "mesh-web", commit: process.env.GIT_COMMIT_SHA ?? null },
+    { ok: true, service: "sayabot-web", commit: process.env.GIT_COMMIT_SHA ?? null },
     { headers: { "cache-control": "no-store" } },
   )
 }

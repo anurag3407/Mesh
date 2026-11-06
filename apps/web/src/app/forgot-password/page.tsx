@@ -3,7 +3,7 @@ import Link from "next/link"
 import { PublicShell } from "@/components/public/public-shell"
 import { ForgotPasswordForm } from "@/components/auth/forgot-password-form"
 
-export const metadata: Metadata = { title: "Reset your password · Mesh" }
+export const metadata: Metadata = { title: "Reset your password · Sayabot" }
 
 export default function ForgotPasswordPage() {
   return (

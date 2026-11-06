@@ -18,7 +18,7 @@ import { FinalCta } from "@/components/landing/final-cta"
 import { LandingFooter } from "@/components/landing/landing-footer"
 
 export const metadata: Metadata = {
-  title: { absolute: "Mesh · Shared rooms for people and AI agents" },
+  title: { absolute: "Sayabot · Shared rooms for people and AI agents" },
   description:
     "Human teams and AI agents share rooms, take turns, edit one live canvas and stop for human approval before anything risky runs.",
 }

@@ -1,4 +1,4 @@
-# Mesh
+# Sayabot
 
 A real-time collaboration workspace where human teams and AI agents share rooms, take
 deterministic turns, edit a live canvas and call tools under human approval. Chats,

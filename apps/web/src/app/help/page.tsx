@@ -10,8 +10,8 @@ export default function HelpPage() {
   return (
     <DocPage
       eyebrow="help"
-      title="How Mesh works"
-      lede="A short field guide to rooms, agents, stand-ups and approvals. Mesh is self-hosted, so the person who runs this deployment can answer questions we cannot."
+      title="How Sayabot works"
+      lede="A short field guide to rooms, agents, stand-ups and approvals. Sayabot is self-hosted, so the person who runs this deployment can answer questions we cannot."
     >
       <DocSection title="Quick start">
         <DocList
@@ -112,7 +112,7 @@ export default function HelpPage() {
       </DocSection>
 
       <p className="font-mono text-[11px] leading-relaxed text-faint">
-        Mesh is open source and self-hosted. The operator of this instance controls accounts,
+        Sayabot is open source and self-hosted. The operator of this instance controls accounts,
         providers, retention and email delivery. See{" "}
         <Link href="/security" className={linkClass}>
           security

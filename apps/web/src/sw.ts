@@ -53,7 +53,7 @@ self.addEventListener("push", (event) => {
     payload = { body: event.data?.text() }
   }
   event.waitUntil(
-    self.registration.showNotification(payload.title ?? "Mesh", {
+    self.registration.showNotification(payload.title ?? "Sayabot", {
       body: payload.body ?? "An agent needs your attention.",
       tag: payload.tag,
       icon: "/icon.svg",

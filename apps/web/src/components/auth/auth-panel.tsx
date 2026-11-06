@@ -169,7 +169,7 @@ function SignInForm({
       </form>
       <OAuthButtons next={next} googleEnabled={googleEnabled} githubEnabled={githubEnabled} />
       <p className="text-center text-[12px] text-muted">
-        New to Mesh?{" "}
+        New to Sayabot?{" "}
         <button type="button" onClick={onSwitch} className="text-text underline underline-offset-4">
           Create an account
         </button>
@@ -279,7 +279,7 @@ export function AuthPanel({
         <>
           <div className="mb-5">
             <h2 className="text-xl font-medium tracking-[-0.01em]">
-              {mode === "signup" ? "Create your account" : "Sign in to Mesh"}
+              {mode === "signup" ? "Create your account" : "Sign in to Sayabot"}
             </h2>
             <p className="mt-1.5 text-[13px] leading-relaxed text-muted">
               {mode === "signup"

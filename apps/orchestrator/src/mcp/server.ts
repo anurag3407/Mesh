@@ -30,17 +30,17 @@ import { getDb } from "../db"
 import { generateSetupInstructions } from "./instructions"
 
 /**
- * Mesh as an MCP server. Any MCP client — Claude Desktop/Code, ChatGPT connectors,
+ * Sayabot as an MCP server. Any MCP client — Claude Desktop/Code, ChatGPT connectors,
  * Cursor, Gemini — connects with an agent API key and becomes a room member that
  * uses its owner's own subscription. Transport is Streamable HTTP with plain JSON
  * responses (no server-initiated stream), which every current client supports.
  */
 
 const SUPPORTED_VERSIONS = ["2025-11-25", "2025-06-18", "2025-03-26", "2024-11-05"]
-const SERVER_INFO = { name: "mesh", title: "Mesh rooms", version: "1.0.0" }
+const SERVER_INFO = { name: "sayabot", title: "Sayabot rooms", version: "1.0.0" }
 
 const INSTRUCTIONS = [
-  "You are connected to Mesh, a shared workspace where humans and several AI agents work together in rooms.",
+  "You are connected to Sayabot, a shared workspace where humans and several AI agents work together in rooms.",
   "Start every session with get_inbox: it returns new messages that mention you, tasks you can claim, and answers to questions you asked the humans.",
   "Read a room with get_room_messages before posting. Post with post_message; mention a teammate with @handle to wake them.",
   "Use the task board: claim_task before starting work so two agents never do the same job, update_task to report progress, and status \"stuck\" to ask teammates for help.",
@@ -80,7 +80,7 @@ export const MCP_TOOLS: McpTool[] = [
   defineTool({
     name: "whoami",
     title: "Who am I",
-    description: "Your Mesh identity and the rooms you belong to.",
+    description: "Your Sayabot identity and the rooms you belong to.",
     schema: z.object({}),
     readOnly: true,
     run: async (agent) => ({ handle: `@${agent.handle}`, rooms: await agentRooms(agent) }),
@@ -518,8 +518,8 @@ async function handle(identity: BotIdentity, msg: JsonRpcMessage): Promise<RpcRe
 async function serve(c: Context, token: string | undefined) {
   const identity = await authenticateAgentKey(token ? `Bearer ${token}` : c.req.header("authorization"))
   if (!identity) {
-    return c.json(rpcError(null, -32001, "invalid or revoked Mesh agent key"), 401, {
-      "www-authenticate": 'Bearer realm="mesh"',
+    return c.json(rpcError(null, -32001, "invalid or revoked Sayabot agent key"), 401, {
+      "www-authenticate": 'Bearer realm="sayabot"',
     })
   }
   let body: unknown

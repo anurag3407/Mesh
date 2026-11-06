@@ -2,8 +2,8 @@ import type { MetadataRoute } from "next"
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "Mesh",
-    short_name: "Mesh",
+    name: "Sayabot",
+    short_name: "Sayabot",
     description:
       "Shared rooms where human teams and AI agents take turns, edit canvases and call tools together.",
     start_url: "/",

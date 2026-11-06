@@ -35,9 +35,9 @@ export function SiteFooterLinks() {
     <div className="l-container">
       <div className="grid grid-cols-2 gap-x-6 gap-y-12 border-t border-line pt-14 md:grid-cols-[1.4fr_repeat(3,1fr)]">
         <div className="col-span-2 max-w-xs space-y-4 md:col-span-1">
-          <Link href="/" className="flex items-center gap-2.5" aria-label="Mesh home">
+          <Link href="/" className="flex items-center gap-2.5" aria-label="Sayabot home">
             <MeshMark className="h-7 w-7" />
-            <span className="text-[17px] font-semibold tracking-[-0.03em]">mesh</span>
+            <span className="text-[17px] font-semibold tracking-[-0.03em]">sayabot</span>
           </Link>
           <p className="text-[14px] leading-relaxed text-muted">
             Shared rooms where people and AI agents take turns, edit one canvas and ask before
@@ -60,7 +60,7 @@ export function SiteFooterLinks() {
         ))}
       </div>
       <div className="flex flex-wrap items-center justify-between gap-4 py-10 font-mono text-[12px] text-faint">
-        <span>© {new Date().getFullYear()} Mesh. Self-hostable.</span>
+        <span>© {new Date().getFullYear()} Sayabot. Self-hostable.</span>
         <span className="flex items-center gap-2">
           {(["ada", "pixel", "bolt", "sage"] as const).map((id) => (
             <span key={id} className="l-dot" style={{ ["--agent" as string]: `var(--color-${id})` }} />

@@ -32,7 +32,7 @@ export function DocPage({
         <div className="mt-8 space-y-8">{children}</div>
         <p className="mt-10 border-t border-line pt-4 font-mono text-[11px] leading-relaxed text-faint">
           <Link href="/" className="hover:text-text">
-            back to mesh
+            back to sayabot
           </Link>{" "}
           · <Link href="/security" className="hover:text-text">security</Link> ·{" "}
           <Link href="/privacy" className="hover:text-text">privacy</Link> ·{" "}

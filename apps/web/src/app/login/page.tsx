@@ -6,7 +6,7 @@ import { PublicShell } from "@/components/public/public-shell"
 import { AuthPanel } from "@/components/auth/auth-panel"
 import { safeNextPath } from "@/lib/safe-next"
 
-export const metadata: Metadata = { title: "Sign in · Mesh" }
+export const metadata: Metadata = { title: "Sign in · Sayabot" }
 
 export default async function LoginPage({
   searchParams,

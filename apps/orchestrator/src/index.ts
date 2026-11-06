@@ -50,8 +50,8 @@ const app = createApp()
 const server = serve(
   { fetch: app.fetch, port: env.PORT },
   (info) => {
-    console.log(`[mesh] orchestrator listening on :${info.port}`)
-    console.log(`[mesh] canvas sync at ws://localhost:${info.port}/collab`)
+    console.log(`[sayabot] orchestrator listening on :${info.port}`)
+    console.log(`[sayabot] canvas sync at ws://localhost:${info.port}/collab`)
   },
 )
 

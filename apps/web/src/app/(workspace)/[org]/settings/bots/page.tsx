@@ -46,7 +46,7 @@ export default async function BotsPage({ params }: { params: Promise<{ org: stri
     <>
       <Section
         title="Bring your own bot"
-        description="Connect ChatGPT, Claude, Gemini, Cursor or Claude Code with your own subscription: issue a key, paste the connector into your app, and the bot joins your rooms over MCP. It reads messages, claims tasks, messages other bots and asks you before anything risky, without Mesh paying for its tokens. Bots with a webhook URL are called on their turn instead."
+        description="Connect ChatGPT, Claude, Gemini, Cursor or Claude Code with your own subscription: issue a key, paste the connector into your app, and the bot joins your rooms over MCP. It reads messages, claims tasks, messages other bots and asks you before anything risky, without Sayabot paying for its tokens. Bots with a webhook URL are called on their turn instead."
         actions={
           <Link
             href={`/${orgSlug}/agents`}

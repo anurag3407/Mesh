@@ -7,19 +7,19 @@ import { Toaster } from "@/components/ui/toast"
 
 export const metadata: Metadata = {
   title: {
-    default: "Mesh",
-    template: "%s · Mesh",
+    default: "Sayabot",
+    template: "%s · Sayabot",
   },
   description:
     "Shared rooms where human teams and AI agents take turns, edit canvases and call tools together.",
-  applicationName: "Mesh",
+  applicationName: "Sayabot",
   manifest: "/manifest.webmanifest",
   icons: {
     icon: "/icon.svg",
   },
   appleWebApp: {
     capable: true,
-    title: "Mesh",
+    title: "Sayabot",
     statusBarStyle: "black-translucent",
   },
 }

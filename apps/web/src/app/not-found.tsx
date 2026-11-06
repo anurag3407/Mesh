@@ -6,9 +6,9 @@ export default function NotFound() {
       <div className="max-w-sm">
         <div className="flex items-center gap-3">
           <span className="grid h-6 w-6 place-items-center bg-accent font-mono text-[13px] font-medium text-void">
-            m
+            s
           </span>
-          <span className="font-mono text-sm text-text">mesh</span>
+          <span className="font-mono text-sm text-text">sayabot</span>
         </div>
         <p className="mt-10 font-mono text-[12px] text-accent">404</p>
         <h1 className="mt-2 text-xl font-medium">This page does not exist</h1>

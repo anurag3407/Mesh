@@ -39,7 +39,7 @@ export function LandingFooter() {
         <div className="l-container">
           {/* em units below are relative to the wordmark size, so Sage stays seated at any width */}
           <div className="flex select-none justify-center text-[clamp(7rem,27vw,26rem)] font-semibold leading-[0.78] tracking-[-0.07em] text-raised">
-            {"mesh".split("").map((ch, i) => (
+            {"sayabot".split("").map((ch, i) => (
               <span key={i} className="ft-letter relative inline-block">
                 {ch}
                 {i === 0 && (

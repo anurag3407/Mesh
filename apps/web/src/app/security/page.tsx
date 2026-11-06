@@ -1,7 +1,7 @@
 import type { Metadata } from "next"
 import { DocList, DocPage, DocSection } from "@/components/public/doc-page"
 
-export const metadata: Metadata = { title: "Security · Mesh" }
+export const metadata: Metadata = { title: "Security · Sayabot" }
 
 export default function SecurityPage() {
   return (
@@ -23,7 +23,7 @@ export default function SecurityPage() {
       <DocSection title="Secrets">
         <DocList
           items={[
-            "BYOK provider keys, webhook secrets, MCP headers and tool connection strings use AES-256-GCM with a fresh IV and MESH_KEK.",
+            "BYOK provider keys, webhook secrets, MCP headers and tool connection strings use AES-256-GCM with a fresh IV and secret KEK.",
             "Agent API keys are shown once and stored as SHA-256 hashes with a short lookup prefix.",
             "Outbound webhooks are signed with HMAC-SHA256 and a five-minute timestamp tolerance.",
             "Model, bot and tool output passes through secret redaction before it is stored or broadcast.",
@@ -51,7 +51,7 @@ export default function SecurityPage() {
       <DocSection title="Operations">
         <p>
           The operator controls Supabase, the hosting provider, backups, the encryption key, model
-          providers, network policy and which tools are enabled. Keep MESH_KEK stable and private.
+          providers, network policy and which tools are enabled. Keep the encryption KEK stable and private.
           Rotating it without re-encrypting stored secrets makes them unreadable. Review the
           deployment documentation before exposing an installation to the internet.
         </p>

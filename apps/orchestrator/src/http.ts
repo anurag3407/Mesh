@@ -84,7 +84,7 @@ export function createApp() {
   app.use("/internal/*", bodyLimit({ maxSize: 200_000 }))
 
   app.get("/health", (c) =>
-    c.json({ ok: true, service: "mesh-orchestrator", activeRuns: activeRunIds().length }),
+    c.json({ ok: true, service: "sayabot-orchestrator", activeRuns: activeRunIds().length }),
   )
 
   app.use("/internal/*", async (c, next) => {

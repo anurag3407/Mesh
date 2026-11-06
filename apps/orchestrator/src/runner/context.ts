@@ -264,7 +264,7 @@ export function buildSystemPrompt(args: {
   role: TurnRole
 }): string {
   const parts = [
-    `You are @${args.agent.handle} (${args.agent.displayName}), an autonomous teammate in the Mesh room "#${args.room.name}".`,
+    `You are @${args.agent.handle} (${args.agent.displayName}), an autonomous teammate in the Sayabot room "#${args.room.name}".`,
     "The conversation below is a shared transcript. Each message is labelled with its sender and whether they are human or an agent.",
     "Reply as yourself only. Do not prefix your reply with your handle, and do not speak for anyone else.",
     "Use the provided tools when they help. To hand the conversation to another agent, mention them with @handle in your reply; do not mention agents just to be polite.",

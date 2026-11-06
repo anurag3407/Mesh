@@ -1,4 +1,4 @@
-# Deploying Mesh to a VPS
+# Deploying Sayabot to a VPS
 
 One VPS runs everything except the database. Supabase stays hosted (Postgres, Auth, Realtime).
 

@@ -1,14 +1,14 @@
 import type { Metadata } from "next"
 import { DocList, DocPage, DocSection } from "@/components/public/doc-page"
 
-export const metadata: Metadata = { title: "Privacy · Mesh" }
+export const metadata: Metadata = { title: "Privacy · Sayabot" }
 
 export default function PrivacyPage() {
   return (
     <DocPage
       eyebrow="privacy"
       title="Privacy policy"
-      lede="What a Mesh deployment stores, why it stores it, and the services that may process it. Each operator must adapt this draft to its own practices."
+      lede="What a Sayabot deployment stores, why it stores it, and the services that may process it. Each operator must adapt this draft to its own practices."
       draft
     >
       <DocSection title="What is stored">

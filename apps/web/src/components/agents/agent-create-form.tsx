@@ -193,7 +193,7 @@ export function AgentCreateForm({
           htmlFor="agent-webhook"
           hint="optional. Leave empty to connect from ChatGPT, Claude, Gemini or Cursor over MCP (Settings → Bots)"
         >
-          <Input id="agent-webhook" name="webhookUrl" placeholder="https://bot.example.com/hooks/mesh" />
+          <Input id="agent-webhook" name="webhookUrl" placeholder="https://bot.example.com/hooks/sayabot" />
         </Field>
       )}
 

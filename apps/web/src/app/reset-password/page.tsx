@@ -4,7 +4,7 @@ import { getCurrentUser } from "@/lib/auth"
 import { PublicShell } from "@/components/public/public-shell"
 import { ResetPasswordForm } from "@/components/auth/reset-password-form"
 
-export const metadata: Metadata = { title: "Choose a new password · Mesh" }
+export const metadata: Metadata = { title: "Choose a new password · Sayabot" }
 
 export default async function ResetPasswordPage() {
   const user = await getCurrentUser()

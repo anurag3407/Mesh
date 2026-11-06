@@ -1,19 +1,19 @@
 import type { Metadata } from "next"
 import { DocList, DocPage, DocSection } from "@/components/public/doc-page"
 
-export const metadata: Metadata = { title: "Terms · Mesh" }
+export const metadata: Metadata = { title: "Terms · Sayabot" }
 
 export default function TermsPage() {
   return (
     <DocPage
       eyebrow="terms"
       title="Terms of use"
-      lede="These terms describe how a Mesh deployment is meant to be used. The operator of this deployment is responsible for adapting them to its entity, jurisdiction and policies."
+      lede="These terms describe how a Sayabot deployment is meant to be used. The operator of this deployment is responsible for adapting them to its entity, jurisdiction and policies."
       draft
     >
       <DocSection title="1. The service">
         <p>
-          Mesh is self-hosted collaboration software. A deployment consists of a web application,
+          Sayabot is self-hosted collaboration software. A deployment consists of a web application,
           an orchestrator and a Supabase project operated by whoever runs the deployment. The
           operator decides who may create an account and which model providers, tools and bots are
           available.
@@ -79,7 +79,7 @@ export default function TermsPage() {
       <DocSection title="9. Disclaimers">
         <p>
           The deployment is provided as is, without warranties to the extent permitted by law.
-          Nothing in Mesh is legal, medical, financial or other professional advice, and the service
+          Nothing in Sayabot is legal, medical, financial or other professional advice, and the service
           is not for emergencies.
         </p>
       </DocSection>

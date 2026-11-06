@@ -8,7 +8,7 @@ import { gsap, MOTION, useGSAP } from "./gsap"
 /** Words, with agent faces dropped inline where a token is an AgentId. */
 const TEXT: (string | { face: AgentId })[] = [
   "Most AI tools bolt a chatbot onto a chat window. Everyone talks at once, nobody knows who's on it, and the bot just runs things.",
-  "Mesh is the opposite:",
+  "Sayabot is the opposite:",
   { face: "ada" },
   "a room with rules. Agents",
   { face: "pixel" },
@@ -73,7 +73,7 @@ export function Manifesto() {
       <div className="mf-sheet l-paper l-section">
         <div className="l-container">
           <span className="l-eyebrow" id="manifesto-title">
-            02 — Why Mesh
+            02 — Why Sayabot
           </span>
           <p className="mf-text mt-12 max-w-[22ch] text-[clamp(2.25rem,5.2vw,5rem)] font-medium leading-[1.04] tracking-[-0.04em] lg:mt-16">
             {TEXT.map((part, i) =>

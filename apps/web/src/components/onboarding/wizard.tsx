@@ -273,9 +273,9 @@ export function OnboardingWizard({
       <aside className="flex flex-col border-b border-line px-6 pb-5 pt-[max(1.25rem,env(safe-area-inset-top))] lg:border-b-0 lg:border-r lg:px-8 lg:py-10">
         <div className="flex items-center gap-2.5">
           <span className="grid h-6 w-6 place-items-center bg-accent font-mono text-[13px] font-medium text-void">
-            m
+            s
           </span>
-          <span className="font-mono text-sm text-text">mesh</span>
+          <span className="font-mono text-sm text-text">sayabot</span>
           <span className="ml-auto font-mono text-[11px] text-faint lg:hidden">
             step {step + 1} of {STEP_TITLES.length}
           </span>

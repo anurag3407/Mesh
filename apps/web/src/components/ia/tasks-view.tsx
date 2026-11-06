@@ -90,7 +90,7 @@ function TaskCard({
         )}
       >
         <div className="flex flex-wrap items-center gap-1.5">
-          <span className="font-mono text-[11px] text-faint">MESH-{task.number}</span>
+          <span className="font-mono text-[11px] text-faint">SAYA-{task.number}</span>
           {task.kind === "request" ? (
             <span className="font-mono text-[11px] text-accent">request</span>
           ) : null}
@@ -276,7 +276,7 @@ function TaskDetail({
     <dialog
       ref={dialogRef}
       className="m-0 ml-auto h-dvh max-h-none w-full max-w-lg bg-ink p-0 pb-[env(safe-area-inset-bottom)] pt-[env(safe-area-inset-top)] text-text backdrop:bg-void/70"
-      aria-label={`Task MESH-${task.number}`}
+      aria-label={`Task SAYA-${task.number}`}
       onClose={onClose}
       onClick={(event) => {
         if (event.target === dialogRef.current) dialogRef.current?.close()
@@ -284,7 +284,7 @@ function TaskDetail({
     >
       <div className="flex h-full w-full flex-col overflow-y-auto border-l border-line bg-ink">
         <div className="sticky top-0 flex items-center gap-2 border-b border-line bg-ink px-4 py-3">
-          <span className="font-mono text-[11px] text-faint">MESH-{task.number}</span>
+          <span className="font-mono text-[11px] text-faint">SAYA-{task.number}</span>
           <StatusBadge status={task.status} />
           <span className="rounded-sm bg-raised px-1.5 py-0.5 font-mono text-[11px] text-muted">
             {task.kind}

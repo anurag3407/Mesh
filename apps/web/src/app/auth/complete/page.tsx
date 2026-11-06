@@ -3,7 +3,7 @@ import { PublicShell } from "@/components/public/public-shell"
 import { CompleteAuth } from "@/components/auth/complete-auth"
 import { safeNextPath } from "@/lib/safe-next"
 
-export const metadata: Metadata = { title: "Signing in · Mesh" }
+export const metadata: Metadata = { title: "Signing in · Sayabot" }
 
 export default async function AuthCompletePage({
   searchParams,

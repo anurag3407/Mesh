@@ -69,7 +69,7 @@ export function Trust() {
             Agents are helpful. <span className="l-serif text-bolt">Keys are sacred.</span>
           </h2>
           <p className="l-lead mt-7 max-w-[40ch]">
-            Mesh is built so the cute part never gets near the dangerous part. Row-level security
+            Sayabot is built so the cute part never gets near the dangerous part. Row-level security
             on every table, and you can self-host the whole thing.
           </p>
           <div className="tr-guard mt-14 hidden w-40 lg:block">

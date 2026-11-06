@@ -43,7 +43,7 @@ export function MessageItem({
         data-status={message.status}
       >
         <div className="flex flex-wrap items-baseline gap-2">
-          <span className="font-mono text-[11px] text-accent">mesh</span>
+          <span className="font-mono text-[11px] text-accent">sayabot</span>
           <span className="font-mono text-[11px] text-faint" title={fullTime(message.createdAt)}>
             {clockTime(message.createdAt)}
           </span>
