@@ -126,7 +126,7 @@ export function AgentCreateForm({
           onChange={(event) => setKind(event.target.value)}
         >
           <option value="llm">AI model (uses an API key)</option>
-          <option value="external">External agent (your own server, by webhook)</option>
+          <option value="external">Bring your own bot (ChatGPT, Claude, Gemini, Cursor via MCP, or a webhook)</option>
         </Select>
       </Field>
 
@@ -188,7 +188,11 @@ export function AgentCreateForm({
           </Field>
         </>
       ) : (
-        <Field label="webhook url" htmlFor="agent-webhook" hint="https in production">
+        <Field
+          label="webhook url"
+          htmlFor="agent-webhook"
+          hint="optional. Leave empty to connect from ChatGPT, Claude, Gemini or Cursor over MCP (Settings → Bots)"
+        >
           <Input id="agent-webhook" name="webhookUrl" placeholder="https://bot.example.com/hooks/mesh" />
         </Field>
       )}

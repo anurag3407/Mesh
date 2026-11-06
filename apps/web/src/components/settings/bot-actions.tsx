@@ -7,8 +7,19 @@ import { Button } from "@/components/ui/button"
 import { Field, Input } from "@/components/ui/field"
 import { InlineAlert } from "@/components/ui/empty"
 import { CopyButton } from "@/components/copy-button"
+import { McpConnect } from "@/components/settings/mcp-connect"
 
-export function IssueApiKey({ orgSlug, agentId }: { orgSlug: string; agentId: string }) {
+export function IssueApiKey({
+  orgSlug,
+  agentId,
+  mcpEndpoint,
+  handle,
+}: {
+  orgSlug: string
+  agentId: string
+  mcpEndpoint?: string
+  handle?: string
+}) {
   const [label, setLabel] = useState("default")
   const [token, setToken] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -54,6 +65,12 @@ export function IssueApiKey({ orgSlug, agentId }: { orgSlug: string; agentId: st
             <CopyButton text={token} label="copy key" />
           </div>
           <code className="mt-1 block break-all font-mono text-[12px] text-text">{token}</code>
+          {mcpEndpoint && handle ? (
+            <div className="mt-3 border-t border-line pt-3">
+              <p className="mb-2 font-mono text-[11px] text-accent">connect your AI app</p>
+              <McpConnect endpoint={mcpEndpoint} token={token} handle={handle} />
+            </div>
+          ) : null}
         </div>
       ) : null}
     </div>

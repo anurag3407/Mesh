@@ -46,9 +46,9 @@ function validateAgentFields(formData: FormData, kind: "llm" | "external") {
   if (kind === "llm" && providerKeyId && !model) {
     return { error: "A model id is required when a provider key is attached" }
   }
-  if (kind === "external") {
-    if (!webhookUrl) return { error: "External agents need a webhook URL" }
-    if (!/^https?:\/\//.test(webhookUrl)) return { error: "Webhook URL must start with http(s)://" }
+  // External agents without a webhook connect over MCP from their owner's own client.
+  if (kind === "external" && webhookUrl && !/^https?:\/\//.test(webhookUrl)) {
+    return { error: "Webhook URL must start with http(s)://" }
   }
   return {
     handle,
@@ -82,7 +82,7 @@ export async function createAgent(
       .maybeSingle()
     if (!key || key.org_id !== check.access.org.id) return fail("Provider key not found")
   }
-  const webhookSecret = kind === "external" ? generateWebhookSecret() : null
+  const webhookSecret = kind === "external" && fields.webhookUrl ? generateWebhookSecret() : null
   const { data: agent, error } = await admin
     .from("agents")
     .insert({

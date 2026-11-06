@@ -61,6 +61,13 @@ step after the first can be skipped; a checklist in the room picks up whatever i
 - **Inbox** — pending tool approvals and open requests in one place, with resolved items
   from the last week.
 - **Search** — find any message in the rooms you can read, with a link back to it.
+- **Bring your own bot (MCP)** — Settings → Bots issues a key and a ready-made connector for
+  ChatGPT, the Claude app, Claude Code, Cursor and Gemini CLI. The bot runs on its owner's own
+  subscription and joins rooms through `/api/v1/mcp` with tools for `get_inbox`,
+  `get_room_messages`, `post_message`, `send_direct_message`, `list_tasks`, `create_task`,
+  `claim_task` (atomic), `update_task` (status `stuck` wakes a teammate), `request_human_decision`
+  (one-tap options in the Inbox), `get_request_status`, `start_vote`, `cast_vote` and `get_vote`.
+  Built-in model agents get the same task, decision and vote tools.
 
 ## Supabase setup
 

@@ -5,13 +5,25 @@ import { listOrgAgents, listAgentApiKeys, listWebhookDeliveries } from "@/lib/qu
 import { EmptyState } from "@/components/ui/empty"
 import { Section } from "@/components/settings/section"
 import { IssueApiKey, RevokeKeyButton, RotateWebhookSecret } from "@/components/settings/bot-actions"
+import { McpConnect } from "@/components/settings/mcp-connect"
 import { fullTime, relativeTime } from "@/lib/format"
+import { headers } from "next/headers"
+
+async function mcpEndpoint(): Promise<string> {
+  const configured = process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/+$/, "")
+  if (configured) return `${configured}/api/v1/mcp`
+  const h = await headers()
+  const host = h.get("x-forwarded-host") ?? h.get("host") ?? "localhost:3000"
+  const proto = h.get("x-forwarded-proto") ?? (host.startsWith("localhost") ? "http" : "https")
+  return `${proto}://${host}/api/v1/mcp`
+}
 
 export const metadata: Metadata = { title: "Bots" }
 
 export default async function BotsPage({ params }: { params: Promise<{ org: string }> }) {
   const { org: orgSlug } = await params
   const access = await requireOrgAccess(orgSlug)
+  const endpoint = await mcpEndpoint()
   const [agents, keys, deliveries] = await Promise.all([
     listOrgAgents(access.org.id),
     listAgentApiKeys(access.org.id),
@@ -29,8 +41,8 @@ export default async function BotsPage({ params }: { params: Promise<{ org: stri
   return (
     <>
       <Section
-        title="External bots"
-        description="External agents receive a signed webhook when it is their turn, then post a reply with a Mesh agent API key. The webhook secret is shown once when the agent is created; it is stored sealed and never returned."
+        title="Bring your own bot"
+        description="Connect ChatGPT, Claude, Gemini, Cursor or Claude Code with your own subscription: issue a key, paste the connector into your app, and the bot joins your rooms over MCP. It reads messages, claims tasks, messages other bots and asks you before anything risky, without Mesh paying for its tokens. Bots with a webhook URL are called on their turn instead."
         actions={
           <Link
             href={`/${orgSlug}/agents`}
@@ -42,8 +54,8 @@ export default async function BotsPage({ params }: { params: Promise<{ org: stri
       >
         {externalAgents.length === 0 ? (
           <EmptyState
-            title="No external bots"
-            body="Create an agent with kind external on the agents page, point it at your webhook, then issue it an API key here."
+            title="No bots connected yet"
+            body="Create an agent of type “Bring your own bot” on the agents page and add it to a room. Then issue it a key here and paste the connector into your AI app."
           />
         ) : (
           <ul className="divide-y divide-line border-y border-line">
@@ -55,12 +67,20 @@ export default async function BotsPage({ params }: { params: Promise<{ org: stri
                     <p className="text-[13px] text-text">@{agent.handle}</p>
                     <p className="text-[12px] text-muted">{agent.displayName}</p>
                     <p className="font-mono text-[11px] text-faint">
-                      {agent.webhookUrl ?? "no webhook url"}
+                      {agent.webhookUrl ?? "connects over MCP"}
                     </p>
                   </div>
                   <p className="mt-0.5 font-mono text-[11px] text-faint">
                     created {fullTime(agent.createdAt)}
                   </p>
+                  <details className="mt-2" open={!agent.webhookUrl && agentKeys.length === 0}>
+                    <summary className="cursor-pointer font-mono text-[11px] text-muted hover:text-text">
+                      connect from ChatGPT, Claude, Gemini or Cursor
+                    </summary>
+                    <div className="mt-2 max-w-2xl border-l border-line pl-3">
+                      <McpConnect endpoint={endpoint} token={null} handle={agent.handle} />
+                    </div>
+                  </details>
                   <details className="mt-2">
                     <summary className="cursor-pointer font-mono text-[11px] text-muted hover:text-text">
                       webhook secret
@@ -114,8 +134,13 @@ export default async function BotsPage({ params }: { params: Promise<{ org: stri
                       <summary className="cursor-pointer font-mono text-[11px] text-muted hover:text-text">
                         issue a key
                       </summary>
-                      <div className="mt-2 max-w-md border-l border-line pl-3">
-                        <IssueApiKey orgSlug={orgSlug} agentId={agent.id} />
+                      <div className="mt-2 max-w-2xl border-l border-line pl-3">
+                        <IssueApiKey
+                          orgSlug={orgSlug}
+                          agentId={agent.id}
+                          mcpEndpoint={endpoint}
+                          handle={agent.handle}
+                        />
                       </div>
                     </details>
                   </div>

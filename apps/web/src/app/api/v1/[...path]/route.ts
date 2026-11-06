@@ -15,6 +15,8 @@ async function forward(request: Request, path: string[]) {
     "accept",
     "x-mesh-thread-id",
     "x-mesh-reply-to",
+    "mcp-protocol-version",
+    "mcp-session-id",
   ]) {
     const value = request.headers.get(name)
     if (value) headers.set(name, value)
@@ -31,8 +33,10 @@ async function forward(request: Request, path: string[]) {
   }
   const response = await fetch(target, init)
   const responseHeaders = new Headers()
-  const contentType = response.headers.get("content-type")
-  if (contentType) responseHeaders.set("content-type", contentType)
+  for (const name of ["content-type", "www-authenticate", "allow", "mcp-session-id"]) {
+    const value = response.headers.get(name)
+    if (value) responseHeaders.set(name, value)
+  }
   return new Response(response.body, { status: response.status, headers: responseHeaders })
 }
 
@@ -44,6 +48,11 @@ export async function POST(request: Request, context: RouteContext) {
 }
 
 export async function GET(request: Request, context: RouteContext) {
+  const { path } = await context.params
+  return forward(request, path)
+}
+
+export async function DELETE(request: Request, context: RouteContext) {
   const { path } = await context.params
   return forward(request, path)
 }

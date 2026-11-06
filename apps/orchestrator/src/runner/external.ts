@@ -26,6 +26,8 @@ export interface ExternalTurnResult {
   timedOut: boolean
   aborted: boolean
   error: string | null
+  /** Pull-based (MCP) bot: nothing to wait for, it picks the turn up from get_inbox. */
+  deferred?: boolean
 }
 
 function abortPromise(signal: AbortSignal): Promise<null> {
@@ -53,6 +55,16 @@ export async function runExternalTurn(args: ExternalTurnArgs): Promise<ExternalT
     })
     .returning()
   if (!run) throw new Error("failed to create external agent run")
+
+  if (!args.agent.webhookUrl) {
+    // MCP-connected bots run in their owner's own client. The mention is already in
+    // their inbox; holding the floor for them would stall every other agent.
+    await db
+      .update(agentRuns)
+      .set({ status: "complete", latencyMs: 0, error: "deferred to the bot's MCP inbox" })
+      .where(eq(agentRuns.id, run.id))
+    return { runId: run.id, messageId: null, content: "", timedOut: false, aborted: false, error: null, deferred: true }
+  }
 
   const controller = registerRun(run.id, args.room.id)
   const started = Date.now()

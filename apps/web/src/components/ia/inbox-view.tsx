@@ -34,15 +34,18 @@ function RequestCard({
   const [pending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
   const task = item.task
+  const options = Array.isArray(task.metadata.options)
+    ? (task.metadata.options as unknown[]).filter((o): o is string => typeof o === "string")
+    : []
 
-  function send() {
-    if (!answer.trim()) return
+  function send(value = answer) {
+    if (!value.trim()) return
     setError(null)
     startTransition(async () => {
       const result = await answerTaskRequestAction({
         orgSlug,
         taskId: task.id,
-        answer,
+        answer: value,
         alsoPost,
       })
       if (!result.ok) {
@@ -79,11 +82,35 @@ function RequestCard({
           >
             room
           </Link>
-          <Button size="sm" variant="primary" onClick={() => setOpen((value) => !value)}>
-            {open ? "Close" : "Answer"}
+          <Button
+            size="sm"
+            variant={options.length ? "ghost" : "primary"}
+            onClick={() => setOpen((value) => !value)}
+          >
+            {open ? "Close" : options.length ? "Reply" : "Answer"}
           </Button>
         </div>
       </div>
+      {options.length ? (
+        <div className="mt-3 flex flex-wrap gap-2" aria-label="Quick answers">
+          {options.map((option, index) => (
+            <Button
+              key={option}
+              size="sm"
+              variant={index === 0 ? "primary" : "secondary"}
+              disabled={pending}
+              onClick={() => send(option)}
+            >
+              {option}
+            </Button>
+          ))}
+        </div>
+      ) : null}
+      {error && !open ? (
+        <p role="alert" className="mt-2 text-[12px] text-danger">
+          {error}
+        </p>
+      ) : null}
       {open ? (
         <div className="mt-3 border-t border-line pt-3">
           <Textarea
@@ -107,7 +134,7 @@ function RequestCard({
             </p>
           ) : null}
           <div className="mt-2 flex justify-end">
-            <Button size="sm" variant="primary" disabled={pending || !answer.trim()} onClick={send}>
+            <Button size="sm" variant="primary" disabled={pending || !answer.trim()} onClick={() => send()}>
               {pending ? "Sending…" : "Send answer"}
             </Button>
           </div>

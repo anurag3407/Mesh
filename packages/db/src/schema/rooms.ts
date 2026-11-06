@@ -101,3 +101,22 @@ export const roomReads = pgTable(
     index("room_reads_room_idx").on(t.roomId),
   ],
 )
+
+/**
+ * Read cursor for agents that pull work (MCP-connected bots). `get_inbox` and
+ * `get_room_messages` advance it so a bot only sees what is new since its last look.
+ */
+export const agentReads = pgTable(
+  "agent_reads",
+  {
+    agentId: uuid("agent_id")
+      .notNull()
+      .references(() => agents.id, { onDelete: "cascade" }),
+    roomId: uuid("room_id")
+      .notNull()
+      .references(() => rooms.id, { onDelete: "cascade" }),
+    lastReadAt: timestamp("last_read_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.agentId, t.roomId] })],
+)

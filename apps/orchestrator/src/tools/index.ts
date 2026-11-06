@@ -80,7 +80,12 @@ export async function buildTools(args: BuildToolsArgs): Promise<BuiltTools> {
     webSearchTool(),
     githubTool(args.orgId),
     postgresInspectorTool(args.orgId),
-    ...taskTools({ roomId: args.roomId, orgId: args.orgId, agentId: args.agent.id }),
+    ...taskTools({
+      roomId: args.roomId,
+      orgId: args.orgId,
+      agentId: args.agent.id,
+      handle: args.agent.handle,
+    }),
   ]
   const tools = toAuditedTools(specs, args.runtime)
 

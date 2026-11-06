@@ -2,7 +2,8 @@ import { destroyHocuspocus, createHocuspocus } from "./canvas/server"
 import { closeDb, getPool } from "./db"
 import { getEnv } from "./env"
 import { createApp } from "./http"
-import { startJobs, stopJobs } from "./jobs"
+import { enqueueRoomMessage, startJobs, stopJobs } from "./jobs"
+import { setCollabEnqueue } from "./collab"
 import { startMeetingScheduler, stopMeetingScheduler } from "./scheduler/meetings"
 import { startApprovalListener } from "./tools/approvals"
 import { startBotReplyListener } from "./bot-reply"
@@ -42,6 +43,7 @@ await control.query("LISTEN mesh_room_interrupt")
 await control.query("LISTEN mesh_stop_run")
 
 await startJobs()
+setCollabEnqueue(enqueueRoomMessage)
 startMeetingScheduler()
 
 const app = createApp()

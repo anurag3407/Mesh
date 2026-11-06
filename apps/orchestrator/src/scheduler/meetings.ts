@@ -10,6 +10,7 @@ import {
 import { and, desc, eq, gt, isNull, lte, or } from "drizzle-orm"
 import { getDb, getPool } from "../db"
 import { enqueueRoomMessage } from "../jobs"
+import { loadTaskContext } from "../runner/context"
 
 const SCHEDULER_LOCK = "mesh:meeting-scheduler"
 const SCAN_MS = 60_000
@@ -76,7 +77,11 @@ async function postMeetingPrompt(args: {
       ? `Check-in: ${args.title}.`
       : `Meeting started: ${args.title}.`
   const agenda = args.agenda.trim() ? `\n\nAgenda: ${args.agenda.trim()}` : ""
-  const content = `${lead}${agenda}\n\nAgents: report what you have done, what you are doing next, and anything you need from the humans.`
+  const board = await loadTaskContext(args.room.id).catch(() => "")
+  const boardSection = board
+    ? `\n\nOpen board:\n${board}\n\nUpdate the tasks you hold with update_task. If something is stuck, say who can unstick it. Claim unowned work that fits you with claim_task.`
+    : ""
+  const content = `${lead}${agenda}${boardSection}\n\nAgents: report what you have done, what you are doing next, and anything you need from the humans.`
   const [message] = await db
     .insert(messages)
     .values({

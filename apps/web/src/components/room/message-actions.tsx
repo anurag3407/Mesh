@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { useState, useTransition } from "react"
-import { retryMessageAction } from "@/lib/actions/messages"
+import { retryMessageAction, sendMessage } from "@/lib/actions/messages"
 import { Button } from "@/components/ui/button"
 import { recoveryHint } from "@/lib/recovery-hint"
 
@@ -60,6 +60,39 @@ export function FailureActions({
           {error}
         </span>
       ) : null}
+    </div>
+  )
+}
+
+/** One-click wake-up for a bot that went quiet on its turn. */
+export function PokeBotButton({
+  orgSlug,
+  roomId,
+  handle,
+  threadRootId,
+}: {
+  orgSlug: string
+  roomId: string
+  handle: string
+  threadRootId: string | null
+}) {
+  const [state, setState] = useState<"idle" | "sending" | "sent" | "failed">("idle")
+  async function poke() {
+    setState("sending")
+    const result = await sendMessage({
+      orgSlug,
+      roomId,
+      threadRootId,
+      content: `@${handle} are you still there? Pick up where you left off and post an update.`,
+    })
+    setState(result.ok ? "sent" : "failed")
+  }
+  return (
+    <div className="mt-2 flex items-center gap-2">
+      <Button size="sm" variant="outline" disabled={state === "sending" || state === "sent"} onClick={poke}>
+        {state === "sent" ? "Poked" : state === "sending" ? "Poking…" : `Poke @${handle}`}
+      </Button>
+      {state === "failed" ? <span className="text-[12px] text-danger">Could not send the poke</span> : null}
     </div>
   )
 }

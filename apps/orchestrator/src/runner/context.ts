@@ -204,22 +204,31 @@ export function renderTranscript(messages: ContextMessage[]): string {
 export async function loadTaskContext(roomId: string): Promise<string> {
   const rows = await getDb()
     .select({
+      id: tasks.id,
       number: tasks.number,
       title: tasks.title,
       status: tasks.status,
-      assigneeAgentId: tasks.assigneeAgentId,
       kind: tasks.kind,
+      assigneeHandle: agents.handle,
+      assigneeUserId: tasks.assigneeUserId,
     })
     .from(tasks)
+    .leftJoin(agents, eq(agents.id, tasks.assigneeAgentId))
     .where(and(eq(tasks.roomId, roomId), ne(tasks.status, "done")))
     .orderBy(desc(tasks.updatedAt))
-    .limit(12)
+    .limit(15)
   if (rows.length === 0) return ""
   return rows
-    .map(
-      (task) =>
-        `#${task.number} [${task.kind}] ${task.title} (${task.status}${task.assigneeAgentId ? ", assigned to an agent" : ""})`,
-    )
+    .map((task) => {
+      const owner = task.assigneeHandle
+        ? `held by @${task.assigneeHandle}`
+        : task.assigneeUserId
+          ? "held by a human"
+          : task.kind === "task"
+            ? "unclaimed"
+            : "waiting for a human"
+      return `MESH-${task.number} [${task.kind}] ${task.title} (${task.status}, ${owner}) id=${task.id}`
+    })
     .join("\n")
 }
 

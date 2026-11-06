@@ -5,7 +5,7 @@ import { CopyButton } from "@/components/copy-button"
 import { Markdown } from "@/components/markdown"
 import { InlineAlert } from "@/components/ui/empty"
 import { ReplyIcon } from "@/components/ui/icons"
-import { FailureActions } from "@/components/room/message-actions"
+import { FailureActions, PokeBotButton } from "@/components/room/message-actions"
 import { ToolCallsList } from "@/components/room/tool-call-card"
 import { clockTime, cn, fullTime } from "@/lib/format"
 import type { MessageView, ToolCallView } from "@/lib/types"
@@ -54,6 +54,15 @@ export function MessageItem({
         <div className="mt-1 text-[13px] leading-relaxed text-muted">
           <Markdown content={message.content} />
         </div>
+        {message.metadata.reason === "agent_quiet" &&
+        typeof message.metadata.quietAgentHandle === "string" ? (
+          <PokeBotButton
+            orgSlug={orgSlug}
+            roomId={message.roomId}
+            handle={message.metadata.quietAgentHandle}
+            threadRootId={message.threadRootId}
+          />
+        ) : null}
         {message.status === "halted" ? (
           <FailureActions
             orgSlug={orgSlug}
@@ -108,6 +117,14 @@ export function MessageItem({
           {isAgent && message.senderHandle ? (
             <span className="font-mono text-[11px] text-muted">@{message.senderHandle}</span>
           ) : null}
+          {typeof message.metadata.dmToHandle === "string" ? (
+            <span
+              className="font-mono text-[11px] text-accent"
+              title="A bot-to-bot direct message. Everyone in the room can read it."
+            >
+              → @{message.metadata.dmToHandle} · bot DM
+            </span>
+          ) : null}
           {inThread ? (
             <span className="font-mono text-[11px] text-faint">thread reply</span>
           ) : null}
@@ -147,6 +164,8 @@ export function MessageItem({
         ) : streaming ? (
           <p className="mt-1.5 font-mono text-[12px] text-faint">thinking…</p>
         ) : null}
+
+        {message.metadata.vote ? <VoteTally vote={message.metadata.vote as VoteMeta} /> : null}
 
         {error ? (
           <div className="mt-2">
@@ -196,5 +215,64 @@ export function MessageItem({
         ) : null}
       </div>
     </article>
+  )
+}
+
+interface VoteMeta {
+  question: string
+  options: string[]
+  ballots: Record<string, { option: string; reason: string; handle: string }>
+}
+
+/** Live tally for a vote an agent started. Ballots arrive as agents call cast_vote. */
+function VoteTally({ vote }: { vote: VoteMeta }) {
+  if (!Array.isArray(vote.options)) return null
+  const ballots = Object.values(vote.ballots ?? {})
+  const total = ballots.length
+  const counts = vote.options.map((option) => ({
+    option,
+    voters: ballots.filter((b) => b.option === option),
+  }))
+  const max = Math.max(0, ...counts.map((c) => c.voters.length))
+  return (
+    <div className="mt-2 space-y-1.5 border border-line bg-panel p-3" aria-label="Vote results">
+      <p className="font-mono text-[11px] text-faint">
+        {total} {total === 1 ? "vote" : "votes"}
+      </p>
+      {counts.map(({ option, voters }) => {
+        const pct = total ? Math.round((voters.length / total) * 100) : 0
+        const leading = max > 0 && voters.length === max
+        return (
+          <div key={option}>
+            <div className="flex items-baseline justify-between gap-2 text-[12px]">
+              <span className={leading ? "text-text" : "text-muted"}>{option}</span>
+              <span className="font-mono text-[11px] text-faint">
+                {voters.length} · {voters.map((v) => `@${v.handle}`).join(" ")}
+              </span>
+            </div>
+            <div className="mt-0.5 h-1 bg-raised">
+              <div
+                className={leading ? "h-1 bg-accent" : "h-1 bg-line-strong"}
+                style={{ width: `${pct}%` }}
+              />
+            </div>
+          </div>
+        )
+      })}
+      {ballots.some((b) => b.reason) ? (
+        <details>
+          <summary className="cursor-pointer font-mono text-[11px] text-muted">reasons</summary>
+          <ul className="mt-1 space-y-1 border-l border-line pl-3 text-[12px] text-muted">
+            {ballots
+              .filter((b) => b.reason)
+              .map((b) => (
+                <li key={b.handle}>
+                  @{b.handle} → {b.option}: {b.reason}
+                </li>
+              ))}
+          </ul>
+        </details>
+      ) : null}
+    </div>
   )
 }

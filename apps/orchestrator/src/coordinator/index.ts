@@ -111,6 +111,32 @@ async function postSystemMessage(args: {
   }
 }
 
+/** A bot went quiet: tell the room so the owner can poke it with one click. */
+async function postQuietBotNotice(args: {
+  roomId: string
+  threadRootId: string | null
+  agent: AgentRow
+}) {
+  const content = `@${args.agent.handle} didn't answer within 60 seconds, so the turn moved on.`
+  const [row] = await getDb()
+    .insert(messages)
+    .values({
+      roomId: args.roomId,
+      threadRootId: args.threadRootId,
+      senderType: "system",
+      senderId: null,
+      content,
+      status: "complete",
+      metadata: {
+        reason: "agent_quiet",
+        quietAgentId: args.agent.id,
+        quietAgentHandle: args.agent.handle,
+      },
+    })
+    .returning({ id: messages.id })
+  if (row) await broadcast(args.roomId, { type: "message.done", messageId: row.id, status: "complete" })
+}
+
 async function halt(
   sessionId: string,
   roomId: string,
@@ -314,14 +340,22 @@ export async function processRoomMessage(
   messageId: string,
   deps: CoordinatorDeps,
 ): Promise<void> {
-  await interruptRoom(roomId)
+  // Only a human message supersedes work in progress; a bot waking a teammate
+  // queues behind the current session instead of cancelling it.
+  const incoming = await loadMessage(messageId)
+  if (incoming?.senderType === "human") await interruptRoom(roomId)
 
   await withRoomLock(roomId, async () => {
     const db = getDb()
     const room = await loadRoom(roomId)
     if (!room) return
     const trigger = await loadMessage(messageId)
-    if (!trigger || trigger.roomId !== roomId || trigger.senderType !== "human") return
+    if (!trigger || trigger.roomId !== roomId) return
+    // Agents can start a session only by mentioning teammates outside their own turn
+    // (MCP bots, webhook bots posting later). collab/postAgentMessage sets the flag.
+    const agentTriggered =
+      trigger.senderType === "agent" && trigger.metadata?.agentTrigger === true && room.kind !== "dm"
+    if (trigger.senderType !== "human" && !agentTriggered) return
 
     const [session] = await db
       .insert(turnSessions)
@@ -351,7 +385,13 @@ export async function processRoomMessage(
     const dmAgent = room.kind === "dm" && room.agentDmAgentId
       ? roomAgentRows.find(({ agent }) => agent.id === room.agentDmAgentId)?.agent
       : undefined
-    let queue: PlannedTurn[] = dmAgent
+    let queue: PlannedTurn[] = agentTriggered
+      ? planMentionsTurn({
+          text: trigger.content,
+          roomAgents: agentRefs,
+          excludeAgentIds: trigger.senderId ? [trigger.senderId] : [],
+        })
+      : dmAgent
       ? [{ agentId: dmAgent.id, role: "responder" }]
       : room.turnMode === "mentions"
         ? planMentionsTurn({ text: trigger.content, roomAgents: agentRefs })
@@ -362,7 +402,8 @@ export async function processRoomMessage(
               text: trigger.content,
             })
           : planModeratedMentions({ text: trigger.content, roomAgents: agentRefs })
-    const explicitModeratedMentions = room.turnMode === "moderated" && queue.length > 0
+    const explicitModeratedMentions =
+      agentTriggered || (room.turnMode === "moderated" && queue.length > 0)
     let botTurnsUsed = 0
     let state: "active" | "complete" | "halted" | "superseded" = "active"
     let lastTrigger = trigger
@@ -433,6 +474,7 @@ export async function processRoomMessage(
         error: string | null
         aborted: boolean
         timedOut?: boolean
+        deferred?: boolean
       }
       try {
         if (agentRow.kind === "external") {
@@ -507,7 +549,15 @@ export async function processRoomMessage(
         break
       }
 
+      if (result.deferred) {
+        // Pull-based bots don't consume the room's bot-turn budget.
+        botTurnsUsed -= 1
+        await setSession(session.id, { botTurnsUsed, queue, state: "active" })
+        continue
+      }
+
       if (result.timedOut) {
+        await postQuietBotNotice({ roomId, threadRootId: trigger.threadRootId, agent: agentRow })
         continue
       }
 

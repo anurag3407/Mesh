@@ -1,4 +1,4 @@
-import { botMessageBodySchema, extractHandles, redactSecrets } from "@mesh/core"
+import { botMessageBodySchema, redactSecrets } from "@mesh/core"
 import { messages } from "@mesh/db"
 import { eq } from "drizzle-orm"
 import type { Context } from "hono"
@@ -8,6 +8,7 @@ import { notifyBotReply } from "../bot-reply"
 import { getDb } from "../db"
 import { broadcast } from "../realtime"
 import { loadMessage } from "../runner/context"
+import { CollabError, postAgentMessage } from "../collab"
 import { authenticateAgentKey, type BotIdentity } from "./auth"
 import { BotStreamParser } from "./stream-parser"
 
@@ -90,30 +91,16 @@ botRoutes.post("/v1/rooms/:roomId/messages", async (c) => {
   )
   if (!thread.ok) return c.json({ error: thread.error }, 400)
 
-  const redacted = redactSecrets(parsed.value.content).text
-  const [row] = await getDb()
-    .insert(messages)
-    .values({
-      roomId: room.roomId,
-      threadRootId: thread.threadRootId,
-      senderType: "agent",
-      senderId: identity.agentId,
-      content: redacted,
-      status: "complete",
-      mentions: extractHandles(parsed.value.content),
-      metadata: { external: true, agentHandle: identity.agent.handle },
-    })
-    .returning({ id: messages.id })
-  if (!row) return c.json({ error: "failed to store message" }, 500)
-
-  await notifyBotReply({
-    roomId: room.roomId,
-    agentId: identity.agentId,
-    threadRootId: thread.threadRootId,
-    messageId: row.id,
-  })
-  await broadcast(room.roomId, { type: "message.done", messageId: row.id, status: "complete" })
-  return c.json({ message_id: row.id }, 201)
+  try {
+    const posted = await postAgentMessage(
+      { agentId: identity.agentId, orgId: identity.orgId, handle: identity.agent.handle },
+      { roomId: room.roomId, content: parsed.value.content, threadRootId: thread.threadRootId },
+    )
+    return c.json(posted, 201)
+  } catch (error) {
+    if (error instanceof CollabError) return c.json({ error: error.message }, 400)
+    throw error
+  }
 })
 
 botRoutes.post("/v1/rooms/:roomId/messages/stream", async (c) => {
