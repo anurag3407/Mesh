@@ -2,58 +2,63 @@
 
 import { useState } from "react"
 import { cn } from "@/lib/format"
+import { Sparkles, ArrowRight, ArrowLeft } from "lucide-react"
 
 const steps = [
   {
     key: "signup",
-    label: "Sign up",
-    title: "One account, one code",
-    body: "A name, an email and a password. A six-digit code confirms the address before the workspace opens. Google is available when the deployment has it configured.",
+    label: "✨ 1. Sign up",
+    title: "One account, instant room entry",
+    body: "A name, an email and a password. A quick confirmation code opens your room. Google is available whenever configured.",
   },
   {
     key: "setup",
-    label: "Setup",
-    title: "Name the room, set its clock",
-    body: "Pick the room name and time zone, choose the morning and evening meeting windows, then add the agents who belong in it. Room instructions are shared with every agent.",
+    label: "⏰ 2. Room Clock",
+    title: "Name the room & set standup windows",
+    body: "Pick a friendly name and time zone. Configure morning and evening meeting windows. All agents share the same room instructions.",
   },
   {
     key: "chats",
-    label: "Chats",
-    title: "One feed, serialized turns",
-    body: "Tag an agent to give it the floor. Agents answer in order, can hand off to a teammate with @handle, and show their tool calls and approvals in the same feed.",
+    label: "💬 3. Turn Chats",
+    title: "Deterministic turns, zero crosstalk",
+    body: "Tag an agent with @handle to grant it the floor. Agents speak one at a time, hand off politely to peers, and request approval for big actions.",
   },
   {
     key: "meetings",
-    label: "Meetings",
-    title: "The room wakes on schedule",
-    body: "Morning and evening meetings start automatically. Check-ins run through the day, so agents report progress and blockers without a human prompting every one.",
+    label: "☕ 4. Standups",
+    title: "Rooms wake on schedule",
+    body: "Morning and evening standups kick off automatically. Periodic check-ins summarize progress without having to micromanage every step.",
   },
   {
     key: "tasks",
-    label: "Tasks",
-    title: "Requests are not lost in chat",
-    body: "A bot can leave a request in the Inbox or put a task on the board. Humans and agents share the same Open, In progress, Stuck and Done columns.",
+    label: "📋 5. Task Board",
+    title: "Requests stay tracked, not lost",
+    body: "Bots deposit needs in the shared Inbox or pin tasks to the board. Humans and agents share the same Open, In Progress, and Done columns.",
   },
   {
     key: "files",
-    label: "Files",
-    title: "The room's documents stay shared",
-    body: "Every canvas is a live document with version history. Agents write and patch the same text humans edit, and dangerous writes still wait for a human decision.",
+    label: "🎨 6. Living Canvas",
+    title: "Co-author documents in real-time",
+    body: "Every canvas is a live multiplayer document. Agents write copy and generate diagrams while you type, with full revision history.",
   },
 ] as const
 
 function Frame({ children, title }: { children: React.ReactNode; title: string }) {
   return (
-    <div className="overflow-hidden rounded-md border border-line bg-ink">
-      <div className="flex items-center justify-between border-b border-line bg-panel px-3 py-2">
-        <span className="font-mono text-[11px] text-faint">{title}</span>
-        <span className="flex gap-1" aria-hidden="true">
-          <span className="h-1.5 w-1.5 bg-line-strong" />
-          <span className="h-1.5 w-1.5 bg-line-strong" />
-          <span className="h-1.5 w-1.5 bg-accent" />
+    <div className="overflow-hidden rounded-2xl border border-line bg-ink shadow-lg">
+      <div className="flex items-center justify-between border-b border-line bg-panel/90 px-3.5 py-2.5">
+        <span className="font-mono text-[11px] font-medium text-faint flex items-center gap-1.5">
+          <span className="h-1.5 w-1.5 rounded-full bg-accent" />
+          {title}
+        </span>
+        {/* Cute pastel traffic lights */}
+        <span className="flex items-center gap-1.5" aria-hidden="true">
+          <span className="h-2 w-2 rounded-full bg-rose-400/80" />
+          <span className="h-2 w-2 rounded-full bg-amber-400/80" />
+          <span className="h-2 w-2 rounded-full bg-emerald-400/80" />
         </span>
       </div>
-      <div className="p-3 sm:p-4">{children}</div>
+      <div className="p-3.5 sm:p-5">{children}</div>
     </div>
   )
 }
@@ -61,28 +66,28 @@ function Frame({ children, title }: { children: React.ReactNode; title: string }
 function MockSignup() {
   return (
     <Frame title="create account">
-      <div className="mx-auto max-w-[260px] space-y-2">
-        <div className="h-8 rounded-sm border border-line bg-panel px-2 text-[12px] leading-8 text-faint">
-          your name
+      <div className="mx-auto max-w-[260px] space-y-2.5">
+        <div className="h-8 rounded-xl border border-line bg-panel px-3 text-[12px] leading-8 text-faint">
+          Sam Rivera 🧑‍💻
         </div>
-        <div className="h-8 rounded-sm border border-line bg-panel px-2 text-[12px] leading-8 text-faint">
-          you@company.com
+        <div className="h-8 rounded-xl border border-line bg-panel px-3 text-[12px] leading-8 text-faint">
+          sam@team.com
         </div>
-        <div className="h-8 rounded-sm border border-line bg-panel px-2 font-mono text-[12px] leading-8 text-faint">
-          ••••••••
+        <div className="h-8 rounded-xl border border-line bg-panel px-3 font-mono text-[12px] leading-8 text-faint">
+          ••••••••••••
         </div>
         <div className="flex gap-1.5">
           {Array.from({ length: 6 }).map((_, index) => (
             <span
               key={index}
-              className="grid h-8 flex-1 place-items-center rounded-sm border border-line bg-panel font-mono text-[12px] text-muted"
+              className="grid h-8 flex-1 place-items-center rounded-lg border border-line bg-panel font-mono text-[12px] text-accent font-semibold"
             >
               {index < 3 ? String(index + 4) : ""}
             </span>
           ))}
         </div>
-        <div className="h-8 rounded-sm bg-accent text-center font-mono text-[11px] leading-8 text-void">
-          verify and continue
+        <div className="h-8.5 rounded-full bg-accent text-center font-mono text-[11px] font-semibold leading-8 text-void shadow-md shadow-accent/20">
+          join room ✨
         </div>
       </div>
     </Frame>
@@ -97,25 +102,27 @@ function MockSetup() {
           {Array.from({ length: 7 }).map((_, index) => (
             <span
               key={index}
-              className={cn("h-1 flex-1", index < 3 ? "bg-accent" : "bg-line")}
+              className={cn("h-1.5 flex-1 rounded-full", index < 4 ? "bg-accent" : "bg-line")}
             />
           ))}
         </div>
-        <p className="font-mono text-[11px] text-faint">step 3 of 7</p>
-        <p className="text-[13px] text-text">Your room</p>
-        <div className="h-8 rounded-sm border border-line bg-panel px-2 text-[12px] leading-8 text-muted">
-          Juniper Flowers
+        <p className="font-mono text-[11px] text-accent">step 4 of 7 · room config</p>
+        <div className="h-8 rounded-xl border border-line bg-panel px-3 text-[12px] leading-8 text-text font-medium flex items-center justify-between">
+          <span>🌸 Juniper Workspace</span>
+          <span className="text-[10px] font-mono text-faint">UTC-7</span>
         </div>
         <div className="grid grid-cols-2 gap-2">
-          <div className="h-7 rounded-sm border border-line bg-panel px-2 text-[11px] leading-7 text-faint">
-            09:00 - 09:30
+          <div className="h-7.5 rounded-xl border border-line bg-panel px-2.5 text-[11px] leading-7 text-muted flex items-center gap-1.5">
+            <span>☕ 09:00</span>
+            <span className="text-faint text-[9px]">standup</span>
           </div>
-          <div className="h-7 rounded-sm border border-line bg-panel px-2 text-[11px] leading-7 text-faint">
-            17:00 - 17:30
+          <div className="h-7.5 rounded-xl border border-line bg-panel px-2.5 text-[11px] leading-7 text-muted flex items-center gap-1.5">
+            <span>🌆 17:00</span>
+            <span className="text-faint text-[9px]">recap</span>
           </div>
         </div>
-        <div className="h-8 rounded-sm bg-accent text-center font-mono text-[11px] leading-8 text-void">
-          continue
+        <div className="h-8.5 rounded-full bg-accent text-center font-mono text-[11px] font-semibold leading-8 text-void shadow-md shadow-accent/20">
+          save & open room
         </div>
       </div>
     </Frame>
@@ -124,31 +131,26 @@ function MockSetup() {
 
 function MockChats() {
   return (
-    <Frame title="group chat">
-      <div className="space-y-2">
-        <div className="rounded-sm border border-line bg-panel px-2 py-1.5">
-          <p className="font-mono text-[11px] text-accent">today&apos;s meeting · opens 17:00</p>
-          <p className="mt-0.5 text-[12px] text-muted">Share progress, blockers, next steps.</p>
+    <Frame title="serialized turns">
+      <div className="space-y-2.5">
+        <div className="rounded-xl border border-line bg-panel/80 px-3 py-2">
+          <p className="font-mono text-[11px] font-semibold text-accent">☕ standup in session</p>
+          <p className="mt-0.5 text-[12px] text-muted">Turn order: @ada ➔ @bolt ➔ you</p>
         </div>
         {[
-          ["@ada", "The migration is staged. I need a rollback check."],
-          ["@build", "Rollback is verified. Shipping after approval."],
-          ["you", "Approved. Ship it and post the result."],
-          ["@ada", "Shipped. The canary is clean."],
+          ["@ada", "Migration verified. Canary rollout is live!"],
+          ["@bolt", "Staging tests 100% green. Ready to push."],
+          ["you", "Approved! Ship it and ping the channel."],
         ].map(([who, text]) => (
-          <div key={text} className="flex gap-2">
-            <span className="mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-sm border border-line bg-panel font-mono text-[11px] text-muted">
-              {who === "you" ? "y" : "@"}
+          <div key={text} className="flex gap-2 items-start">
+            <span className="mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-lg border border-line bg-panel font-mono text-[11px] text-accent font-semibold">
+              {who === "you" ? "🧑" : "🤖"}
             </span>
-            <p className="text-[12px] leading-relaxed text-muted">
-              <span className="font-mono text-[11px] text-text">{who}</span> {text}
-            </p>
+            <div className="rounded-xl rounded-tl-sm border border-line/60 bg-panel/70 px-2.5 py-1.5 text-[12px] leading-relaxed text-muted">
+              <span className="font-mono font-semibold text-text text-[11px]">{who}</span> {text}
+            </div>
           </div>
         ))}
-        <div className="flex items-center gap-2 border-t border-line pt-2">
-          <span className="font-mono text-[11px] text-faint">@ message</span>
-          <span className="ml-auto h-5 w-5 rounded-sm bg-accent" aria-hidden="true" />
-        </div>
       </div>
     </Frame>
   )
@@ -156,58 +158,58 @@ function MockChats() {
 
 function MockMeetings() {
   return (
-    <Frame title="meetings">
+    <Frame title="room schedule">
       <div className="space-y-2">
-        <div className="flex items-baseline justify-between">
-          <p className="text-[12px] text-text">Today</p>
-          <span className="font-mono text-[11px] text-accent">live</span>
+        <div className="flex items-baseline justify-between px-1">
+          <p className="text-[12px] font-medium text-text">Today&apos;s Standups</p>
+          <span className="flex items-center gap-1 font-mono text-[11px] text-accent">
+            <span className="h-1.5 w-1.5 rounded-full bg-accent animate-ping" />
+            live
+          </span>
         </div>
         {[
-          ["Morning meeting", "09:00 - 09:30", "ended"],
-          ["Evening meeting", "17:00 - 17:30", "next"],
-          ["Check-ins", "every hour · 10 min", "on"],
+          ["Morning Standup", "09:00 - 09:30", "completed ✨"],
+          ["Evening Check-in", "17:00 - 17:30", "up next ⏳"],
+          ["Hourly Bot Sync", "every 60m", "active 🐾"],
         ].map(([title, time, status]) => (
           <div
             key={title}
-            className="flex items-center justify-between rounded-sm border border-line bg-panel px-2 py-1.5"
+            className="flex items-center justify-between rounded-xl border border-line bg-panel/80 px-3 py-2"
           >
             <div>
-              <p className="text-[12px] text-muted">{title}</p>
-              <p className="font-mono text-[11px] text-faint">{time}</p>
+              <p className="text-[12px] font-medium text-text">{title}</p>
+              <p className="font-mono text-[10px] text-faint">{time}</p>
             </div>
-            <span className="font-mono text-[11px] text-faint">{status}</span>
+            <span className="rounded-full border border-line bg-raised px-2 py-0.5 text-[10px] font-mono text-muted">
+              {status}
+            </span>
           </div>
         ))}
-        <div className="flex gap-2">
-          <span className="rounded-sm bg-accent px-2 py-1 font-mono text-[11px] text-void">
-            start now
-          </span>
-          <span className="rounded-sm border border-line px-2 py-1 font-mono text-[11px] text-muted">
-            wake bots
-          </span>
-        </div>
       </div>
     </Frame>
   )
 }
 
 function MockTasks() {
-  const columns = [
-    ["open", ["Verify the rollback", "#14"]],
-    ["in progress", ["Muse: draft the notice", "#15"]],
-    ["stuck", ["Waiting on a price", "#16"]],
-    ["done", ["Ship the canary", "#13"]],
+  const columns: [string, string[]][] = [
+    ["Open", ["API contract", "Design icons"]],
+    ["Active", ["Schema mig"]],
+    ["Stuck", ["OAuth key"]],
+    ["Done", ["Turn sync"]],
   ]
   return (
-    <Frame title="tasks">
+    <Frame title="shared board">
       <div className="grid grid-cols-4 gap-1.5">
         {columns.map(([label, cards]) => (
-          <div key={label as string} className="space-y-1.5">
-            <p className="font-mono text-[11px] text-faint">{label}</p>
-            {(cards as string[]).map((card) => (
-              <div key={card} className="rounded-sm border border-line bg-panel p-1.5">
-                <p className="text-[11px] leading-snug text-muted">{card}</p>
-                <p className="mt-1 font-mono text-[11px] text-faint">#</p>
+          <div key={label} className="space-y-1.5">
+            <p className="font-mono text-[10px] uppercase tracking-wider text-faint">{label}</p>
+            {cards.map((card) => (
+              <div key={card} className="rounded-xl border border-line bg-panel/80 p-2 shadow-sm">
+                <p className="text-[11px] font-medium leading-snug text-text">{card}</p>
+                <div className="mt-1 flex items-center justify-between">
+                  <span className="text-[9px] font-mono text-faint">#task</span>
+                  <span className="h-1.5 w-1.5 rounded-full bg-accent" />
+                </div>
               </div>
             ))}
           </div>
@@ -219,23 +221,24 @@ function MockTasks() {
 
 function MockFiles() {
   return (
-    <Frame title="files">
+    <Frame title="living canvas">
       <div className="space-y-2">
         {[
-          ["Room notes", "markdown · edited by @ada"],
-          ["Release checklist", "markdown · edited by you"],
-          ["Pricing model", "code · edited by @build"],
+          ["Room Canvas", "markdown · live with @ada & you"],
+          ["Architecture RFC", "diagram · updated 2m ago"],
         ].map(([title, meta]) => (
           <div
             key={title}
-            className="flex items-center justify-between rounded-sm border border-line bg-panel px-2 py-1.5"
+            className="flex items-center justify-between rounded-xl border border-line bg-panel/80 px-3 py-2"
           >
-            <p className="text-[12px] text-muted">{title}</p>
-            <p className="font-mono text-[11px] text-faint">{meta}</p>
+            <p className="text-[12px] font-medium text-text">{title}</p>
+            <p className="font-mono text-[10px] text-accent">{meta}</p>
           </div>
         ))}
-        <div className="rounded-sm border border-line bg-void p-2 font-mono text-[11px] leading-relaxed text-muted">
-          # Room notes{"\n"}freeze, verify, ship.
+        <div className="rounded-xl border border-line bg-void/90 p-2.5 font-mono text-[11px] leading-relaxed text-muted">
+          <p className="text-accent"># Roadmap</p>
+          <p className="text-text">1. deterministic turns [done]</p>
+          <p className="text-faint">2. living canvas sync [in progress...]</p>
         </div>
       </div>
     </Frame>
@@ -266,11 +269,12 @@ export function ProductTour() {
   }
 
   return (
-    <div className="rounded-md border border-line bg-panel">
+    <div className="overflow-hidden rounded-3xl border border-line bg-panel/80 shadow-xl backdrop-blur-xl">
+      {/* Step Tabs Pill Bar */}
       <div
         role="tablist"
         aria-label="Product tour"
-        className="flex flex-wrap gap-1 border-b border-line p-2"
+        className="flex flex-wrap gap-1.5 border-b border-line bg-ink/50 p-3"
         onKeyDown={onKeyDown}
       >
         {steps.map((item) => (
@@ -282,49 +286,60 @@ export function ProductTour() {
             aria-controls={`tour-${item.key}`}
             onClick={() => setActive(item.key)}
             className={cn(
-              "rounded-sm px-2.5 py-1.5 font-mono text-[12px] transition-colors",
+              "rounded-full px-3 py-1.5 font-mono text-[12px] transition-all",
               item.key === active
-                ? "bg-raised text-text"
-                : "text-faint hover:bg-raised hover:text-text",
+                ? "bg-accent font-semibold text-void shadow-md shadow-accent/20"
+                : "text-muted hover:bg-raised hover:text-text",
             )}
           >
             {item.label}
           </button>
         ))}
       </div>
+
       <div
         id={`tour-${active}`}
         role="tabpanel"
-        className="grid gap-6 p-5 sm:grid-cols-[1fr_320px] sm:p-6"
+        className="grid gap-8 p-6 sm:grid-cols-[1fr_340px] sm:p-8"
       >
-        <div className="self-center">
-          <p className="font-mono text-[11px] text-accent">
-            {String(index + 1).padStart(2, "0")} / {String(steps.length).padStart(2, "0")}
+        <div className="self-center space-y-4">
+          <div className="inline-flex items-center gap-1.5 rounded-full border border-accent/30 bg-accent/10 px-3 py-0.5 font-mono text-[11px] text-accent">
+            <Sparkles className="h-3 w-3" />
+            <span>Step {index + 1} of {steps.length}</span>
+          </div>
+          <h3 className="text-2xl font-bold tracking-tight text-text sm:text-3xl">
+            {step.title}
+          </h3>
+          <p className="max-w-[44ch] text-[14px] leading-relaxed text-muted">
+            {step.body}
           </p>
-          <h3 className="mt-2 text-xl font-medium tracking-[-0.01em]">{step.title}</h3>
-          <p className="mt-3 max-w-[42ch] text-[13px] leading-relaxed text-muted">{step.body}</p>
-          <div className="mt-5 flex gap-2">
+          <div className="flex items-center gap-3 pt-2">
             {index > 0 ? (
               <button
                 type="button"
                 onClick={() => setActive(steps[index - 1]!.key)}
-                className="rounded-sm border border-line px-2 py-1 font-mono text-[11px] text-muted hover:text-text"
+                className="flex items-center gap-1.5 rounded-full border border-line px-3.5 py-1.5 font-mono text-[11px] text-muted transition-colors hover:border-line-strong hover:text-text"
               >
-                back
+                <ArrowLeft className="h-3 w-3" />
+                <span>back</span>
               </button>
             ) : null}
             {index < steps.length - 1 ? (
               <button
                 type="button"
                 onClick={() => setActive(steps[index + 1]!.key)}
-                className="rounded-sm border border-line px-2 py-1 font-mono text-[11px] text-text hover:bg-raised"
+                className="flex items-center gap-1.5 rounded-full bg-accent px-4 py-1.5 font-mono text-[11px] font-semibold text-void shadow-md shadow-accent/20 transition-all hover:scale-105 hover:bg-accent-strong"
               >
-                next
+                <span>next stop</span>
+                <ArrowRight className="h-3 w-3" />
               </button>
             ) : null}
           </div>
         </div>
-        <Mock />
+
+        <div className="flex items-center justify-center">
+          <Mock />
+        </div>
       </div>
     </div>
   )

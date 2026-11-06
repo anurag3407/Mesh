@@ -265,7 +265,7 @@ export function AuthPanel({
   return (
     <div
       className={cn(
-        "w-full rounded-md border border-line bg-panel p-5 sm:p-6",
+        "w-full rounded-3xl border border-line/80 bg-panel/90 p-6 sm:p-7 shadow-2xl backdrop-blur-xl",
         compact ? "max-w-sm" : "max-w-[400px]",
       )}
     >
