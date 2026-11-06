@@ -19,8 +19,22 @@
   --color-ok: #8fbf9f;
   --color-warn: #e2b36b;
   --color-danger: #e37b74;
+
+  /* Agent identity hues. One per agent, used only to say "this is that agent":
+     avatars, turn chips, cursors, card tints. Never for status or CTAs. */
+  --color-ada: #ff7a45;
+  --color-pixel: #b6a4ff;
+  --color-bolt: #f2c65e;
+  --color-sage: #7fd3a8;
+  --color-blush: #ff8fa3;
+
+  /* Paper: the one inverted surface, for editorial breaks on public pages. */
+  --color-cream: #ece6d6;
+  --color-cream-deep: #e1d9c4;
+  --color-cream-ink: #11150f;
   --font-sans: "IBM Plex Sans Variable", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, monospace;
+  --font-serif: "Instrument Serif", ui-serif, Georgia, serif;
   --radius-sm: 6px;
   --radius-md: 10px;
   --radius-lg: 16px;
@@ -31,8 +45,13 @@
   color-scheme: dark;
 }
 
-* {
-  border-color: var(--color-line);
+/* Default border colour. Layered so border-* utilities can still override it. */
+@layer base {
+  *,
+  ::before,
+  ::after {
+    border-color: var(--color-line);
+  }
 }
 
 html,
@@ -268,75 +287,6 @@ dialog::backdrop {
 textarea::placeholder,
 input::placeholder {
   color: var(--color-faint);
-}
-
-/* ========================================================
-   CUTE GROKBOT-STYLE MASCOT & LANDING ANIMATIONS
-   ======================================================== */
-@keyframes bot-float {
-  0%, 100% {
-    transform: translateY(0px) rotate(0deg);
-  }
-  50% {
-    transform: translateY(-8px) rotate(0.8deg);
-  }
-}
-
-@keyframes bot-shadow {
-  0%, 100% {
-    transform: scale(1);
-    opacity: 0.5;
-  }
-  50% {
-    transform: scale(0.84);
-    opacity: 0.25;
-  }
-}
-
-@keyframes cute-pulse-glow {
-  0%, 100% {
-    opacity: 0.5;
-    transform: scale(1);
-  }
-  50% {
-    opacity: 0.85;
-    transform: scale(1.05);
-  }
-}
-
-@keyframes cute-wiggle {
-  0%, 100% { transform: rotate(0deg); }
-  25% { transform: rotate(-6deg); }
-  75% { transform: rotate(6deg); }
-}
-
-@keyframes cute-wave {
-  0%, 100% { transform: rotate(0deg); }
-  20% { transform: rotate(-20deg); }
-  40% { transform: rotate(16deg); }
-  60% { transform: rotate(-16deg); }
-  80% { transform: rotate(12deg); }
-}
-
-.animate-bot-float {
-  animation: bot-float 4.2s ease-in-out infinite;
-}
-
-.animate-bot-shadow {
-  animation: bot-shadow 4.2s ease-in-out infinite;
-}
-
-.animate-pulse-glow {
-  animation: cute-pulse-glow 3.5s ease-in-out infinite;
-}
-
-.animate-cute-wiggle {
-  animation: cute-wiggle 1.6s ease-in-out infinite;
-}
-
-.animate-cute-wave {
-  animation: cute-wave 2s ease-in-out infinite;
-  transform-origin: bottom center;
 }
 
 @media (prefers-reduced-motion: reduce) {
