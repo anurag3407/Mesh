@@ -1,5 +1,10 @@
 # Deployment
 
+> **Self-hosting on a VPS?** Use the Docker + nginx stack in [`deploy/`](../deploy/README.md):
+> one script hardens the server, one issues TLS, and `deploy/deploy.sh` builds, migrates and
+> rolls out with health checks and automatic rollback. The sections below still apply for
+> Supabase setup and for split hosting (Vercel + Fly.io).
+
 ## Topology
 
 ```

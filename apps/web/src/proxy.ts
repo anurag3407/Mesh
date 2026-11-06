@@ -14,6 +14,8 @@ const PUBLIC_PATHS = [
   "/auth",
   "/offline",
   "/api/v1",
+  // MCP connector short URL (/mcp/<agent key>). Authenticated by the key, not a session.
+  "/mcp",
 ]
 
 export async function proxy(request: NextRequest) {
@@ -38,6 +40,6 @@ export async function proxy(request: NextRequest) {
 
 export const config = {
   matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|icon.svg|manifest.webmanifest|sw.js|swe-worker|workbox).*)",
+    "/((?!api/health|_next/static|_next/image|favicon.ico|icon.svg|manifest.webmanifest|sw.js|swe-worker|workbox).*)",
   ],
 }

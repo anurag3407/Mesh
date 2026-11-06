@@ -17,3 +17,9 @@ __pycache__
 *.pyc
 .venv
 .e2e-state.json
+
+# Production deploy state (secrets, certificates, release history)
+deploy/.env.production
+deploy/certbot/
+deploy/.releases
+deploy/.deploy.lock

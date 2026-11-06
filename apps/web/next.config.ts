@@ -1,5 +1,6 @@
 import withSerwistInit from "@serwist/next"
 import type { NextConfig } from "next"
+import { fileURLToPath } from "node:url"
 
 const withSerwist = withSerwistInit({
   swSrc: "src/sw.ts",
@@ -16,7 +17,17 @@ const withSerwist = withSerwistInit({
   })),
 })
 
+// Docker builds set NEXT_OUTPUT=standalone to get a self-contained server bundle.
+// Tracing from the monorepo root pulls in packages/* that the app imports as source.
+const standalone = process.env.NEXT_OUTPUT === "standalone"
+
 const nextConfig: NextConfig = {
+  ...(standalone
+    ? {
+        output: "standalone" as const,
+        outputFileTracingRoot: fileURLToPath(new URL("../../", import.meta.url)),
+      }
+    : {}),
   transpilePackages: ["@mesh/core", "@mesh/db", "@mesh/llm"],
   serverExternalPackages: ["pg", "pg-boss", "@e2b/code-interpreter"],
   poweredByHeader: false,

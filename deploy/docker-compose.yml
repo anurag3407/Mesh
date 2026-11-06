@@ -1,0 +1,149 @@
+# Mesh production stack for a single VPS.
+#
+#   internet ─▶ nginx :80/:443 ─┬─▶ web :3000            (pages, server actions, /api/v1 bot+MCP proxy)
+#                               └─▶ orchestrator :4000   (/collab canvas WebSocket only)
+#   web ─▶ orchestrator (internal HTTP)     both ─▶ Supabase (Postgres, Auth, Realtime)
+#
+# Only nginx publishes ports. Run through deploy/deploy.sh, which passes
+#   --env-file deploy/.env.production -f deploy/docker-compose.yml
+
+name: mesh
+
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "20m"
+    max-file: "5"
+
+x-hardening: &hardening
+  init: true
+  restart: unless-stopped
+  security_opt:
+    - no-new-privileges:true
+  cap_drop:
+    - ALL
+  logging: *logging
+  networks:
+    - mesh
+
+x-orchestrator-image: &orchestrator-image
+  image: ${MESH_IMAGE_PREFIX:-mesh}/orchestrator:${MESH_TAG:-latest}
+
+services:
+  web:
+    <<: *hardening
+    image: ${MESH_IMAGE_PREFIX:-mesh}/web:${MESH_TAG:-latest}
+    build:
+      context: ..
+      dockerfile: deploy/docker/web.Dockerfile
+      args:
+        NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL:?set NEXT_PUBLIC_SUPABASE_URL}
+        NEXT_PUBLIC_SUPABASE_ANON_KEY: ${NEXT_PUBLIC_SUPABASE_ANON_KEY:?set NEXT_PUBLIC_SUPABASE_ANON_KEY}
+        NEXT_PUBLIC_SITE_URL: https://${MESH_DOMAIN:?set MESH_DOMAIN}
+        NEXT_PUBLIC_COLLAB_URL: wss://${MESH_DOMAIN}/collab
+        NEXT_PUBLIC_VAPID_PUBLIC_KEY: ${NEXT_PUBLIC_VAPID_PUBLIC_KEY:-}
+        NEXT_PUBLIC_GITHUB_AUTH_ENABLED: ${NEXT_PUBLIC_GITHUB_AUTH_ENABLED:-false}
+        NEXT_PUBLIC_GOOGLE_AUTH_ENABLED: ${NEXT_PUBLIC_GOOGLE_AUTH_ENABLED:-false}
+        NEXT_PUBLIC_SSO_ENABLED: ${NEXT_PUBLIC_SSO_ENABLED:-false}
+        GIT_COMMIT_SHA: ${MESH_TAG:-unknown}
+    env_file: .env.production
+    environment:
+      NODE_ENV: production
+      # Derived from MESH_DOMAIN so the browser, auth redirects and canvas agree.
+      NEXT_PUBLIC_SITE_URL: https://${MESH_DOMAIN}
+      NEXT_PUBLIC_COLLAB_URL: wss://${MESH_DOMAIN}/collab
+      ORCHESTRATOR_URL: http://orchestrator:4000
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /app/apps/web/.next/cache:uid=1000,gid=1000
+    depends_on:
+      orchestrator:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          memory: ${MESH_WEB_MEMORY:-1g}
+    stop_grace_period: 20s
+
+  orchestrator:
+    <<: [*hardening, *orchestrator-image]
+    build:
+      context: ..
+      dockerfile: deploy/docker/orchestrator.Dockerfile
+      args:
+        GIT_COMMIT_SHA: ${MESH_TAG:-unknown}
+    env_file: .env.production
+    environment:
+      NODE_ENV: production
+      PORT: "4000"
+      SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL}
+      # Webhooks to private networks are a dev-only escape hatch.
+      MESH_ALLOW_PRIVATE_WEBHOOKS: "false"
+    read_only: true
+    tmpfs:
+      - /tmp
+    deploy:
+      resources:
+        limits:
+          memory: ${MESH_ORCHESTRATOR_MEMORY:-1g}
+    # Gives pg-boss and Hocuspocus time to finish jobs and flush canvases on SIGTERM.
+    stop_grace_period: 30s
+
+  # One-off tasks: `deploy.sh migrate` / `deploy.sh seed`. Never started by `up`.
+  migrate:
+    <<: [*hardening, *orchestrator-image]
+    profiles: ["tools"]
+    restart: "no"
+    env_file: .env.production
+    working_dir: /app/packages/db
+    command: ["node", "--import", "tsx", "src/migrate.ts"]
+    read_only: true
+    tmpfs:
+      - /tmp
+
+  nginx:
+    image: nginx:${NGINX_VERSION:-1.28-alpine}
+    restart: unless-stopped
+    logging: *logging
+    networks:
+      - mesh
+    security_opt:
+      - no-new-privileges:true
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      MESH_DOMAIN: ${MESH_DOMAIN}
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/templates:/etc/nginx/templates:ro
+      - ./nginx/snippets:/etc/nginx/snippets:ro
+      - ./certbot/conf:/etc/letsencrypt:ro
+      - ./certbot/www:/var/www/certbot:ro
+    depends_on:
+      web:
+        condition: service_healthy
+    # Reload every 6h so renewed certificates are picked up without downtime.
+    command: ["/bin/sh", "-c", "while :; do sleep 6h & wait $${!}; nginx -s reload; done & exec nginx -g 'daemon off;'"]
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null --no-check-certificate https://127.0.0.1/api/health --header=\"Host: $${MESH_DOMAIN}\" || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+  certbot:
+    image: certbot/certbot:${CERTBOT_VERSION:-v4.1.1}
+    restart: unless-stopped
+    logging: *logging
+    networks:
+      - mesh
+    volumes:
+      - ./certbot/conf:/etc/letsencrypt
+      - ./certbot/www:/var/www/certbot
+    entrypoint: ["/bin/sh", "-c", "trap exit TERM; while :; do certbot renew --webroot -w /var/www/certbot --quiet; sleep 12h & wait $${!}; done"]
+
+networks:
+  mesh:
+    driver: bridge

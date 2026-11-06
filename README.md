@@ -126,7 +126,8 @@ pnpm e2e             # Playwright, needs E2E_* env and two test accounts
 
 ## Deployment
 
-See [docs/deployment.md](docs/deployment.md).
+VPS (Docker + nginx + Let's Encrypt): see [deploy/README.md](deploy/README.md).
+Other hosts and Supabase setup: see [docs/deployment.md](docs/deployment.md).
 
 ## Choices that differ from the plan
 

@@ -1,0 +1,25 @@
+# Keep the build context small and free of secrets.
+**/node_modules
+**/.next
+**/.turbo
+**/dist
+**/coverage
+**/*.tsbuildinfo
+.git
+.github
+.env
+.env.*
+!.env.example
+deploy/.env*
+deploy/certbot
+deploy/backups
+e2e
+playwright-report
+test-results
+examples
+docs
+plan.md
+**/.DS_Store
+apps/web/public/sw.js
+apps/web/public/sw.js.map
+apps/web/public/swe-worker*.js
