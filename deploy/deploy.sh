@@ -34,7 +34,7 @@ die()  { printf '%s[deploy]%s %s\n' "$c_red" "$c_off" "$*" >&2; exit 1; }
 compose() { MESH_TAG="${MESH_TAG:-latest}" docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" "$@"; }
 
 env_value() {
-  grep -E "^$1=" "$ENV_FILE" 2>/dev/null | tail -n1 | cut -d= -f2- | sed -e 's/^"//' -e 's/"$//' -e "s/^'//" -e "s/'$//"
+  (grep -E "^$1=" "$ENV_FILE" 2>/dev/null || true) | tail -n1 | cut -d= -f2- | sed -e 's/^"//' -e 's/"$//' -e "s/^'//" -e "s/'$//"
 }
 
 # ── preflight ────────────────────────────────────────────────────────────
@@ -139,7 +139,7 @@ public_check() {
   local url="https://$DOMAIN/api/health"
   for _ in $(seq 1 10); do
     # --resolve pins the request to this host, so the check does not depend on DNS/CDN.
-    if curl -fsS --max-time 5 --resolve "$DOMAIN:443:127.0.0.1" "$url" >/dev/null 2>&1; then
+    if curl -fsSk --max-time 5 --resolve "$DOMAIN:443:127.0.0.1" "$url" >/dev/null 2>&1; then
       ok "$url responds"
       return 0
     fi

@@ -1,0 +1,48 @@
+name: Deploy to Lightsail
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-lightsail
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Build & Deploy on Lightsail
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Build & Rollout on Lightsail VPS
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.LIGHTSAIL_HOST }}
+          username: ${{ secrets.LIGHTSAIL_USER }}
+          key: ${{ secrets.LIGHTSAIL_SSH_KEY }}
+          port: ${{ secrets.LIGHTSAIL_PORT }}
+          timeout: 900s
+          command_timeout: 900s
+          script_stop: true
+          script: |
+            set -e
+            echo "==> Starting deploy on Lightsail VPS ($(uname -n))..."
+            
+            if [ ! -d "$HOME/mesh" ]; then
+              echo "==> Cloning repository into $HOME/mesh..."
+              git clone https://github.com/anurag3407/Mesh.git "$HOME/mesh"
+            fi
+            
+            cd "$HOME/mesh"
+            echo "==> Fetching latest changes from origin/main..."
+            git fetch origin main
+            git reset --hard origin/main
+            
+            echo "==> Checking required deploy files..."
+            if [ ! -f "deploy/.env.production" ]; then
+              echo "ERROR: deploy/.env.production is missing on the server!" >&2
+              exit 1
+            fi
+            
+            echo "==> Running VPS build, migrations & health rollout..."
+            ./deploy/deploy.sh
