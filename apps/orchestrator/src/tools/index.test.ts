@@ -116,6 +116,7 @@ describe("buildTools capability filtering", () => {
           mcp: false,
           computer: false,
           secrets: false,
+          memory: false,
         },
       } as unknown as typeof agents.$inferSelect,
       runtime: dummyRuntime,
@@ -151,6 +152,15 @@ describe("buildTools capability filtering", () => {
     const toolNames = Object.keys(result.tools)
     expect(toolNames).not.toContain("code_sandbox")
     expect(toolNames).toContain("computer_shell")
+    expect(toolNames).toContain("fs_read")
+    expect(toolNames).toContain("fs_edit")
+    expect(toolNames).toContain("fs_write")
+    expect(toolNames).toContain("fs_glob")
+    expect(toolNames).toContain("fs_grep")
+    expect(toolNames).toContain("git_status")
+    expect(toolNames).toContain("git_diff")
+    expect(toolNames).toContain("git_commit")
+    expect(toolNames).toContain("git_push")
     expect(toolNames).toContain("computer_read_file")
     expect(toolNames).toContain("computer_write_file")
     expect(toolNames).toContain("computer_list")

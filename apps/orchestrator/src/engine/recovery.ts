@@ -1,0 +1,186 @@
+export type EngineErrorCategory =
+  | "rate_limit"
+  | "server_error"
+  | "network"
+  | "context_overflow"
+  | "quota_exhausted"
+  | "auth_error"
+  | "refusal"
+  | "unknown"
+
+export interface EngineErrorClassification {
+  category: EngineErrorCategory
+  retryable: boolean
+  retryAfterMs?: number
+  resetTime?: Date
+  message: string
+}
+
+/**
+ * Classifies runtime errors from model providers into structured engine actions:
+ * - 429 / rate_limit -> retryable with backoff & retry-after
+ * - 5xx / network -> retryable with jittered backoff
+ * - context overflow -> compaction trigger
+ * - quota exhausted -> park or switch to fallback model
+ * - auth error -> park with re-enter key alert
+ * - refusal -> surface or switch to fallback model
+ */
+export function classifyEngineError(error: unknown): EngineErrorClassification {
+  const msg = error instanceof Error ? error.message : String(error)
+  const lower = msg.toLowerCase()
+
+  // 1. Context Overflow
+  if (
+    lower.includes("context_length_exceeded") ||
+    lower.includes("maximum context length") ||
+    lower.includes("prompt is too long") ||
+    lower.includes("too many tokens")
+  ) {
+    return {
+      category: "context_overflow",
+      retryable: false,
+      message: "Context window exceeded",
+    }
+  }
+
+  // 2. Auth Errors
+  if (
+    lower.includes("invalid api key") ||
+    lower.includes("authentication error") ||
+    lower.includes("unauthorized") ||
+    lower.includes("401") ||
+    lower.includes("forbidden") ||
+    lower.includes("403")
+  ) {
+    return {
+      category: "auth_error",
+      retryable: false,
+      message: "Authentication failed. Check API key credentials.",
+    }
+  }
+
+  // 3. Quota Exhaustion
+  if (
+    lower.includes("insufficient_quota") ||
+    lower.includes("quota exceeded") ||
+    lower.includes("credit balance is too low") ||
+    lower.includes("billing account")
+  ) {
+    return {
+      category: "quota_exhausted",
+      retryable: false,
+      message: "Provider quota or credit balance exhausted.",
+    }
+  }
+
+  // 4. Rate Limits (429)
+  if (lower.includes("rate_limit") || lower.includes("rate limit") || lower.includes("429")) {
+    let retryAfterMs: number | undefined
+    const matchSeconds = lower.match(/retry (?:after|in) (\d+(?:\.\d+)?) ?(?:s|sec|seconds)?/)
+    if (matchSeconds && matchSeconds[1]) {
+      retryAfterMs = Math.round(parseFloat(matchSeconds[1]) * 1000)
+    }
+
+    return {
+      category: "rate_limit",
+      retryable: true,
+      retryAfterMs,
+      message: "Rate limit exceeded. Waiting before retry.",
+    }
+  }
+
+  // 5. Server Errors (5xx)
+  if (
+    lower.includes("500") ||
+    lower.includes("502") ||
+    lower.includes("503") ||
+    lower.includes("504") ||
+    lower.includes("internal server error") ||
+    lower.includes("overloaded") ||
+    lower.includes("bad gateway")
+  ) {
+    return {
+      category: "server_error",
+      retryable: true,
+      message: "Model provider server error. Retrying with backoff.",
+    }
+  }
+
+  // 6. Network Errors
+  if (
+    lower.includes("econnreset") ||
+    lower.includes("econnrefused") ||
+    lower.includes("etimedout") ||
+    lower.includes("fetch failed") ||
+    lower.includes("network error")
+  ) {
+    return {
+      category: "network",
+      retryable: true,
+      message: "Network connection error. Retrying with backoff.",
+    }
+  }
+
+  // 7. Refusals
+  if (lower.includes("refused to respond") || lower.includes("content policy") || lower.includes("safety check")) {
+    return {
+      category: "refusal",
+      retryable: false,
+      message: "Model refused the request.",
+    }
+  }
+
+  return {
+    category: "unknown",
+    retryable: false,
+    message: msg,
+  }
+}
+
+export interface RetryOptions {
+  maxRetries?: number
+  baseDelayMs?: number
+  maxDelayMs?: number
+  onRetry?: (attempt: number, delayMs: number, classification: EngineErrorClassification) => void
+  sleepFn?: (ms: number) => Promise<void>
+}
+
+/**
+ * Executes an operation with exponential backoff and jitter for retryable errors (429, 5xx, network).
+ */
+export async function executeWithRecovery<T>(
+  fn: () => Promise<T>,
+  options: RetryOptions = {},
+): Promise<T> {
+  const maxRetries = options.maxRetries ?? 5
+  const baseDelayMs = options.baseDelayMs ?? 1000
+  const maxDelayMs = options.maxDelayMs ?? 30_000
+  const sleep = options.sleepFn ?? ((ms: number) => new Promise((resolve) => setTimeout(resolve, ms)))
+
+  let attempt = 0
+
+  while (true) {
+    try {
+      return await fn()
+    } catch (error) {
+      const classification = classifyEngineError(error)
+      if (!classification.retryable || attempt >= maxRetries) {
+        throw error
+      }
+
+      attempt++
+      let delayMs = classification.retryAfterMs
+      if (!delayMs) {
+        const exp = Math.min(maxDelayMs, baseDelayMs * Math.pow(2, attempt - 1))
+        const jitter = Math.random() * 0.3 * exp
+        delayMs = Math.round(exp + jitter)
+      }
+
+      if (options.onRetry) {
+        options.onRetry(attempt, delayMs, classification)
+      }
+
+      await sleep(delayMs)
+    }
+  }
+}

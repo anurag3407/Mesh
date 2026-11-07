@@ -63,6 +63,8 @@ const CAPABILITY_DESCRIPTIONS: Record<keyof AgentCapabilities, { label: string; 
   mcp: { label: "MCP Tools", desc: "Access room-level Model Context Protocol servers" },
   computer: { label: "Persistent Computer", desc: "Dedicated Linux container with persistent disk" },
   secrets: { label: "Secret Broker", desc: "Safely inject authorized API tokens into outbound HTTPS requests" },
+  memory: { label: "Durable Memory", desc: "Store and recall facts, preferences, and decisions across turns" },
+  subagents: { label: "Spawn Subagents", desc: "Spawn parallel child subagents for focused reading and research tasks" },
 }
 
 export function BotWizard({ orgSlug, templates, providerKeys, rooms, vaultSecrets }: Props) {

@@ -39,11 +39,83 @@ export interface TurnResult {
   aborted: boolean
 }
 
-interface ResolvedModel {
+export interface ResolvedModel {
   model: LanguageModel
   provider: string
   modelName: string
   apiKey?: string
+}
+
+export function getCheapModelName(provider: string, customCheap?: string): string {
+  if (customCheap) return customCheap
+  switch (provider) {
+    case "anthropic":
+      return "claude-3-5-haiku-latest"
+    case "openai":
+      return "gpt-4o-mini"
+    case "google":
+      return "gemini-2.0-flash"
+    case "deepseek":
+      return "deepseek-chat"
+    case "openrouter":
+      return "openai/gpt-4o-mini"
+    default:
+      return "gpt-4o-mini"
+  }
+}
+
+export async function resolveAgentCheapModel(agent: AgentRow): Promise<ResolvedModel> {
+  const customCheap = (agent.params as Record<string, unknown> | null)?.cheapModel as string | undefined
+  const db = getDb()
+  if (agent.providerKeyId) {
+    const [key] = await db
+      .select()
+      .from(providerKeys)
+      .where(eq(providerKeys.id, agent.providerKeyId))
+      .limit(1)
+    if (key) {
+      const apiKey = providerKeyToApiKey(key, getEnv().MESH_KEK)
+      const cheapModelName = getCheapModelName(key.provider, customCheap)
+      return {
+        model: createLanguageModel({
+          provider: key.provider,
+          apiKey,
+          model: cheapModelName,
+          baseUrl: key.baseUrl,
+        }),
+        provider: key.provider,
+        modelName: cheapModelName,
+        apiKey,
+      }
+    }
+  }
+  const dev = devModelConfig()
+  if (dev) {
+    const cheapModelName = getCheapModelName(dev.provider, customCheap)
+    return {
+      model: createLanguageModel({ ...dev, model: cheapModelName }),
+      provider: dev.provider,
+      modelName: cheapModelName,
+    }
+  }
+  return resolveAgentModel(agent)
+}
+
+export function resolveEffortLevel(params: {
+  configuredEffort?: string
+  hasTask: boolean
+  isSubagent?: boolean
+}): "low" | "medium" | "high" | "max" | undefined {
+  const eff = params.configuredEffort ?? "auto"
+  if (eff === "low" || eff === "medium" || eff === "high" || eff === "max") {
+    return eff
+  }
+  if (eff === "auto") {
+    if (params.isSubagent) return "low"
+    if (params.hasTask) return "high"
+    return "low"
+  }
+  return undefined
 }
 
 export async function resolveAgentModel(agent: AgentRow): Promise<ResolvedModel> {
@@ -177,6 +249,8 @@ export async function runLlmTurn(args: RunLlmTurnArgs): Promise<TurnResult> {
   let latencyMs = 0
   let error: string | null = null
   let aborted = false
+  let finishReason: string | null = null
+  let steps = 1
   const startedAt = Date.now()
 
   const finalize = async () => {
@@ -230,6 +304,9 @@ export async function runLlmTurn(args: RunLlmTurnArgs): Promise<TurnResult> {
       .update(agentRuns)
       .set({
         status: aborted ? "halted" : error ? "error" : "complete",
+        finishReason: aborted ? "abort" : error ? "error" : (finishReason ?? "stop"),
+        steps,
+        engine: typeof (agent.params as any)?.engine === "string" ? (agent.params as any).engine : "v1",
         inputTokens: usage?.inputTokens ?? null,
         outputTokens: usage?.outputTokens ?? null,
         costUsd: cost,
@@ -301,7 +378,7 @@ export async function runLlmTurn(args: RunLlmTurnArgs): Promise<TurnResult> {
           lastPersist = now
           await getDb()
             .update(messages)
-            .set({ content: redactSecrets(fullRaw).text })
+            .set({ content: redactSecrets(runScrubber(fullRaw)).text })
             .where(eq(messages.id, message.id))
             .catch((persistError) => console.error("[runner] partial persist failed", persistError))
         }
@@ -312,6 +389,8 @@ export async function runLlmTurn(args: RunLlmTurnArgs): Promise<TurnResult> {
     latencyMs = result.latencyMs
     aborted = result.aborted
     error = result.error
+    finishReason = result.finishReason
+    steps = result.steps
   } catch (streamError) {
     aborted = controller.signal.aborted
     error = aborted

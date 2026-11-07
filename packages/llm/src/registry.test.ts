@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest"
-import { MissingModelConfigError, createLanguageModel, devModelConfig } from "./registry"
+import {
+  MissingModelConfigError,
+  createLanguageModel,
+  devModelConfig,
+  getProviderCapabilities,
+  buildProviderOptions,
+} from "./registry"
 
 function modelIdOf(model: ReturnType<typeof createLanguageModel>): string {
   return typeof model === "string" ? model : model.modelId
@@ -50,6 +56,46 @@ describe("devModelConfig", () => {
       baseUrl: "http://localhost:11434/v1",
       apiKey: "dev",
       model: "llama3.1",
+    })
+  })
+})
+
+describe("getProviderCapabilities & buildProviderOptions", () => {
+  it("returns correct capabilities for Anthropic", () => {
+    const caps = getProviderCapabilities("anthropic")
+    expect(caps.supportsPromptCache).toBe(true)
+    expect(caps.supportsContextEditing).toBe(true)
+    expect(caps.supportsEffort).toBe(true)
+    expect(caps.supportsComputerUse).toBe(true)
+    expect(caps.defaultContextWindow).toBe(200_000)
+  })
+
+  it("returns correct capabilities for OpenAI", () => {
+    const caps = getProviderCapabilities("openai")
+    expect(caps.supportsPromptCache).toBe(true)
+    expect(caps.supportsEffort).toBe(true)
+    expect(caps.defaultContextWindow).toBe(128_000)
+  })
+
+  it("builds provider options for Anthropic with cacheBreakpoint and effort", () => {
+    const opts = buildProviderOptions({
+      provider: "anthropic",
+      cacheBreakpoint: true,
+      effort: "high",
+    })
+    expect(opts.anthropic).toEqual({
+      cacheControl: { type: "ephemeral" },
+      thinking: { type: "enabled", budgetTokens: 4096 },
+    })
+  })
+
+  it("builds provider options for OpenAI reasoning effort", () => {
+    const opts = buildProviderOptions({
+      provider: "openai",
+      effort: "medium",
+    })
+    expect(opts.openai).toEqual({
+      reasoningEffort: "medium",
     })
   })
 })

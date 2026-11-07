@@ -105,7 +105,16 @@ export default async function AgentProfilePage({
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="p-4 rounded-xl border border-border bg-card space-y-2">
             <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Model & Runtime</h3>
-            <div className="text-sm font-medium">{agent.model || "Default Model"}</div>
+            <div className="flex items-center justify-between text-sm font-medium">
+              <span>{agent.model || "Default Model"}</span>
+              <span className="font-mono text-xs text-muted-foreground">
+                Engine: {(agent.params as any)?.engine || "v1"}
+              </span>
+            </div>
+            <div className="flex items-center justify-between text-xs font-mono text-muted-foreground">
+              <span>Max Steps: {(agent.params as any)?.maxSteps ?? 6}</span>
+              <span>Temp: {(agent.params as any)?.temperature ?? "default"}</span>
+            </div>
             {agent.system_prompt && (
               <div className="mt-2 text-xs text-muted-foreground bg-muted/40 p-2.5 rounded-lg line-clamp-4 font-mono">
                 {agent.system_prompt}

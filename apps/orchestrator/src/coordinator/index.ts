@@ -44,6 +44,7 @@ import {
   type RoomAgentRow,
   type RoomRow,
 } from "../runner/context"
+import { startAgentTurn } from "../engine"
 import { resolveAgentModel, runLlmTurn } from "../runner/llm"
 import { interruptRoom } from "./interrupt"
 
@@ -355,7 +356,7 @@ export async function processRoomMessage(
   // Only a human message supersedes work in progress; a bot waking a teammate
   // queues behind the current session instead of cancelling it.
   const incoming = await loadMessage(messageId)
-  if (incoming?.senderType === "human") await interruptRoom(roomId)
+  if (incoming?.senderType === "human") await interruptRoom(roomId, incoming)
 
   await withRoomLock(roomId, async () => {
     const db = getDb()
@@ -535,7 +536,7 @@ export async function processRoomMessage(
             enqueueWebhook: deps.enqueueWebhook,
           })
         } else {
-          result = await runLlmTurn({
+          result = await startAgentTurn({
             room,
             agent: agentRow,
             sessionId: session.id,

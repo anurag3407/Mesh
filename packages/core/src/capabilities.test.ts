@@ -17,6 +17,8 @@ describe("capabilities", () => {
       mcp: true,
       computer: false,
       secrets: false,
+      memory: true,
+      subagents: true,
     })
   })
 
@@ -45,6 +47,8 @@ describe("capabilities", () => {
       mcp: true,
       computer: { profile: "browser" },
       secrets: true,
+      memory: true,
+      subagents: true,
     })
     expect((parsed as unknown as Record<string, unknown>).unknownKey).toBeUndefined()
   })

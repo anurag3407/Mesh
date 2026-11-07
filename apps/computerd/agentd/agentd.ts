@@ -12,6 +12,17 @@ function isSafePath(targetPath: string): boolean {
   return resolved.startsWith("/home/bot") || resolved.startsWith("/tmp")
 }
 
+interface BackgroundJob {
+  id: string
+  cmd: string
+  child: ReturnType<typeof spawn>
+  startedAt: number
+  output: string
+  exitCode: number | null
+}
+
+const bgJobs = new Map<string, BackgroundJob>()
+
 export function startAgentd(socketPath = SOCKET_PATH) {
   try {
     if (existsSync(socketPath)) unlinkSync(socketPath)
@@ -74,6 +85,24 @@ async function handleRequest(client: Socket, jsonStr: string) {
       const timeout = setTimeout(() => {
         child.kill("SIGTERM")
       }, timeoutMs)
+
+      if (req.background) {
+        const jobId = `job_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`
+        const job: BackgroundJob = {
+          id: jobId,
+          cmd,
+          child,
+          startedAt: started,
+          output: "",
+          exitCode: null,
+        }
+        bgJobs.set(jobId, job)
+        child.stdout?.on("data", (d) => { job.output += d.toString("utf8") })
+        child.stderr?.on("data", (d) => { job.output += d.toString("utf8") })
+        child.on("close", (code) => { job.exitCode = code ?? 1 })
+        client.write(JSON.stringify({ t: "started", jobId, pid: child.pid }) + "\n")
+        break
+      }
 
       if (stdin) {
         child.stdin.write(stdin)
@@ -214,8 +243,64 @@ async function handleRequest(client: Socket, jsonStr: string) {
           diskMb: 0,
           processes: 1,
           browserRunning: false,
+          browserAvailable: false,
         }) + "\n",
       )
+      break
+    }
+
+    case "job.status": {
+      const { jobId } = req
+      const job = bgJobs.get(jobId)
+      if (!job) {
+        client.write(JSON.stringify({ error: "Job not found" }) + "\n")
+        return
+      }
+      client.write(
+        JSON.stringify({
+          jobId,
+          status: job.exitCode === null ? "running" : "exited",
+          exitCode: job.exitCode,
+          durationMs: Date.now() - job.startedAt,
+        }) + "\n",
+      )
+      break
+    }
+
+    case "job.output": {
+      const { jobId, sinceBytes = 0 } = req
+      const job = bgJobs.get(jobId)
+      if (!job) {
+        client.write(JSON.stringify({ error: "Job not found" }) + "\n")
+        return
+      }
+      const chunk = job.output.slice(sinceBytes)
+      client.write(
+        JSON.stringify({
+          jobId,
+          output: chunk,
+          totalBytes: job.output.length,
+          status: job.exitCode === null ? "running" : "exited",
+        }) + "\n",
+      )
+      break
+    }
+
+    case "job.kill": {
+      const { jobId, signal = "SIGTERM" } = req
+      const job = bgJobs.get(jobId)
+      if (!job) {
+        client.write(JSON.stringify({ error: "Job not found" }) + "\n")
+        return
+      }
+      job.child.kill(signal)
+      client.write(JSON.stringify({ ok: true, jobId }) + "\n")
+      break
+    }
+
+    case "browser": {
+      const { action } = req
+      client.write(JSON.stringify({ ok: true, action: action || "ready", message: "browser session ready" }) + "\n")
       break
     }
 

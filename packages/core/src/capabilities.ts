@@ -10,6 +10,8 @@ export interface AgentCapabilities {
   mcp: boolean
   computer: false | { profile: "standard" | "browser" }
   secrets: boolean
+  memory: boolean
+  subagents: boolean
 }
 
 export const DEFAULT_CAPABILITIES: AgentCapabilities = {
@@ -22,6 +24,8 @@ export const DEFAULT_CAPABILITIES: AgentCapabilities = {
   mcp: true,
   computer: false,
   secrets: false,
+  memory: true,
+  subagents: true,
 }
 
 export const agentCapabilitiesSchema = z.object({
@@ -41,6 +45,8 @@ export const agentCapabilitiesSchema = z.object({
     ])
     .default(false),
   secrets: z.boolean().default(false),
+  memory: z.boolean().default(true),
+  subagents: z.boolean().default(true),
 })
 
 /**
@@ -62,6 +68,8 @@ export function parseCapabilities(input: unknown): AgentCapabilities {
     mcp: typeof raw.mcp === "boolean" ? raw.mcp : DEFAULT_CAPABILITIES.mcp,
     computer: false,
     secrets: typeof raw.secrets === "boolean" ? raw.secrets : DEFAULT_CAPABILITIES.secrets,
+    memory: typeof raw.memory === "boolean" ? raw.memory : DEFAULT_CAPABILITIES.memory,
+    subagents: typeof raw.subagents === "boolean" ? raw.subagents : DEFAULT_CAPABILITIES.subagents,
   }
 
   if (raw.computer && typeof raw.computer === "object") {

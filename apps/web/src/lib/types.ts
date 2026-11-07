@@ -110,6 +110,7 @@ export interface ToolCallView {
   resolvedAt: string | null
   error: string | null
   createdAt: string
+  liveOutput?: string
 }
 
 export interface CanvasView {

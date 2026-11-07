@@ -18,12 +18,17 @@ export interface ToolRuntime {
   scrub?: (s: string) => string
 }
 
+export interface ToolContext {
+  toolCallId: string
+  signal?: AbortSignal
+}
+
 export interface ToolSpec {
   name: string
   description: string
   schema: z.ZodType
   dangerous: boolean | ((args: Record<string, unknown>) => boolean)
-  execute: (args: any, signal?: AbortSignal) => Promise<unknown>
+  execute: (args: any, signal?: AbortSignal, ctx?: ToolContext) => Promise<unknown>
 }
 
 const STORED_RESULT_LIMIT = 120_000
@@ -87,6 +92,15 @@ export function toAuditedTools(specs: ToolSpec[], runtime: ToolRuntime): ToolSet
           .returning({ id: toolCalls.id })
         if (!row) throw new Error("failed to record tool call")
 
+        const startedAt = Date.now()
+        await broadcast(runtime.roomId, {
+          type: "tool.started",
+          toolCallId: row.id,
+          agentId: runtime.agentId,
+          toolName: spec.name,
+          args: storedArgs,
+        })
+
         if (dangerous) {
           await broadcast(runtime.roomId, {
             type: "tool.approval_requested",
@@ -124,6 +138,12 @@ export function toAuditedTools(specs: ToolSpec[], runtime: ToolRuntime): ToolSet
                 error: signal?.aborted ? "Run stopped while awaiting approval" : "Approval expired or was rejected",
               })
               .where(eq(toolCalls.id, row.id))
+            await broadcast(runtime.roomId, {
+              type: "tool.finished",
+              toolCallId: row.id,
+              status: "rejected",
+              durationMs: Date.now() - startedAt,
+            })
             return {
               ok: false,
               rejected: true,
@@ -135,7 +155,11 @@ export function toAuditedTools(specs: ToolSpec[], runtime: ToolRuntime): ToolSet
         }
 
         try {
-          const result = await spec.execute(input, options.abortSignal)
+          const ctx: ToolContext = {
+            toolCallId: row.id,
+            signal: options.abortSignal,
+          }
+          const result = await spec.execute(input, options.abortSignal, ctx)
           await getDb()
             .update(toolCalls)
             .set({
@@ -144,6 +168,12 @@ export function toAuditedTools(specs: ToolSpec[], runtime: ToolRuntime): ToolSet
               resolvedAt: new Date(),
             })
             .where(eq(toolCalls.id, row.id))
+          await broadcast(runtime.roomId, {
+            type: "tool.finished",
+            toolCallId: row.id,
+            status: "done",
+            durationMs: Date.now() - startedAt,
+          })
           return result
         } catch (error) {
           const message = error instanceof Error ? error.message : String(error)
@@ -152,6 +182,12 @@ export function toAuditedTools(specs: ToolSpec[], runtime: ToolRuntime): ToolSet
             .update(toolCalls)
             .set({ status: "error", error: redactSecrets(scrubbedError).text, resolvedAt: new Date() })
             .where(eq(toolCalls.id, row.id))
+          await broadcast(runtime.roomId, {
+            type: "tool.finished",
+            toolCallId: row.id,
+            status: "error",
+            durationMs: Date.now() - startedAt,
+          })
           return { ok: false, error: message }
         }
       },

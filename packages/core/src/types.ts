@@ -85,6 +85,19 @@ export const roomEventSchema = z.discriminatedUnion("type", [
     status: z.enum(["approved", "rejected"]),
   }),
   z.object({
+    type: z.literal("tool.started"),
+    toolCallId: z.string(),
+    agentId: z.string(),
+    toolName: z.string(),
+    args: z.unknown(),
+  }),
+  z.object({
+    type: z.literal("tool.finished"),
+    toolCallId: z.string(),
+    status: z.enum(["done", "error", "rejected"]),
+    durationMs: z.number(),
+  }),
+  z.object({
     type: z.literal("tool.output"),
     toolCallId: z.string(),
     seq: z.number().int(),
@@ -105,6 +118,30 @@ export const roomEventSchema = z.discriminatedUnion("type", [
     type: z.literal("room.notice"),
     level: z.enum(["info", "warn", "error"]),
     message: z.string(),
+  }),
+  z.object({
+    type: z.literal("run.step"),
+    runId: z.string(),
+    step: z.number().int(),
+    kind: z.enum(["model", "tool", "compaction", "recall", "plan", "subagent", "verify"]),
+    label: z.string(),
+  }),
+  z.object({
+    type: z.literal("run.status"),
+    runId: z.string(),
+    status: z.enum(["thinking", "tool", "waiting:approval", "waiting:answer", "compacting"]),
+  }),
+  z.object({
+    type: z.literal("run.plan"),
+    runId: z.string(),
+    items: z.array(
+      z.object({
+        id: z.string(),
+        title: z.string(),
+        status: z.enum(["pending", "in_progress", "done", "blocked"]),
+        note: z.string().optional(),
+      }),
+    ),
   }),
 ])
 export type RoomEvent = z.infer<typeof roomEventSchema>

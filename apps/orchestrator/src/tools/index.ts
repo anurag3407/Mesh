@@ -4,9 +4,14 @@ import { connectMcpServers, openSecret } from "@mesh/llm"
 import type { ToolSet } from "ai"
 import { and, eq, isNull, or } from "drizzle-orm"
 import { z } from "zod"
-import { canvasPatchTool, canvasWriteTool } from "../canvas/tools"
+import { canvasPatchTool, canvasReadTool, canvasWriteTool } from "../canvas/tools"
 import { getDb } from "../db"
 import { getEnv } from "../env"
+import { updatePlanTool } from "../engine/plan-tool"
+import { skillTools } from "../engine/skills"
+import { spawnSubagentTool } from "../engine/subagents"
+import { partitionToolsForSearch } from "../engine/tool-search"
+import { memoryTools } from "../memory/tools"
 import { toAuditedTools, type ToolRuntime, type ToolSpec } from "./audited"
 import { computerTools } from "./builtins/computer"
 import { githubTool } from "./builtins/github"
@@ -78,6 +83,7 @@ export async function buildTools(args: BuildToolsArgs): Promise<BuiltTools> {
   const specs: ToolSpec[] = [
     ...(caps.canvas
       ? [
+          canvasReadTool({ roomId: args.roomId, agentId: args.agent.id }),
           canvasWriteTool({ roomId: args.roomId, agentId: args.agent.id }),
           canvasPatchTool({ roomId: args.roomId, agentId: args.agent.id }),
         ]
@@ -103,52 +109,74 @@ export async function buildTools(args: BuildToolsArgs): Promise<BuiltTools> {
         })
       : []),
     ...(caps.secrets ? [useSecretTool({ agentId: args.agent.id, orgId: args.orgId })] : []),
+    ...(caps.memory
+      ? memoryTools({
+          orgId: args.orgId,
+          agentId: args.agent.id,
+          roomId: args.roomId,
+        })
+      : []),
+    ...((args.agent.params as Record<string, unknown> | null)?.engine === "v2" && args.runtime.runId
+      ? [
+          updatePlanTool({ runId: args.runtime.runId, roomId: args.roomId }),
+          ...skillTools({ orgId: args.orgId, agentId: args.agent.id }),
+        ]
+      : []),
+    ...((args.agent.params as Record<string, unknown> | null)?.engine === "v2" &&
+    caps.subagents &&
+    args.runtime.runId
+      ? [
+          spawnSubagentTool({
+            parentRunId: args.runtime.runId,
+            roomId: args.roomId,
+            orgId: args.orgId,
+            agent: args.agent,
+            scrub: args.runtime.scrub,
+          }),
+        ]
+      : []),
   ]
-  const tools = toAuditedTools(specs, args.runtime)
-
-  if (!caps.mcp) {
-    return {
-      tools,
-      warnings,
-      close: async () => {},
-    }
-  }
-
-  const { configs, warnings: configWarnings } = await loadMcpConfigs(args)
-  warnings.push(...configWarnings)
-
-  const mcp = await connectMcpServers(configs)
-  warnings.push(...mcp.errors.map((e) => `MCP server "${e.serverName}" unavailable: ${e.message}`))
 
   const extraSpecs: ToolSpec[] = []
-  for (const [name, definition] of Object.entries(mcp.tools)) {
-    if (tools[name]) {
-      warnings.push(`Skipped MCP tool ${name}: a built-in tool already uses that name`)
-      continue
+  let closeMcp = async () => {}
+  if (caps.mcp) {
+    const { configs, warnings: configWarnings } = await loadMcpConfigs(args)
+    warnings.push(...configWarnings)
+
+    const mcp = await connectMcpServers(configs)
+    closeMcp = mcp.close
+    warnings.push(...mcp.errors.map((e) => `MCP server "${e.serverName}" unavailable: ${e.message}`))
+
+    for (const [name, definition] of Object.entries(mcp.tools)) {
+      if (specs.some((s) => s.name === name)) {
+        warnings.push(`Skipped MCP tool ${name}: a built-in tool already uses that name`)
+        continue
+      }
+      const meta = mcp.meta[name]
+      if (!meta) continue
+      extraSpecs.push({
+        name,
+        description:
+          ((definition as { description?: string }).description ?? "") ||
+          `MCP tool ${meta.originalName} from ${meta.serverName}`,
+        schema: (definition as { inputSchema?: z.ZodType }).inputSchema ?? z.record(z.string(), z.unknown()),
+        dangerous: meta.dangerous,
+        execute: async (input: Record<string, unknown>, signal?: AbortSignal) => {
+          if (signal?.aborted) throw new Error("run aborted")
+          return mcp.call(meta.serverId, meta.originalName, input)
+        },
+      })
     }
-    const meta = mcp.meta[name]
-    if (!meta) continue
-    extraSpecs.push({
-      name,
-      description:
-        ((definition as { description?: string }).description ?? "") ||
-        `MCP tool ${meta.originalName} from ${meta.serverName}`,
-      schema: (definition as { inputSchema?: z.ZodType }).inputSchema ?? z.record(z.string(), z.unknown()),
-      dangerous: meta.dangerous,
-      execute: async (input: Record<string, unknown>, signal?: AbortSignal) => {
-        if (signal?.aborted) throw new Error("run aborted")
-        return mcp.call(meta.serverId, meta.originalName, input)
-      },
-    })
   }
-  if (extraSpecs.length) {
-    const extra = toAuditedTools(extraSpecs, args.runtime)
-    for (const [name, definition] of Object.entries(extra)) tools[name] = definition
-  }
+
+  const allSpecs = [...specs, ...extraSpecs]
+  const isV2 = (args.agent.params as Record<string, unknown> | null)?.engine === "v2"
+  const finalSpecs = isV2 ? partitionToolsForSearch(allSpecs).exposed : allSpecs
+  const tools = toAuditedTools(finalSpecs, args.runtime)
 
   return {
     tools,
     warnings,
-    close: mcp.close,
+    close: closeMcp,
   }
 }

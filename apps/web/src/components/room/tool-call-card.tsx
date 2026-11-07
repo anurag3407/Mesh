@@ -167,6 +167,22 @@ export function ToolCallCard({ call }: { call: ToolCallView }) {
             {call.error}
           </p>
         ) : null}
+        {call.liveOutput ? (
+          <div className="mt-3">
+            <div className="flex items-center justify-between">
+              <p className="font-mono text-[11px] text-faint">
+                live output {call.status === "running" ? "· streaming…" : ""}
+              </p>
+              <CopyButton text={call.liveOutput} />
+            </div>
+            <pre
+              data-testid="tool-live-output"
+              className="mt-1 max-h-64 overflow-auto rounded-sm border border-line bg-ink p-2 font-mono text-[12px] leading-relaxed text-muted whitespace-pre-wrap"
+            >
+              {call.liveOutput}
+            </pre>
+          </div>
+        ) : null}
         {resultText ? (
           <>
             <div className="mt-3 flex items-center justify-between">

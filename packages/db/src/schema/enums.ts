@@ -31,6 +31,7 @@ export const agentRunStatusEnum = pgEnum("agent_run_status", [
   "complete",
   "error",
   "halted",
+  "waiting",
 ])
 export const turnRoleEnum = pgEnum("turn_role", [
   "responder",
@@ -100,4 +101,20 @@ export const computerStatusEnum = pgEnum("computer_status", [
 ])
 export const computerProfileEnum = pgEnum("computer_profile", ["standard", "browser"])
 export const agentVisibilityEnum = pgEnum("agent_visibility", ["private", "org"])
+
+export const memoryScopeEnum = pgEnum("memory_scope", ["agent", "room", "org"])
+export const memoryKindEnum = pgEnum("memory_kind", [
+  "fact",
+  "preference",
+  "decision",
+  "procedure",
+  "episode",
+])
+export const memorySourceEnum = pgEnum("memory_source", [
+  "agent",
+  "human",
+  "compaction",
+  "consolidation",
+  "import",
+])
 

@@ -22,6 +22,27 @@ async function recordVersion(canvasId: string, authorId: string, text: string) {
     .values({ canvasId, authorType: "agent", authorId, snapshotText: text })
 }
 
+export function canvasReadTool(args: CanvasToolArgs): ToolSpec {
+  return {
+    name: "canvas_read",
+    description: "Read the current full contents and metadata of a room canvas by its id.",
+    schema: z.object({
+      canvasId: z.string().uuid(),
+    }),
+    dangerous: false,
+    execute: async (input: { canvasId: string }) => {
+      const canvas = await requireCanvas(input.canvasId, args.roomId)
+      return {
+        canvasId: canvas.id,
+        title: canvas.title,
+        kind: canvas.kind,
+        language: canvas.language,
+        content: canvas.snapshotText,
+      }
+    },
+  }
+}
+
 export function canvasWriteTool(args: CanvasToolArgs): ToolSpec {
   return {
     name: "canvas_write",

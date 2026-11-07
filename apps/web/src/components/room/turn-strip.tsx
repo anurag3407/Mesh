@@ -13,19 +13,27 @@ export function TurnStrip({
   streamingRunId,
   orgSlug,
   roomId,
+  runActivity,
 }: {
   turnState: TurnStateView | null
   agents: RoomAgentView[]
   streamingRunId: string | null
   orgSlug: string
   roomId: string
+  runActivity?: {
+    runId: string
+    step?: number
+    label?: string
+    status?: string
+    plan?: Array<{ id: string; title: string; status: string; note?: string }>
+  } | null
 }) {
   const [pending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
   const byId = new Map(agents.map(({ agent }) => [agent.id, agent]))
   const active = turnState?.activeAgentId ? byId.get(turnState.activeAgentId) : null
   const queue = (turnState?.queue ?? []).map((id) => byId.get(id)).filter(Boolean)
-  const visible = Boolean(turnState?.activeAgentId) || queue.length > 0 || Boolean(streamingRunId)
+  const visible = Boolean(turnState?.activeAgentId) || queue.length > 0 || Boolean(streamingRunId) || Boolean(runActivity)
   if (!visible) return null
 
   function stop() {
@@ -37,6 +45,8 @@ export function TurnStrip({
     })
   }
 
+  const completedPlanItems = runActivity?.plan ? runActivity.plan.filter((i) => i.status === "done").length : 0
+
   return (
     <div
       className="flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-line bg-panel px-4 py-2"
@@ -46,6 +56,18 @@ export function TurnStrip({
       <span className={cn("text-[12px]", active || streamingRunId ? "text-text" : "text-faint")}>
         {active ? `@${active.handle}` : streamingRunId ? "an agent" : "next agent starting"}
       </span>
+      {runActivity?.label || runActivity?.status ? (
+        <span className="flex items-center gap-1.5 font-mono text-[11px] text-muted">
+          <span className="inline-block h-1.5 w-1.5 rounded-full bg-accent animate-pulse" />
+          {runActivity.step ? `step ${runActivity.step} · ` : ""}
+          {runActivity.label ?? runActivity.status}
+        </span>
+      ) : null}
+      {runActivity?.plan && runActivity.plan.length > 0 ? (
+        <span className="rounded bg-raised px-1.5 py-0.5 font-mono text-[10px] text-faint">
+          plan {completedPlanItems}/{runActivity.plan.length}
+        </span>
+      ) : null}
       {queue.length ? (
         <>
           <span className="font-mono text-[11px] text-faint">up next</span>

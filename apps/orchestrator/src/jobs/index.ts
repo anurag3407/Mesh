@@ -7,6 +7,7 @@ import { deliverWebhook, type WebhookJobData } from "./webhook"
 export const ROOM_MESSAGE_QUEUE = "room.message"
 export const WEBHOOK_QUEUE = "webhook.deliver"
 export const TASK_WAKE_QUEUE = "task.wake"
+export const RUN_RESUME_QUEUE = "run.resume"
 
 let boss: PgBoss | null = null
 
@@ -34,6 +35,12 @@ export async function startJobs(): Promise<PgBoss> {
   await instance.createQueue(TASK_WAKE_QUEUE, {
     retryLimit: 2,
     expireInSeconds: 60,
+    deleteAfterSeconds: 86_400,
+  })
+  await instance.createQueue(RUN_RESUME_QUEUE, {
+    retryLimit: 3,
+    retryDelay: 5,
+    expireInSeconds: 300,
     deleteAfterSeconds: 86_400,
   })
 
@@ -77,6 +84,21 @@ export async function startJobs(): Promise<PgBoss> {
     },
   )
 
+  await instance.work<{ runId: string; reason?: string }>(
+    RUN_RESUME_QUEUE,
+    { batchSize: 1, localConcurrency: 4, pollingIntervalSeconds: 1 },
+    async (jobs) => {
+      for (const job of jobs) {
+        try {
+          const { resumeRun } = await import("../engine/resume")
+          await resumeRun(job.data.runId)
+        } catch (error) {
+          console.error(`[run.resume] failed for run ${job.data.runId}`, error)
+        }
+      }
+    },
+  )
+
   boss = instance
   console.log("[pg-boss] workers online")
   return instance
@@ -106,6 +128,11 @@ export async function enqueueTaskWake(data: TaskWakeData): Promise<void> {
     singletonKey: `${data.taskId}:${data.agentId}`,
     singletonSeconds: 30,
   })
+}
+
+export async function enqueueRunResume(runId: string, reason?: string): Promise<void> {
+  if (!boss) throw new Error("job queue is not started")
+  await boss.send(RUN_RESUME_QUEUE, { runId, reason })
 }
 
 export async function stopJobs(): Promise<void> {

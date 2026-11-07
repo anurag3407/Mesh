@@ -21,6 +21,7 @@ export interface StreamAgentResult {
   aborted: boolean
   error: string | null
   finishReason: string | null
+  steps: number
 }
 
 /**
@@ -50,7 +51,13 @@ export async function streamAgentText(options: StreamAgentOptions): Promise<Stre
       text += delta
       await options.onDelta(delta)
     }
-    const [usage, finishReason] = await Promise.all([result.usage, result.finishReason])
+    const [usage, finishReason, steps] = await Promise.all([
+      result.usage,
+      result.finishReason,
+      Promise.resolve(result.steps)
+        .then((s) => (Array.isArray(s) ? s.length : 1))
+        .catch(() => 1),
+    ])
     return {
       text,
       usage,
@@ -59,6 +66,7 @@ export async function streamAgentText(options: StreamAgentOptions): Promise<Stre
       aborted: options.abortSignal?.aborted ?? false,
       error: null,
       finishReason,
+      steps: typeof steps === "number" ? steps : 1,
     }
   } catch (error) {
     const aborted =
@@ -72,6 +80,7 @@ export async function streamAgentText(options: StreamAgentOptions): Promise<Stre
       aborted,
       error: aborted ? null : error instanceof Error ? error.message : String(error),
       finishReason: null,
+      steps: 0,
     }
   }
 }

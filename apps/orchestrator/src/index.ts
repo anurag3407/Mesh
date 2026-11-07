@@ -43,6 +43,12 @@ await control.query("LISTEN mesh_room_interrupt")
 await control.query("LISTEN mesh_stop_run")
 
 await startJobs()
+void import("./engine/resume").then(({ recoverStaleRuns }) =>
+  recoverStaleRuns().then(
+    (res) => res.recoveredCount > 0 && console.log(`[recovery] rescued ${res.recoveredCount} stale runs`),
+    (err) => console.error("[recovery] failed to recover stale runs", err),
+  ),
+)
 setCollabEnqueue(enqueueRoomMessage)
 startMeetingScheduler()
 

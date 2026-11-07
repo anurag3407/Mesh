@@ -140,6 +140,7 @@ export function RoomWorkspace({
       messages={realtime.messages}
       toolCalls={realtime.toolCalls}
       turnState={realtime.turnState}
+      runActivity={realtime.runActivity}
       roomAgents={data.roomAgents}
       people={roomPeople}
       canAdmin={data.canAdmin}

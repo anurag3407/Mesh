@@ -40,6 +40,14 @@ export interface PresencePerson {
   typing: boolean
 }
 
+export interface RunActivityState {
+  runId: string
+  step?: number
+  label?: string
+  status?: string
+  plan?: Array<{ id: string; title: string; status: string; note?: string }>
+}
+
 function eventPayload<T>(payload: unknown): T {
   return payload as T
 }
@@ -73,6 +81,7 @@ export function useRoomRealtime(args: {
   const [threadCounts, setThreadCounts] = useState<Record<string, number>>(
     args.initialThreadCounts,
   )
+  const [runActivity, setRunActivity] = useState<RunActivityState | null>(null)
   const [connection, setConnection] = useState<Connection>("connecting")
   const [hasOlder, setHasOlder] = useState(args.initialMessages.length >= MESSAGE_PAGE_SIZE)
   const [loadingOlder, setLoadingOlder] = useState(false)
@@ -307,6 +316,7 @@ export function useRoomRealtime(args: {
       })
       .on("broadcast", { event: "message.done" }, ({ payload }) => {
         const event = eventPayload<{ messageId: string; status: MessageView["status"] }>(payload)
+        setRunActivity(null)
         setMessages((prev) => {
           const index = prev.findIndex((message) => message.id === event.messageId)
           if (index === -1) return prev
@@ -315,6 +325,36 @@ export function useRoomRealtime(args: {
           return copy
         })
         void refreshMessage(event.messageId)
+      })
+      .on("broadcast", { event: "run.step" }, ({ payload }) => {
+        const event = eventPayload<{ runId: string; step: number; kind: string; label: string }>(payload)
+        setRunActivity((prev) => ({
+          runId: event.runId,
+          step: event.step,
+          label: event.label,
+          status: prev?.status,
+          plan: prev?.plan,
+        }))
+      })
+      .on("broadcast", { event: "run.status" }, ({ payload }) => {
+        const event = eventPayload<{ runId: string; status: string }>(payload)
+        setRunActivity((prev) => ({
+          runId: event.runId,
+          step: prev?.step,
+          label: prev?.label,
+          status: event.status,
+          plan: prev?.plan,
+        }))
+      })
+      .on("broadcast", { event: "run.plan" }, ({ payload }) => {
+        const event = eventPayload<{ runId: string; plan: Array<{ id: string; title: string; status: string; note?: string }> }>(payload)
+        setRunActivity((prev) => ({
+          runId: event.runId,
+          step: prev?.step,
+          label: prev?.label,
+          status: prev?.status,
+          plan: event.plan,
+        }))
       })
       .on("broadcast", { event: "turn.state" }, ({ payload }) => {
         const event = eventPayload<TurnStateView>(payload)
@@ -358,6 +398,72 @@ export function useRoomRealtime(args: {
         setToolCalls((prev) =>
           prev.map((call) =>
             call.id === event.toolCallId ? { ...call, status: event.status } : call,
+          ),
+        )
+      })
+      .on("broadcast", { event: "tool.started" }, ({ payload }) => {
+        const event = eventPayload<{
+          toolCallId: string
+          agentId: string
+          toolName: string
+          args: Record<string, unknown>
+        }>(payload)
+        setToolCalls((prev) => {
+          if (prev.some((call) => call.id === event.toolCallId)) {
+            return prev
+          }
+          return sortToolCalls([
+            ...prev,
+            {
+              id: event.toolCallId,
+              runId: null,
+              roomId: roomIdRef.current,
+              messageId: null,
+              toolName: event.toolName,
+              args: event.args ?? {},
+              result: null,
+              status: "running",
+              approvedBy: null,
+              resolvedAt: null,
+              error: null,
+              createdAt: new Date().toISOString(),
+              liveOutput: "",
+            },
+          ])
+        })
+      })
+      .on("broadcast", { event: "tool.finished" }, ({ payload }) => {
+        const event = eventPayload<{
+          toolCallId: string
+          status: "done" | "error" | "rejected"
+          durationMs: number
+        }>(payload)
+        setToolCalls((prev) =>
+          prev.map((call) =>
+            call.id === event.toolCallId
+              ? {
+                  ...call,
+                  status: event.status === "error" ? "error" : event.status === "rejected" ? "rejected" : "done",
+                  resolvedAt: new Date().toISOString(),
+                }
+              : call,
+          ),
+        )
+      })
+      .on("broadcast", { event: "tool.output" }, ({ payload }) => {
+        const event = eventPayload<{
+          toolCallId: string
+          seq: number
+          chunk: string
+        }>(payload)
+        setToolCalls((prev) =>
+          prev.map((call) =>
+            call.id === event.toolCallId
+              ? {
+                  ...call,
+                  liveOutput: (call.liveOutput ?? "") + event.chunk,
+                }
+              : call,
           ),
         )
       })
@@ -498,6 +604,7 @@ export function useRoomRealtime(args: {
     messages,
     toolCalls,
     turnState,
+    runActivity,
     presence,
     threadCounts,
     connection,

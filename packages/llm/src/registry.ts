@@ -66,3 +66,135 @@ export interface ProviderKeyRow {
 export function providerKeyToApiKey(row: ProviderKeyRow, kek: string): string {
   return decryptSecret({ ciphertext: row.ciphertext, iv: row.iv, tag: row.tag }, kek)
 }
+
+export interface ProviderCapabilities {
+  supportsPromptCache: boolean
+  supportsServerCompaction: boolean
+  supportsContextEditing: boolean
+  supportsEffort: boolean
+  supportsMidConversationSystem: boolean
+  supportsParallelTools: boolean
+  supportsComputerUse: boolean
+  defaultContextWindow: number
+}
+
+export type EffortLevel = "low" | "medium" | "high" | "max"
+
+const PROVIDER_CAPABILITIES: Record<Provider, ProviderCapabilities> = {
+  anthropic: {
+    supportsPromptCache: true,
+    supportsServerCompaction: false,
+    supportsContextEditing: true,
+    supportsEffort: true,
+    supportsMidConversationSystem: true,
+    supportsParallelTools: true,
+    supportsComputerUse: true,
+    defaultContextWindow: 200_000,
+  },
+  openai: {
+    supportsPromptCache: true,
+    supportsServerCompaction: false,
+    supportsContextEditing: false,
+    supportsEffort: true,
+    supportsMidConversationSystem: true,
+    supportsParallelTools: true,
+    supportsComputerUse: false,
+    defaultContextWindow: 128_000,
+  },
+  google: {
+    supportsPromptCache: true,
+    supportsServerCompaction: false,
+    supportsContextEditing: false,
+    supportsEffort: true,
+    supportsMidConversationSystem: true,
+    supportsParallelTools: true,
+    supportsComputerUse: false,
+    defaultContextWindow: 1_000_000,
+  },
+  groq: {
+    supportsPromptCache: false,
+    supportsServerCompaction: false,
+    supportsContextEditing: false,
+    supportsEffort: false,
+    supportsMidConversationSystem: true,
+    supportsParallelTools: true,
+    supportsComputerUse: false,
+    defaultContextWindow: 32_000,
+  },
+  cerebras: {
+    supportsPromptCache: false,
+    supportsServerCompaction: false,
+    supportsContextEditing: false,
+    supportsEffort: false,
+    supportsMidConversationSystem: true,
+    supportsParallelTools: true,
+    supportsComputerUse: false,
+    defaultContextWindow: 32_000,
+  },
+  "openai-compatible": {
+    supportsPromptCache: false,
+    supportsServerCompaction: false,
+    supportsContextEditing: false,
+    supportsEffort: false,
+    supportsMidConversationSystem: true,
+    supportsParallelTools: true,
+    supportsComputerUse: false,
+    defaultContextWindow: 32_000,
+  },
+}
+
+export function getProviderCapabilities(provider: Provider): ProviderCapabilities {
+  return PROVIDER_CAPABILITIES[provider] ?? {
+    supportsPromptCache: false,
+    supportsServerCompaction: false,
+    supportsContextEditing: false,
+    supportsEffort: false,
+    supportsMidConversationSystem: true,
+    supportsParallelTools: true,
+    supportsComputerUse: false,
+    defaultContextWindow: 32_000,
+  }
+}
+
+export interface BuildProviderOptionsArgs {
+  provider: Provider
+  effort?: EffortLevel
+  cacheBreakpoint?: boolean
+}
+
+/**
+ * Builds provider-specific options for AI SDK calls in a provider-neutral way.
+ */
+export function buildProviderOptions(args: BuildProviderOptionsArgs): Record<string, Record<string, unknown>> {
+  const { provider, effort, cacheBreakpoint } = args
+  const options: Record<string, Record<string, unknown>> = {}
+
+  if (provider === "anthropic") {
+    const anthropicOpts: Record<string, unknown> = {}
+    if (cacheBreakpoint) {
+      anthropicOpts.cacheControl = { type: "ephemeral" }
+    }
+    if (effort) {
+      const budgetMap: Record<EffortLevel, number> = {
+        low: 1024,
+        medium: 2048,
+        high: 4096,
+        max: 8192,
+      }
+      anthropicOpts.thinking = { type: "enabled", budgetTokens: budgetMap[effort] }
+    }
+    if (Object.keys(anthropicOpts).length > 0) {
+      options.anthropic = anthropicOpts
+    }
+  } else if (provider === "openai") {
+    const openaiOpts: Record<string, unknown> = {}
+    if (effort) {
+      openaiOpts.reasoningEffort = effort === "max" ? "high" : effort
+    }
+    if (Object.keys(openaiOpts).length > 0) {
+      options.openai = openaiOpts
+    }
+  }
+
+  return options
+}

@@ -51,6 +51,7 @@ export function ChatPanel({
   messages,
   toolCalls,
   turnState,
+  runActivity,
   roomAgents,
   people,
   canAdmin,
@@ -75,6 +76,7 @@ export function ChatPanel({
   messages: MessageView[]
   toolCalls: ToolCallView[]
   turnState: TurnStateView | null
+  runActivity?: import("./use-room-realtime").RunActivityState | null
   roomAgents: RoomAgentView[]
   people: MemberView[]
   canAdmin: boolean
@@ -364,6 +366,7 @@ export function ChatPanel({
         streamingRunId={streamingMessage?.runId ?? null}
         orgSlug={orgSlug}
         roomId={roomId}
+        runActivity={runActivity}
       />
 
       <div className="shrink-0 border-t border-line pb-[env(safe-area-inset-bottom)]">

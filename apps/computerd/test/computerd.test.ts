@@ -22,4 +22,16 @@ describe("computerd container specs", () => {
     expect(spec.Tmpfs["/tmp"]).toBe("size=512m,mode=1777")
     expect(spec.SecurityOpt).toContain("no-new-privileges:true")
   })
+
+  it("ensures agentd stats spec contains browserAvailable", () => {
+    const stats = {
+      cpu: 0,
+      memMb: 50,
+      diskMb: 0,
+      processes: 1,
+      browserRunning: false,
+      browserAvailable: false,
+    }
+    expect(stats.browserAvailable).toBe(false)
+  })
 })

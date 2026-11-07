@@ -3,6 +3,7 @@
 import { useEffect, useId, useLayoutEffect, useRef, useState, useTransition } from "react"
 import { useRouter } from "next/navigation"
 import { sendMessage } from "@/lib/actions/messages"
+import { rememberAction } from "@/lib/actions/memory"
 import { startMeetingNowAction } from "@/lib/actions/meetings"
 import { createTaskAction } from "@/lib/actions/tasks"
 import { enqueueOutbox, flushOutbox, readOutbox } from "@/lib/outbox"
@@ -348,6 +349,35 @@ export function Composer({
     if (!content || pending) return
     setError(null)
     setNotice(null)
+
+    if (content.startsWith("/remember ")) {
+      const memoryText = content.slice("/remember ".length).trim()
+      if (!memoryText) {
+        setError("Please provide memory text: /remember <fact or decision>")
+        return
+      }
+      setPending(true)
+      try {
+        const result = await rememberAction({
+          orgSlug,
+          roomId,
+          body: memoryText,
+        })
+        if (!result.ok) {
+          setError(result.error ?? "Failed to save memory")
+        } else {
+          clearIfUnchanged(content)
+          setNotice("Saved to team memory")
+          showToast({ message: "Saved to room memory", tone: "success" })
+        }
+      } catch {
+        setError("Failed to save memory")
+      } finally {
+        setPending(false)
+      }
+      return
+    }
+
     setPending(true)
     if (!navigator.onLine) {
       try {
