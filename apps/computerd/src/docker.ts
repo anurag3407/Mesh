@@ -38,7 +38,9 @@ export class DockerClient {
     })
     if (!res.ok) {
       const body = await res.text().catch(() => "")
-      throw new Error(`Docker API ${options.method || "GET"} ${path} failed (${res.status}): ${body}`)
+      throw new Error(
+        `Docker API ${options.method || "GET"} ${path} failed (${res.status}): ${body}`,
+      )
     }
     const ct = res.headers.get("content-type") || ""
     if (ct.includes("application/json")) {
@@ -77,6 +79,12 @@ export class DockerClient {
 
   async removeContainer(idOrName: string, force = true): Promise<void> {
     await this.request(`/containers/${encodeURIComponent(idOrName)}?force=${force}&v=true`, {
+      method: "DELETE",
+    })
+  }
+
+  async removeVolume(name: string, force = true): Promise<void> {
+    await this.request(`/volumes/${encodeURIComponent(name)}?force=${force}`, {
       method: "DELETE",
     })
   }

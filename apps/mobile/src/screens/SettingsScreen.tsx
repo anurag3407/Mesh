@@ -1,9 +1,16 @@
 import React from "react"
-import { Alert, SafeAreaView, StatusBar, StyleSheet, Text, TouchableOpacity, View } from "react-native"
+import {
+  Alert,
+  SafeAreaView,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from "react-native"
 import { LogOut, Server, Shield, User, Key } from "lucide-react-native"
 import { useAuth } from "../hooks/useAuth"
 import { ENV } from "../config/env"
-import { Button } from "../components/ui/Button"
 
 export function SettingsScreen() {
   const { user, signOut } = useAuth()
@@ -70,9 +77,7 @@ export function SettingsScreen() {
               <Key size={18} color="#eab308" />
               <View style={styles.textColumn}>
                 <Text style={styles.cardMain}>BYOK Keys (OpenRouter, OpenAI, Claude)</Text>
-                <Text style={styles.cardSub}>
-                  AES-256-GCM encrypted in workspace vault
-                </Text>
+                <Text style={styles.cardSub}>AES-256-GCM encrypted in workspace vault</Text>
               </View>
             </View>
           </View>

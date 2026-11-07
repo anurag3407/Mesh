@@ -35,9 +35,12 @@ async function notifyOrchestratorState(
 
 async function getGrantsEnv(agentId: string): Promise<Record<string, string>> {
   try {
-    const res = await fetch(`${ORCHESTRATOR_URL}/internal/computer/${encodeURIComponent(agentId)}/grants-env`, {
-      headers: { "x-internal-secret": INTERNAL_SECRET },
-    })
+    const res = await fetch(
+      `${ORCHESTRATOR_URL}/internal/computer/${encodeURIComponent(agentId)}/grants-env`,
+      {
+        headers: { "x-internal-secret": INTERNAL_SECRET },
+      },
+    )
     if (res.ok) {
       const data = (await res.json()) as { env?: Record<string, string> }
       return data.env ?? {}
@@ -49,7 +52,11 @@ async function getGrantsEnv(agentId: string): Promise<Record<string, string>> {
 export class ComputerLifecycle {
   private docker = new DockerClient()
 
-  async ensure(agentId: string, orgId: string, profile: "standard" | "browser" = "standard"): Promise<{ status: string; ip?: string }> {
+  async ensure(
+    agentId: string,
+    orgId: string,
+    profile: "standard" | "browser" = "standard",
+  ): Promise<{ status: string; ip?: string }> {
     const existing = inFlightEnsure.get(agentId)
     if (existing) return existing
 
@@ -59,7 +66,9 @@ export class ComputerLifecycle {
 
       if (inspect) {
         if (inspect.State?.Running) {
-          const ip = inspect.NetworkSettings?.Networks?.botnet?.IPAddress || inspect.NetworkSettings?.IPAddress
+          const ip =
+            inspect.NetworkSettings?.Networks?.botnet?.IPAddress ||
+            inspect.NetworkSettings?.IPAddress
           return { status: "running", ip }
         }
 
@@ -67,7 +76,9 @@ export class ComputerLifecycle {
         await notifyOrchestratorState(agentId, "starting", inspect.Id)
         await this.docker.startContainer(containerName)
         const startedInspect = await this.docker.inspectContainer(containerName)
-        const ip = startedInspect.NetworkSettings?.Networks?.botnet?.IPAddress || startedInspect.NetworkSettings?.IPAddress
+        const ip =
+          startedInspect.NetworkSettings?.Networks?.botnet?.IPAddress ||
+          startedInspect.NetworkSettings?.IPAddress
         await notifyOrchestratorState(agentId, "running", inspect.Id, ip)
         return { status: "running", ip }
       }
@@ -85,7 +96,10 @@ export class ComputerLifecycle {
         ...Object.entries(grantsEnv).map(([k, v]) => `${k}=${v}`),
       ]
 
-      const image = profile === "browser" ? `saaya/computer:${IMAGE_TAG}-browser` : `saaya/computer:${IMAGE_TAG}`
+      const image =
+        profile === "browser"
+          ? `saaya/computer:${IMAGE_TAG}-browser`
+          : `saaya/computer:${IMAGE_TAG}`
 
       const created = await this.docker.createContainer({
         name: containerName,
@@ -118,7 +132,9 @@ export class ComputerLifecycle {
 
       await this.docker.startContainer(containerName)
       const inspectAfterStart = await this.docker.inspectContainer(containerName)
-      const ip = inspectAfterStart.NetworkSettings?.Networks?.botnet?.IPAddress || inspectAfterStart.NetworkSettings?.IPAddress
+      const ip =
+        inspectAfterStart.NetworkSettings?.Networks?.botnet?.IPAddress ||
+        inspectAfterStart.NetworkSettings?.IPAddress
       await notifyOrchestratorState(agentId, "running", created.Id, ip)
 
       return { status: "running", ip }
@@ -166,6 +182,11 @@ export class ComputerLifecycle {
     try {
       await this.docker.removeContainer(containerName, true)
     } catch {}
+    if (deleteDisk) {
+      try {
+        await this.docker.removeVolume(`saaya-bot-${agentId}`)
+      } catch {}
+    }
     await notifyOrchestratorState(agentId, "none")
   }
 }

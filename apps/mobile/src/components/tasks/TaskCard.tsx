@@ -1,6 +1,6 @@
 import React from "react"
 import { StyleSheet, Text, View } from "react-native"
-import { CheckCircle2, Clock, AlertCircle, Bot } from "lucide-react-native"
+import { Clock, AlertCircle, Bot } from "lucide-react-native"
 import type { TaskItem } from "../../types"
 
 interface TaskCardProps {
@@ -60,9 +60,7 @@ export function TaskCard({ task }: TaskCardProps) {
             {task.turnsUsed} / {task.budgetTurns} turns
           </Text>
         </View>
-        {task.costUsd > 0 && (
-          <Text style={styles.costText}>${task.costUsd.toFixed(4)}</Text>
-        )}
+        {task.costUsd > 0 && <Text style={styles.costText}>${task.costUsd.toFixed(4)}</Text>}
       </View>
     </View>
   )

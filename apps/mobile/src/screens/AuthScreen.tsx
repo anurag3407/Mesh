@@ -11,7 +11,6 @@ import {
   View,
 } from "react-native"
 import { Lock, Mail, MessageSquare } from "lucide-react-native"
-import { Button } from "../components/ui/Button"
 import { supabase } from "../core/supabase"
 
 interface AuthScreenProps {

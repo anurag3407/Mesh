@@ -18,7 +18,6 @@ import {
   Bot,
   Hash,
   CheckCheck,
-  Plus,
 } from "lucide-react-native"
 import { useRooms } from "../hooks/useRooms"
 import type { Room } from "../types"
@@ -29,9 +28,7 @@ export function RoomsScreen({ navigation }: any) {
   const [search, setSearch] = useState("")
   const [activeTab, setActiveTab] = useState<"chats" | "tasks" | "computers">("chats")
 
-  const filtered = rooms.filter((r) =>
-    r.name.toLowerCase().includes(search.toLowerCase())
-  )
+  const filtered = rooms.filter((r) => r.name.toLowerCase().includes(search.toLowerCase()))
 
   const renderRoom = ({ item, index }: { item: Room; index: number }) => {
     const isDm = item.kind === "dm"
@@ -53,11 +50,7 @@ export function RoomsScreen({ navigation }: any) {
       >
         {/* Contact / Agent Circular Avatar */}
         <View style={[styles.avatar, { backgroundColor: `${color}20`, borderColor: color }]}>
-          {isDm ? (
-            <Bot size={22} color={color} />
-          ) : (
-            <Hash size={22} color={color} />
-          )}
+          {isDm ? <Bot size={22} color={color} /> : <Hash size={22} color={color} />}
         </View>
 
         {/* Center Content */}
@@ -99,10 +92,7 @@ export function RoomsScreen({ navigation }: any) {
           <TouchableOpacity style={styles.topActionBtn}>
             <Camera size={20} color="#aebac1" />
           </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.topActionBtn}
-            onPress={() => setSearchOpen(!searchOpen)}
-          >
+          <TouchableOpacity style={styles.topActionBtn} onPress={() => setSearchOpen(!searchOpen)}>
             <Search size={20} color="#aebac1" />
           </TouchableOpacity>
           <TouchableOpacity

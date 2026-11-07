@@ -7,6 +7,7 @@
     "dev": "dotenv -e ../../.env -- tsx watch src/index.ts",
     "start": "dotenv -e ../../.env -- tsx src/index.ts",
     "typecheck": "tsc",
+    "lint": "eslint src",
     "test": "vitest run"
   },
   "dependencies": {

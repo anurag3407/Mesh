@@ -15,6 +15,7 @@ export default tseslint.config(
       "**/next-env.d.ts",
       "**/public/sw.js",
       "**/public/swe-worker*.js",
+      "apps/mobile/metro.config.js",
     ],
   },
   js.configs.recommended,

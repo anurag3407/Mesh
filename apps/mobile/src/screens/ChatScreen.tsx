@@ -1,7 +1,6 @@
 import React, { useRef, useState } from "react"
 import {
   FlatList,
-  Platform,
   SafeAreaView,
   StatusBar,
   StyleSheet,
@@ -92,9 +91,7 @@ export function ChatScreen({ route, navigation }: any) {
         </View>
 
         {/* Human In The Loop Danger Tool Approval Card */}
-        {approval && (
-          <ApprovalCard approval={approval} onResolve={resolveApproval} />
-        )}
+        {approval && <ApprovalCard approval={approval} onResolve={resolveApproval} />}
 
         {/* Messages Feed */}
         <FlatList
