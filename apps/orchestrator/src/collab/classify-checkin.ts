@@ -9,6 +9,7 @@ import {
 } from "@mesh/db"
 import { getDb } from "../db"
 import { type CollabAgent, CollabError, postAgentMessage, resolveAgentRoomId } from "./index"
+import { autoCloseMootRequests } from "./tasks-service"
 
 export interface CheckinReportInput {
   roomId?: string
@@ -41,6 +42,9 @@ export async function classifyAndRecordCheckin(
 ): Promise<CheckinReportResult> {
   const db = dbOverride || getDb()
   const roomId = await resolveAgentRoomId(agent, input.roomId || input.room)
+
+  // Auto-close any expired or moot requests in this room before evaluating check-in
+  await autoCloseMootRequests({ roomId }, db).catch(() => {})
 
   // 1. Fetch agent cursor (lastReportedAt)
   const [read] = await db

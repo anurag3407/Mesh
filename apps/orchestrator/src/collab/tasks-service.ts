@@ -44,9 +44,11 @@ export interface TaskMutationInput {
  * 2. Status invariants:
  *    - done requires completed_at and outcome_kind; outcome_kind='none' requires human actor.
  *    - stuck requires unblock_needs.
+ *    - stuck with human_answer requires form evidence (agent cannot claim human-fact blocker before reading the form).
  *    - moving to in_progress with unresolved blockers requires an explicit reason.
  * 3. Same-room check for all blocked_by tasks.
  * 4. Atomic transaction updating tasks row and appending task_events row.
+ * 5. Auto-closing moot requests linked to tasks completed with done.
  */
 export async function applyTaskMutation(input: TaskMutationInput, dbOverride?: Db) {
   const db = dbOverride || getDb()
@@ -114,6 +116,34 @@ export async function applyTaskMutation(input: TaskMutationInput, dbOverride?: D
       input.unblockNeeds !== undefined ? input.unblockNeeds : task.unblockNeeds
     if (toStatus === "stuck" && !effectiveUnblockNeeds) {
       throw new CollabError("marking a task stuck requires unblock_needs")
+    }
+
+    // Invariant 3b: Human-fact blocker validation
+    // An agent cannot claim a human-fact blocker before reading the form that would ask for it.
+    if (
+      toStatus === "stuck" &&
+      effectiveUnblockNeeds === "human_answer" &&
+      input.actor.type === "agent"
+    ) {
+      const meta = (input.metadata ?? {}) as Record<string, unknown>
+      const existingMeta = (task.metadata ?? {}) as Record<string, unknown>
+      const formRef =
+        (typeof meta.formRef === "string" && meta.formRef.trim().length > 0) ||
+        (typeof meta.form_ref === "string" && meta.form_ref.trim().length > 0) ||
+        (typeof meta.formUrl === "string" && meta.formUrl.trim().length > 0) ||
+        (typeof meta.form_url === "string" && meta.form_url.trim().length > 0) ||
+        (typeof existingMeta.formRef === "string" && existingMeta.formRef.trim().length > 0) ||
+        (typeof existingMeta.formUrl === "string" && existingMeta.formUrl.trim().length > 0)
+      const formRead = meta.formRead === true || existingMeta.formRead === true
+      const detail = (input.unblockDetail ?? task.unblockDetail ?? "").trim()
+      const detailCitesForm =
+        /(form|application|page|url|field|screen|portal)/i.test(detail) && detail.length >= 15
+
+      if (!formRef && !formRead && !detailCitesForm) {
+        throw new CollabError(
+          "cannot claim a human-fact blocker before reading the form that would ask for it: cite the form or provide form_ref and the specific missing field",
+        )
+      }
     }
 
     // Invariant 4: Moving to in_progress with open blockers requires explicit reason
@@ -202,9 +232,170 @@ export async function applyTaskMutation(input: TaskMutationInput, dbOverride?: D
       })
     }
 
+    // Auto-close moot requests linked to this task when task is completed
+    if (toStatus === "done" && task.kind === "task") {
+      const openRequests = await tx
+        .select({
+          id: tasks.id,
+          number: tasks.number,
+          metadata: tasks.metadata,
+          blockedBy: tasks.blockedBy,
+        })
+        .from(tasks)
+        .where(
+          and(
+            eq(tasks.roomId, task.roomId),
+            eq(tasks.kind, "request"),
+            eq(tasks.status, "open"),
+          ),
+        )
+
+      for (const req of openRequests) {
+        const reqMeta = (req.metadata || {}) as Record<string, unknown>
+        const isLinkedByMeta = reqMeta.taskId === task.id
+        const isLinkedByBlockedBy =
+          (req.blockedBy || []).includes(task.id) || (task.blockedBy || []).includes(req.id)
+
+        if (isLinkedByMeta || isLinkedByBlockedBy) {
+          await tx
+            .update(tasks)
+            .set({
+              status: "done",
+              statusChangedAt: now,
+              completedAt: now,
+              outcomeKind: "decision",
+              outcomeRef: `auto-closed: task ${task.id} completed`,
+              updatedAt: now,
+            })
+            .where(eq(tasks.id, req.id))
+
+          await tx.insert(taskEvents).values({
+            taskId: req.id,
+            actorType: "system",
+            actorId: null,
+            fromStatus: "open",
+            toStatus: "done",
+            reason: `auto-closed: task MESH-${task.number} completed, ask is moot`,
+            outcomeKind: "decision",
+            outcomeRef: `auto-closed: task ${task.id} completed`,
+            metadata: { autoClosed: true, reason: "parent_task_completed", taskId: task.id },
+            createdAt: now,
+          })
+        }
+      }
+    }
+
     return {
       task: updatedTask,
       event,
+    }
+  })
+}
+
+export interface AutoCloseMootInput {
+  roomId?: string
+  orgId?: string
+}
+
+export interface AutoCloseMootResult {
+  closedCount: number
+  closedRequestIds: string[]
+}
+
+/**
+ * Auto-closes moot open requests:
+ * 1. Expired requests (expires_at <= now).
+ * 2. Requests whose linked task (metadata.taskId) is already done.
+ * Records typed task_events for each closure.
+ */
+export async function autoCloseMootRequests(
+  input: AutoCloseMootInput,
+  dbOverride?: Db,
+): Promise<AutoCloseMootResult> {
+  const db = dbOverride || getDb()
+  const now = new Date()
+
+  return await db.transaction(async (tx) => {
+    const conditions = [eq(tasks.kind, "request"), eq(tasks.status, "open")]
+    if (input.roomId) {
+      conditions.push(eq(tasks.roomId, input.roomId))
+    }
+    if (input.orgId) {
+      conditions.push(eq(tasks.orgId, input.orgId))
+    }
+
+    const openRequests = await tx
+      .select({
+        id: tasks.id,
+        number: tasks.number,
+        expiresAt: tasks.expiresAt,
+        metadata: tasks.metadata,
+      })
+      .from(tasks)
+      .where(and(...conditions))
+
+    const toClose: Array<{ id: string; number: number; reason: string }> = []
+
+    for (const req of openRequests) {
+      // Condition A: Expired
+      if (req.expiresAt && req.expiresAt <= now) {
+        toClose.push({
+          id: req.id,
+          number: req.number,
+          reason: "auto-closed: request expired without response (moot)",
+        })
+        continue
+      }
+
+      // Condition B: Associated task already done
+      const meta = (req.metadata || {}) as Record<string, unknown>
+      if (typeof meta.taskId === "string" && meta.taskId.trim().length > 0) {
+        const [linkedTask] = await tx
+          .select({ status: tasks.status, number: tasks.number })
+          .from(tasks)
+          .where(eq(tasks.id, meta.taskId))
+          .limit(1)
+
+        if (linkedTask && linkedTask.status === "done") {
+          toClose.push({
+            id: req.id,
+            number: req.number,
+            reason: `auto-closed: associated task MESH-${linkedTask.number} is already done (moot)`,
+          })
+        }
+      }
+    }
+
+    for (const item of toClose) {
+      await tx
+        .update(tasks)
+        .set({
+          status: "done",
+          statusChangedAt: now,
+          completedAt: now,
+          outcomeKind: "decision",
+          outcomeRef: item.reason,
+          updatedAt: now,
+        })
+        .where(eq(tasks.id, item.id))
+
+      await tx.insert(taskEvents).values({
+        taskId: item.id,
+        actorType: "system",
+        actorId: null,
+        fromStatus: "open",
+        toStatus: "done",
+        reason: item.reason,
+        outcomeKind: "decision",
+        outcomeRef: item.reason,
+        metadata: { autoClosed: true },
+        createdAt: now,
+      })
+    }
+
+    return {
+      closedCount: toClose.length,
+      closedRequestIds: toClose.map((t) => t.id),
     }
   })
 }

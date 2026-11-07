@@ -270,7 +270,7 @@ export const MCP_TOOLS: McpTool[] = [
     name: "update_task",
     title: "Update task",
     description:
-      "Report progress on a task you hold: change status, add a progress note, or release it. Setting status \"stuck\" requires unblock_needs. Setting status \"done\" requires an outcome (artifact, submission, external_change, or decision). Moving to in_progress with open blockers requires a reason.",
+      "Report progress on a task you hold: change status, add a progress note, or release it. Setting status \"stuck\" requires unblock_needs. Setting status \"stuck\" with unblock_needs \"human_answer\" is a human-fact blocker: you cannot claim a human-fact blocker before reading the form or application that would ask for it; provide form_ref or cite the exact form/field in unblock_detail. Setting status \"done\" requires an outcome (artifact, submission, external_change, or decision). Moving to in_progress with open blockers requires a reason.",
     schema: z.object({
       task_id: uuid,
       status: taskStatus.optional(),
@@ -289,7 +289,8 @@ export const MCP_TOOLS: McpTool[] = [
         ])
         .optional()
         .describe("Required when status is stuck"),
-      unblock_detail: z.string().max(1_000).optional(),
+      unblock_detail: z.string().max(1_000).optional().describe("Explanation of blocker. When unblock_needs is human_answer, must cite form/application evidence."),
+      form_ref: z.string().optional().describe("URL or canvas/form citation when setting stuck due to human_answer (cannot claim human-fact blocker before reading the form)"),
       blocked_by: z.array(uuid).optional().describe("Array of task IDs blocking this task"),
       outcome: z
         .object({
@@ -317,6 +318,7 @@ export const MCP_TOOLS: McpTool[] = [
         dueAt: input.due_at,
         unblockNeeds: input.unblock_needs,
         unblockDetail: input.unblock_detail,
+        formRef: input.form_ref,
         blockedBy: input.blocked_by,
         outcome: input.outcome,
         reason: input.reason,
@@ -326,10 +328,11 @@ export const MCP_TOOLS: McpTool[] = [
     name: "request_human_decision",
     title: "Ask the humans",
     description:
-      "Check with the humans first. Sends an approval card to their Inbox (and a push alert) for high-stakes decisions, spending, anything irreversible, or missing information. Repeats with the same question or fold_key automatically fold into the existing question.",
+      "Check with the humans first. Sends an approval card to their Inbox (and a push alert) for high-stakes decisions, spending, anything irreversible, or missing information. Repeats with the same question or fold_key automatically fold into the existing question. Asks for completed tasks auto-close as moot.",
     schema: z.object({
       room_id: z.string().optional(),
       room: z.string().optional(),
+      task_id: uuid.optional().describe("Optional task ID this request blocks or belongs to; asks for completed tasks auto-close as moot"),
       question: z.string().min(4).max(120),
       details: z.string().max(4_000).optional(),
       options: z.array(z.string().min(1).max(60)).max(6).optional(),
@@ -339,6 +342,7 @@ export const MCP_TOOLS: McpTool[] = [
       requestHumanDecision(agent, {
         roomId: input.room_id,
         room: input.room,
+        taskId: input.task_id,
         question: input.question,
         details: input.details,
         options: input.options,

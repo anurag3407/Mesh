@@ -14,6 +14,26 @@ function createMockDb() {
   const tasksTable: any[] = []
   const eventsTable: any[] = []
 
+  function extractStrings(cond: any): string[] {
+    const result: string[] = []
+    if (!cond) return result
+    if (typeof cond === "string") return [cond]
+    if (Array.isArray(cond.queryChunks)) {
+      for (const chunk of cond.queryChunks) {
+        if (typeof chunk === "string" && !["", " = ", "(", ")", " and ", " or "].includes(chunk)) {
+          result.push(chunk)
+        } else if (chunk && typeof chunk === "object") {
+          if ("value" in chunk) {
+            if (typeof chunk.value === "string") result.push(chunk.value)
+          } else if ("queryChunks" in chunk) {
+            result.push(...extractStrings(chunk))
+          }
+        }
+      }
+    }
+    return result
+  }
+
   const db: any = {
     select: () => ({
       from: () => ({
@@ -25,8 +45,12 @@ function createMockDb() {
               ]),
           }),
         }),
-        where: () => ({
+        where: (condition: any) => ({
           limit: (n: number) => {
+            const strings = extractStrings(condition)
+            const matched = tasksTable.filter((t) => strings.includes(t.id))
+            if (matched.length) return matched.slice(0, n)
+
             const openReqs = tasksTable.filter(
               (t) => t.kind === "request" && t.status === "open",
             )
@@ -102,5 +126,44 @@ describe("requestHumanDecision deduplication & folding", () => {
     expect(tasksTable.length).toBe(1)
     // Invariant: no duplicate push sent on repeated ask
     expect(pushNotifications.length).toBe(1)
+  })
+
+  it("invariant: requestHumanDecision stores taskId in metadata", async () => {
+    pushNotifications.length = 0
+    const { db, tasksTable } = createMockDb()
+
+    const dbModule = await import("../db")
+    vi.spyOn(dbModule, "getDb").mockReturnValue(db)
+
+    const res = await requestHumanDecision(agent, {
+      roomId,
+      taskId: "task-100",
+      question: "Which database schema version to migrate?",
+    })
+
+    expect(res.status).toBe("waiting_for_human")
+    expect(tasksTable.length).toBe(1)
+    expect(tasksTable[0].metadata?.taskId).toBe("task-100")
+  })
+
+  it("invariant: requestHumanDecision rejects asks on already done tasks as moot", async () => {
+    const { db, tasksTable } = createMockDb()
+    tasksTable.push({
+      id: "task-already-done",
+      number: 105,
+      kind: "task",
+      status: "done",
+    })
+
+    const dbModule = await import("../db")
+    vi.spyOn(dbModule, "getDb").mockReturnValue(db)
+
+    await expect(
+      requestHumanDecision(agent, {
+        roomId,
+        taskId: "task-already-done",
+        question: "Should we run extra migrations?",
+      }),
+    ).rejects.toThrow("task is already done; this ask is moot")
   })
 })

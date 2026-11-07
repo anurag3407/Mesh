@@ -131,7 +131,7 @@ export function taskTools(args: {
     {
       name: "update_task",
       description:
-        "Report progress on a task you hold: status, a progress note, or release it. Done requires outcome (artifact, submission, external_change, or decision). Stuck requires unblock_needs. Moving to in_progress with open blockers requires reason." +
+        "Report progress on a task you hold: status, a progress note, or release it. Done requires outcome (artifact, submission, external_change, or decision). Stuck requires unblock_needs. Stuck with human_answer requires form evidence (form_ref or explicit form and required field in unblock_detail). Moving to in_progress with open blockers requires reason." +
         handoff,
       schema: z.object({
         task_id: z.string().uuid(),
@@ -142,6 +142,7 @@ export function taskTools(args: {
         due_at: z.string().optional(),
         unblock_needs: unblockNeedsSchema.optional(),
         unblock_detail: z.string().max(1_000).optional(),
+        form_ref: z.string().optional(),
         blocked_by: z.array(z.string().uuid()).optional(),
         outcome: z
           .object({
@@ -161,6 +162,7 @@ export function taskTools(args: {
         due_at?: string
         unblock_needs?: z.infer<typeof unblockNeedsSchema>
         unblock_detail?: string
+        form_ref?: string
         blocked_by?: string[]
         outcome?: {
           kind: z.infer<typeof outcomeKindSchema>
@@ -178,6 +180,7 @@ export function taskTools(args: {
             dueAt: input.due_at,
             unblockNeeds: input.unblock_needs,
             unblockDetail: input.unblock_detail,
+            formRef: input.form_ref,
             blockedBy: input.blocked_by,
             outcome: input.outcome,
             reason: input.reason,
@@ -187,18 +190,20 @@ export function taskTools(args: {
     {
       name: "request_human_decision",
       description:
-        "Check with the humans first. Puts a decision card in their Inbox for anything high-stakes, costly, irreversible or unclear. Give 2–6 short options so they can answer in one tap. Repeats with same question or fold_key fold into the existing question.",
+        "Check with the humans first. Puts a decision card in their Inbox for anything high-stakes, costly, irreversible or unclear. Give 2–6 short options so they can answer in one tap. Repeats with same question or fold_key fold into the existing question. Asks for completed tasks auto-close as moot.",
       schema: z.object({
+        task_id: z.string().uuid().optional(),
         question: z.string().min(4).max(120),
         details: z.string().max(4_000).optional(),
         options: z.array(z.string().min(1).max(60)).max(6).optional(),
         fold_key: z.string().max(64).optional(),
       }),
       dangerous: false,
-      execute: (input: { question: string; details?: string; options?: string[]; fold_key?: string }) =>
+      execute: (input: { task_id?: string; question: string; details?: string; options?: string[]; fold_key?: string }) =>
         friendly(() =>
           requestHumanDecision(agent, {
             roomId: args.roomId,
+            taskId: input.task_id,
             question: input.question,
             details: input.details,
             options: input.options,

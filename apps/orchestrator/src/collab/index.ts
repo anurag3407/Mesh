@@ -541,12 +541,14 @@ export async function updateTask(
     dueAt?: string | null
     unblockNeeds?: UnblockNeeds | null
     unblockDetail?: string | null
+    formRef?: string | null
     blockedBy?: string[] | null
     outcome?: {
       kind: OutcomeKind
       ref?: string | null
     } | null
     reason?: string | null
+    metadata?: Record<string, unknown>
   },
 ) {
   const task = await loadTaskInOrg(agent, args.taskId)
@@ -575,6 +577,10 @@ export async function updateTask(
     outcome: args.outcome,
     reason: args.reason,
     note: args.note,
+    metadata: {
+      ...(args.formRef ? { formRef: args.formRef } : {}),
+      ...(args.metadata ?? {}),
+    },
   })
 
   let helpMessage: Awaited<ReturnType<typeof postAgentMessage>> | null = null
@@ -610,6 +616,7 @@ export async function requestHumanDecision(
   args: {
     roomId?: string
     room?: string
+    taskId?: string
     question: string
     details?: string
     options?: string[]
@@ -619,6 +626,21 @@ export async function requestHumanDecision(
   const roomId = await resolveAgentRoomId(agent, args.roomId || args.room)
   const options = [...new Set((args.options ?? []).map((o) => o.trim()).filter(Boolean))].slice(0, 6)
   const effectiveFoldKey = computeFoldKey(args.question, args.foldKey)
+
+  // Validate linked task if provided: asks for already completed tasks are rejected as moot
+  if (args.taskId) {
+    const [targetTask] = await getDb()
+      .select({ id: tasks.id, status: tasks.status, number: tasks.number })
+      .from(tasks)
+      .where(eq(tasks.id, args.taskId))
+      .limit(1)
+
+    if (targetTask && targetTask.status === "done") {
+      throw new CollabError(
+        `cannot request decision on MESH-${targetTask.number}: task is already done; this ask is moot`,
+      )
+    }
+  }
 
   // Deduplicate against still-open requests in the same room with same foldKey
   const [existing] = await getDb()
@@ -674,7 +696,12 @@ export async function requestHumanDecision(
       foldKey: effectiveFoldKey,
       askedCount: 1,
       expiresAt: new Date(Date.now() + 72 * 60 * 60 * 1000),
-      metadata: { source: "agent", createdByAgent: agent.agentId, options },
+      metadata: {
+        source: "agent",
+        createdByAgent: agent.agentId,
+        options,
+        ...(args.taskId ? { taskId: args.taskId } : {}),
+      },
     })
     .returning({ id: tasks.id, number: tasks.number })
 
@@ -687,7 +714,11 @@ export async function requestHumanDecision(
     fromStatus: null,
     toStatus: "open",
     reason: "human decision requested",
-    metadata: { foldKey: effectiveFoldKey, options },
+    metadata: {
+      foldKey: effectiveFoldKey,
+      options,
+      ...(args.taskId ? { taskId: args.taskId } : {}),
+    },
   })
 
   notifyHumansNeeded({ roomId, agentId: agent.agentId, kind: "request", detail: args.question })
