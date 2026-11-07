@@ -3,30 +3,45 @@ import {
   FlatList,
   RefreshControl,
   SafeAreaView,
+  StatusBar,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
   View,
 } from "react-native"
-import { Hash, MessageSquare, Bot, Search, RefreshCw, Terminal } from "lucide-react-native"
+import {
+  Camera,
+  Search,
+  MoreVertical,
+  MessageSquare,
+  Bot,
+  Hash,
+  CheckCheck,
+  Plus,
+} from "lucide-react-native"
 import { useRooms } from "../hooks/useRooms"
 import type { Room } from "../types"
 
 export function RoomsScreen({ navigation }: any) {
   const { rooms, orgSlug, loading, refresh } = useRooms()
+  const [searchOpen, setSearchOpen] = useState(false)
   const [search, setSearch] = useState("")
+  const [activeTab, setActiveTab] = useState<"chats" | "tasks" | "computers">("chats")
 
   const filtered = rooms.filter((r) =>
     r.name.toLowerCase().includes(search.toLowerCase())
   )
 
-  const renderRoom = ({ item }: { item: Room }) => {
+  const renderRoom = ({ item, index }: { item: Room; index: number }) => {
     const isDm = item.kind === "dm"
+    // Distinct avatar accent colors for agents like WhatsApp group avatars
+    const avatarColors = ["#10b981", "#3b82f6", "#8b5cf6", "#f59e0b", "#ec4899", "#06b6d4"]
+    const color = avatarColors[index % avatarColors.length]
 
     return (
       <TouchableOpacity
-        style={styles.roomItem}
+        style={styles.chatRow}
         activeOpacity={0.7}
         onPress={() =>
           navigation.navigate("Chat", {
@@ -36,28 +51,38 @@ export function RoomsScreen({ navigation }: any) {
           })
         }
       >
-        <View style={[styles.iconCircle, isDm ? styles.dmCircle : styles.channelCircle]}>
+        {/* Contact / Agent Circular Avatar */}
+        <View style={[styles.avatar, { backgroundColor: `${color}20`, borderColor: color }]}>
           {isDm ? (
-            <Bot size={18} color="#10b981" />
+            <Bot size={22} color={color} />
           ) : (
-            <Hash size={18} color="#60a5fa" />
+            <Hash size={22} color={color} />
           )}
         </View>
 
-        <View style={styles.roomInfo}>
-          <View style={styles.nameRow}>
-            <Text style={styles.roomName}>{item.name}</Text>
-            <View style={styles.turnModeBadge}>
-              <Text style={styles.turnModeText}>{item.turnMode}</Text>
-            </View>
-          </View>
-          {item.systemDirective ? (
-            <Text style={styles.directive} numberOfLines={1}>
-              {item.systemDirective}
+        {/* Center Content */}
+        <View style={styles.chatDetails}>
+          <View style={styles.topRow}>
+            <Text style={styles.contactName} numberOfLines={1}>
+              {isDm ? `@${item.name}` : item.name}
             </Text>
-          ) : (
-            <Text style={styles.metaText}>{item.kind} workspace room</Text>
-          )}
+            <Text style={styles.timeText}>10:42 AM</Text>
+          </View>
+
+          <View style={styles.bottomRow}>
+            <View style={styles.snippetRow}>
+              <CheckCheck size={15} color="#53bdeb" style={styles.checkIcon} />
+              <Text style={styles.snippetText} numberOfLines={1}>
+                {item.systemDirective || "Tap to chat with autonomous agents..."}
+              </Text>
+            </View>
+
+            {item.turnMode === "debate" && (
+              <View style={styles.badge}>
+                <Text style={styles.badgeText}>DEBATE</Text>
+              </View>
+            )}
+          </View>
         </View>
       </TouchableOpacity>
     )
@@ -65,46 +90,95 @@ export function RoomsScreen({ navigation }: any) {
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <View>
-          <Text style={styles.headerTitle}>Sayabot Rooms</Text>
-          <Text style={styles.headerSub}>Workspace: #{orgSlug}</Text>
+      <StatusBar barStyle="light-content" backgroundColor="#1f2c34" />
+
+      {/* WhatsApp Top Header Bar */}
+      <View style={styles.topBar}>
+        <Text style={styles.appTitle}>Sayabot</Text>
+        <View style={styles.topActions}>
+          <TouchableOpacity style={styles.topActionBtn}>
+            <Camera size={20} color="#aebac1" />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.topActionBtn}
+            onPress={() => setSearchOpen(!searchOpen)}
+          >
+            <Search size={20} color="#aebac1" />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.topActionBtn}
+            onPress={() => navigation.navigate("SettingsTab")}
+          >
+            <MoreVertical size={20} color="#aebac1" />
+          </TouchableOpacity>
         </View>
-        <TouchableOpacity style={styles.refreshBtn} onPress={refresh}>
-          <RefreshCw size={18} color="#94a3b8" />
+      </View>
+
+      {/* Optional Search Bar */}
+      {searchOpen && (
+        <View style={styles.searchBar}>
+          <Search size={16} color="#8696a0" />
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Search agents or rooms..."
+            placeholderTextColor="#8696a0"
+            value={search}
+            onChangeText={setSearch}
+            autoFocus
+          />
+        </View>
+      )}
+
+      {/* WhatsApp Horizontal Sub-Tabs */}
+      <View style={styles.tabBar}>
+        <TouchableOpacity
+          style={[styles.tabItem, activeTab === "chats" && styles.tabItemActive]}
+          onPress={() => setActiveTab("chats")}
+        >
+          <Text style={[styles.tabTitle, activeTab === "chats" && styles.tabTitleActive]}>
+            CHATS
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.tabItem, activeTab === "tasks" && styles.tabItemActive]}
+          onPress={() => navigation.navigate("TasksTab")}
+        >
+          <Text style={[styles.tabTitle, activeTab === "tasks" && styles.tabTitleActive]}>
+            TASKS
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.tabItem, activeTab === "computers" && styles.tabItemActive]}
+          onPress={() => navigation.navigate("ComputersTab")}
+        >
+          <Text style={[styles.tabTitle, activeTab === "computers" && styles.tabTitleActive]}>
+            COMPUTERS
+          </Text>
         </TouchableOpacity>
       </View>
 
-      {/* Search Input */}
-      <View style={styles.searchBar}>
-        <Search size={16} color="#64748b" />
-        <TextInput
-          style={styles.searchInput}
-          placeholder="Filter rooms or direct agent chats..."
-          placeholderTextColor="#475569"
-          value={search}
-          onChangeText={setSearch}
-        />
-      </View>
-
-      {/* Room List */}
+      {/* WhatsApp Chat List */}
       <FlatList
         data={filtered}
         keyExtractor={(item) => item.id}
         renderItem={renderRoom}
         contentContainerStyle={styles.listContent}
         refreshControl={
-          <RefreshControl refreshing={loading} onRefresh={refresh} tintColor="#10b981" />
+          <RefreshControl refreshing={loading} onRefresh={refresh} tintColor="#00a884" />
         }
-        ListEmptyComponent={
-          !loading ? (
-            <View style={styles.emptyContainer}>
-              <Text style={styles.emptyText}>No rooms found.</Text>
-            </View>
-          ) : null
-        }
+        ItemSeparatorComponent={() => <View style={styles.separator} />}
       />
+
+      {/* WhatsApp Green Floating Action Button (FAB) */}
+      <TouchableOpacity
+        style={styles.fab}
+        activeOpacity={0.85}
+        onPress={() => navigation.navigate("TasksTab")}
+      >
+        <MessageSquare size={22} color="#ffffff" />
+      </TouchableOpacity>
     </SafeAreaView>
   )
 }
@@ -112,122 +186,162 @@ export function RoomsScreen({ navigation }: any) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#060907",
+    backgroundColor: "#121b22",
   },
-  header: {
+  topBar: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingHorizontal: 18,
-    paddingVertical: 14,
-    borderBottomWidth: 1,
-    borderColor: "#161f1a",
+    backgroundColor: "#1f2c34",
+    paddingHorizontal: 16,
+    paddingVertical: 12,
   },
-  headerTitle: {
-    color: "#f8fafc",
+  appTitle: {
+    color: "#e9edef",
     fontSize: 20,
-    fontWeight: "800",
+    fontWeight: "700",
+    letterSpacing: 0.2,
   },
-  headerSub: {
-    color: "#10b981",
-    fontSize: 12,
-    fontWeight: "600",
-    marginTop: 2,
-  },
-  refreshBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: "#111814",
+  topActions: {
+    flexDirection: "row",
     alignItems: "center",
-    justifyContent: "center",
+    gap: 18,
+  },
+  topActionBtn: {
+    padding: 4,
   },
   searchBar: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#0f1612",
-    marginHorizontal: 16,
-    marginVertical: 12,
+    backgroundColor: "#1f2c34",
     paddingHorizontal: 14,
-    height: 42,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: "#1e2922",
+    paddingVertical: 8,
     gap: 10,
+    borderBottomWidth: 1,
+    borderColor: "#2a3942",
   },
   searchInput: {
     flex: 1,
-    color: "#f8fafc",
-    fontSize: 14,
+    color: "#e9edef",
+    fontSize: 15,
+  },
+  tabBar: {
+    flexDirection: "row",
+    backgroundColor: "#1f2c34",
+    elevation: 3,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 1.5,
+  },
+  tabItem: {
+    flex: 1,
+    paddingVertical: 12,
+    alignItems: "center",
+    borderBottomWidth: 3,
+    borderBottomColor: "transparent",
+  },
+  tabItemActive: {
+    borderBottomColor: "#00a884",
+  },
+  tabTitle: {
+    color: "#8696a0",
+    fontSize: 13,
+    fontWeight: "700",
+    letterSpacing: 0.5,
+  },
+  tabTitleActive: {
+    color: "#00a884",
   },
   listContent: {
-    paddingBottom: 24,
+    paddingBottom: 80,
   },
-  roomItem: {
+  chatRow: {
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: 18,
-    paddingVertical: 14,
-    borderBottomWidth: 1,
-    borderColor: "#0f1612",
-    gap: 14,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
   },
-  iconCircle: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+  avatar: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     alignItems: "center",
     justifyContent: "center",
+    marginRight: 14,
+    borderWidth: 1,
   },
-  channelCircle: {
-    backgroundColor: "#172554",
-  },
-  dmCircle: {
-    backgroundColor: "#064e3b",
-  },
-  roomInfo: {
+  chatDetails: {
     flex: 1,
+    justifyContent: "center",
   },
-  nameRow: {
+  topRow: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    marginBottom: 2,
+    marginBottom: 4,
   },
-  roomName: {
-    color: "#f8fafc",
+  contactName: {
+    color: "#e9edef",
     fontSize: 16,
-    fontWeight: "700",
+    fontWeight: "600",
+    flex: 1,
   },
-  turnModeBadge: {
-    backgroundColor: "#111814",
-    paddingHorizontal: 8,
+  timeText: {
+    color: "#8696a0",
+    fontSize: 11.5,
+    marginLeft: 8,
+  },
+  bottomRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  snippetRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    flex: 1,
+    gap: 4,
+  },
+  checkIcon: {
+    marginRight: 1,
+  },
+  snippetText: {
+    color: "#8696a0",
+    fontSize: 13.5,
+    flex: 1,
+  },
+  badge: {
+    backgroundColor: "#202c33",
+    paddingHorizontal: 6,
     paddingVertical: 2,
-    borderRadius: 6,
-    borderWidth: 1,
-    borderColor: "#1e2922",
+    borderRadius: 4,
+    marginLeft: 6,
   },
-  turnModeText: {
-    color: "#94a3b8",
+  badgeText: {
+    color: "#00a884",
     fontSize: 10,
     fontWeight: "700",
-    textTransform: "uppercase",
   },
-  directive: {
-    color: "#64748b",
-    fontSize: 12,
+  separator: {
+    height: 1,
+    backgroundColor: "#1f2c34",
+    marginLeft: 78,
   },
-  metaText: {
-    color: "#475569",
-    fontSize: 12,
-    textTransform: "capitalize",
-  },
-  emptyContainer: {
-    padding: 32,
+  fab: {
+    position: "absolute",
+    right: 18,
+    bottom: 22,
+    width: 54,
+    height: 54,
+    borderRadius: 27,
+    backgroundColor: "#00a884",
     alignItems: "center",
-  },
-  emptyText: {
-    color: "#64748b",
-    fontSize: 14,
+    justifyContent: "center",
+    elevation: 4,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.35,
+    shadowRadius: 3,
   },
 })

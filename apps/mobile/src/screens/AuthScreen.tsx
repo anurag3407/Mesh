@@ -3,13 +3,14 @@ import {
   KeyboardAvoidingView,
   Platform,
   SafeAreaView,
+  StatusBar,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
   View,
 } from "react-native"
-import { Lock, Mail, Server, ShieldCheck } from "lucide-react-native"
+import { Lock, Mail, MessageSquare } from "lucide-react-native"
 import { Button } from "../components/ui/Button"
 import { supabase } from "../core/supabase"
 
@@ -58,19 +59,20 @@ export function AuthScreen({ onSuccess }: AuthScreenProps) {
 
   return (
     <SafeAreaView style={styles.container}>
+      <StatusBar barStyle="light-content" backgroundColor="#121b22" />
       <KeyboardAvoidingView
         behavior={Platform.OS === "ios" ? "padding" : undefined}
         style={styles.keyboardView}
       >
         <View style={styles.content}>
-          {/* Logo / Badge */}
+          {/* WhatsApp Green Icon Badge */}
           <View style={styles.logoBadge}>
-            <ShieldCheck size={36} color="#10b981" />
+            <MessageSquare size={38} color="#ffffff" />
           </View>
 
-          <Text style={styles.title}>Sayabot Command Center</Text>
+          <Text style={styles.title}>Welcome to Sayabot</Text>
           <Text style={styles.subtitle}>
-            Multiplayer Autonomous AI Agents with Persistent Linux Computers
+            Simple, private messaging with autonomous AI teammates and persistent Linux computers.
           </Text>
 
           {errorMsg && (
@@ -82,11 +84,11 @@ export function AuthScreen({ onSuccess }: AuthScreenProps) {
           {/* Form */}
           <View style={styles.form}>
             <View style={styles.inputContainer}>
-              <Mail size={18} color="#64748b" style={styles.inputIcon} />
+              <Mail size={18} color="#8696a0" style={styles.inputIcon} />
               <TextInput
                 style={styles.input}
-                placeholder="developer@sayalabs.in"
-                placeholderTextColor="#475569"
+                placeholder="Enter email address"
+                placeholderTextColor="#8696a0"
                 keyboardType="email-address"
                 autoCapitalize="none"
                 value={email}
@@ -95,24 +97,27 @@ export function AuthScreen({ onSuccess }: AuthScreenProps) {
             </View>
 
             <View style={styles.inputContainer}>
-              <Lock size={18} color="#64748b" style={styles.inputIcon} />
+              <Lock size={18} color="#8696a0" style={styles.inputIcon} />
               <TextInput
                 style={styles.input}
-                placeholder="Password"
-                placeholderTextColor="#475569"
+                placeholder="Enter password"
+                placeholderTextColor="#8696a0"
                 secureTextEntry
                 value={password}
                 onChangeText={setPassword}
               />
             </View>
 
-            <Button
-              title={isSignUp ? "Create Workspace Account" : "Connect to Workspace"}
-              variant="primary"
-              loading={loading}
-              onPress={handleSubmit}
+            <TouchableOpacity
               style={styles.submitBtn}
-            />
+              onPress={handleSubmit}
+              disabled={loading}
+              activeOpacity={0.85}
+            >
+              <Text style={styles.submitBtnText}>
+                {loading ? "Connecting..." : isSignUp ? "Agree & Continue" : "Sign In"}
+              </Text>
+            </TouchableOpacity>
 
             <TouchableOpacity
               onPress={() => {
@@ -124,7 +129,7 @@ export function AuthScreen({ onSuccess }: AuthScreenProps) {
               <Text style={styles.toggleText}>
                 {isSignUp
                   ? "Already have an account? Sign In"
-                  : "Need an account? Register with Supabase"}
+                  : "New to workspace? Register account"}
               </Text>
             </TouchableOpacity>
           </View>
@@ -137,44 +142,43 @@ export function AuthScreen({ onSuccess }: AuthScreenProps) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#060907",
+    backgroundColor: "#121b22",
   },
   keyboardView: {
     flex: 1,
     justifyContent: "center",
   },
   content: {
-    paddingHorizontal: 24,
+    paddingHorizontal: 28,
     alignItems: "center",
   },
   logoBadge: {
     width: 68,
     height: 68,
     borderRadius: 34,
-    backgroundColor: "#0d261b",
-    borderWidth: 1,
-    borderColor: "#10b981",
+    backgroundColor: "#00a884",
     alignItems: "center",
     justifyContent: "center",
-    marginBottom: 16,
+    marginBottom: 20,
+    elevation: 3,
   },
   title: {
-    color: "#f8fafc",
+    color: "#e9edef",
     fontSize: 22,
-    fontWeight: "800",
+    fontWeight: "700",
     textAlign: "center",
   },
   subtitle: {
-    color: "#94a3b8",
-    fontSize: 13,
+    color: "#8696a0",
+    fontSize: 13.5,
     textAlign: "center",
-    marginTop: 6,
-    marginBottom: 24,
-    maxWidth: 280,
-    lineHeight: 18,
+    marginTop: 8,
+    marginBottom: 28,
+    lineHeight: 19,
+    maxWidth: 300,
   },
   errorBox: {
-    backgroundColor: "#450a0a",
+    backgroundColor: "#3b1e1e",
     padding: 10,
     borderRadius: 8,
     marginBottom: 16,
@@ -192,31 +196,41 @@ const styles = StyleSheet.create({
   inputContainer: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#0f1612",
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: "#1e2922",
+    backgroundColor: "#1f2c34",
+    borderRadius: 10,
     paddingHorizontal: 14,
-    height: 50,
+    height: 48,
+    borderBottomWidth: 2,
+    borderBottomColor: "#00a884",
   },
   inputIcon: {
     marginRight: 10,
   },
   input: {
     flex: 1,
-    color: "#f8fafc",
+    color: "#e9edef",
     fontSize: 15,
   },
   submitBtn: {
     marginTop: 8,
     height: 48,
+    backgroundColor: "#00a884",
+    borderRadius: 24,
+    alignItems: "center",
+    justifyContent: "center",
+    elevation: 2,
+  },
+  submitBtnText: {
+    color: "#121b22",
+    fontSize: 15,
+    fontWeight: "700",
   },
   toggleBtn: {
     paddingVertical: 12,
     alignItems: "center",
   },
   toggleText: {
-    color: "#10b981",
+    color: "#53bdeb",
     fontSize: 13,
     fontWeight: "600",
   },

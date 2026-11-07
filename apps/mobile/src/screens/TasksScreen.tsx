@@ -3,15 +3,15 @@ import {
   FlatList,
   RefreshControl,
   SafeAreaView,
+  StatusBar,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from "react-native"
-import { CheckSquare, Filter, RefreshCw, Zap } from "lucide-react-native"
+import { CheckSquare, RefreshCw } from "lucide-react-native"
 import { useTasks } from "../hooks/useTasks"
 import { TaskCard } from "../components/tasks/TaskCard"
-import type { TaskItem } from "../types"
 
 export function TasksScreen() {
   const { tasks, loading, refresh } = useTasks()
@@ -25,14 +25,15 @@ export function TasksScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
+      <StatusBar barStyle="light-content" backgroundColor="#1f2c34" />
       {/* Header */}
       <View style={styles.header}>
         <View>
-          <Text style={styles.title}>Autonomous Task Board</Text>
+          <Text style={styles.title}>Autonomous Tasks</Text>
           <Text style={styles.subtitle}>24/7 Background Agent Work Queue</Text>
         </View>
         <TouchableOpacity style={styles.refreshBtn} onPress={refresh}>
-          <RefreshCw size={18} color="#94a3b8" />
+          <RefreshCw size={18} color="#aebac1" />
         </TouchableOpacity>
       </View>
 
@@ -58,12 +59,12 @@ export function TasksScreen() {
         renderItem={({ item }) => <TaskCard task={item} />}
         contentContainerStyle={styles.listContent}
         refreshControl={
-          <RefreshControl refreshing={loading} onRefresh={refresh} tintColor="#10b981" />
+          <RefreshControl refreshing={loading} onRefresh={refresh} tintColor="#00a884" />
         }
         ListEmptyComponent={
           !loading ? (
             <View style={styles.emptyContainer}>
-              <CheckSquare size={36} color="#334155" />
+              <CheckSquare size={36} color="#8696a0" />
               <Text style={styles.emptyText}>No tasks found in this view.</Text>
             </View>
           ) : null
@@ -76,66 +77,58 @@ export function TasksScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#060907",
+    backgroundColor: "#121b22",
   },
   header: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingHorizontal: 18,
-    paddingVertical: 14,
-    borderBottomWidth: 1,
-    borderColor: "#161f1a",
+    backgroundColor: "#1f2c34",
+    paddingHorizontal: 16,
+    paddingVertical: 12,
   },
   title: {
-    color: "#f8fafc",
-    fontSize: 20,
-    fontWeight: "800",
+    color: "#e9edef",
+    fontSize: 19,
+    fontWeight: "700",
   },
   subtitle: {
-    color: "#10b981",
+    color: "#00a884",
     fontSize: 12,
     fontWeight: "600",
     marginTop: 2,
   },
   refreshBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: "#111814",
-    alignItems: "center",
-    justifyContent: "center",
+    padding: 6,
   },
   tabsRow: {
     flexDirection: "row",
-    paddingHorizontal: 14,
-    paddingVertical: 10,
+    backgroundColor: "#1f2c34",
+    paddingHorizontal: 12,
+    paddingBottom: 10,
     gap: 8,
     borderBottomWidth: 1,
-    borderColor: "#0f1612",
+    borderColor: "#2a3942",
   },
   tab: {
     paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 8,
-    backgroundColor: "#111814",
-    borderWidth: 1,
-    borderColor: "#1e2922",
+    paddingVertical: 5,
+    borderRadius: 16,
+    backgroundColor: "#202c33",
   },
   tabActive: {
-    backgroundColor: "#064e3b",
-    borderColor: "#10b981",
+    backgroundColor: "#00a884",
   },
   tabText: {
-    color: "#64748b",
+    color: "#8696a0",
     fontSize: 11,
     fontWeight: "700",
   },
   tabTextActive: {
-    color: "#34d399",
+    color: "#121b22",
   },
   listContent: {
-    padding: 14,
+    padding: 12,
   },
   emptyContainer: {
     padding: 40,
@@ -143,7 +136,7 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   emptyText: {
-    color: "#64748b",
+    color: "#8696a0",
     fontSize: 14,
   },
 })

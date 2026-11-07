@@ -14,15 +14,15 @@ export function RootNavigator() {
 
   if (loading) {
     return (
-      <View style={{ flex: 1, backgroundColor: "#060907", alignItems: "center", justifyContent: "center" }}>
-        <ActivityIndicator size="large" color="#10b981" />
+      <View style={{ flex: 1, backgroundColor: "#121b22", alignItems: "center", justifyContent: "center" }}>
+        <ActivityIndicator size="large" color="#00a884" />
       </View>
     )
   }
 
   return (
     <NavigationContainer>
-      <Stack.Navigator screenOptions={{ headerShown: false, contentStyle: { backgroundColor: "#060907" } }}>
+      <Stack.Navigator screenOptions={{ headerShown: false, contentStyle: { backgroundColor: "#121b22" } }}>
         {!session ? (
           <Stack.Screen name="Auth" component={AuthScreenWrapper} />
         ) : (

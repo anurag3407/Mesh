@@ -14,15 +14,15 @@ export function TabNavigator() {
       screenOptions={{
         headerShown: false,
         tabBarStyle: {
-          backgroundColor: "#080c0a",
-          borderTopColor: "#161f1a",
+          backgroundColor: "#1f2c34",
+          borderTopColor: "#2a3942",
           borderTopWidth: 1,
           height: 60,
           paddingBottom: 8,
           paddingTop: 6,
         },
-        tabBarActiveTintColor: "#10b981",
-        tabBarInactiveTintColor: "#64748b",
+        tabBarActiveTintColor: "#00a884",
+        tabBarInactiveTintColor: "#8696a0",
         tabBarLabelStyle: {
           fontSize: 11,
           fontWeight: "600",
@@ -33,7 +33,7 @@ export function TabNavigator() {
         name="RoomsTab"
         component={RoomsScreen}
         options={{
-          tabBarLabel: "Rooms",
+          tabBarLabel: "Chats",
           tabBarIcon: ({ color, size }) => <MessageSquare size={size} color={color} />,
         }}
       />

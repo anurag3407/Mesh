@@ -3,6 +3,7 @@ import {
   FlatList,
   RefreshControl,
   SafeAreaView,
+  StatusBar,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -20,14 +21,12 @@ export function ComputersScreen() {
   const fetchComputers = async () => {
     setLoading(true)
     try {
-      // Fetch agents that have computer capability enabled
       const { data: agentRows } = await supabase
         .from("agents")
         .select("id, handle, display_name, capabilities")
         .limit(30)
 
       if (agentRows) {
-        // Query orchestrator internal state or simulate container view
         const list: ComputerContainerState[] = agentRows
           .filter((a: any) => a.capabilities?.computer)
           .map((a: any) => ({
@@ -68,13 +67,14 @@ export function ComputersScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
+      <StatusBar barStyle="light-content" backgroundColor="#1f2c34" />
       <View style={styles.header}>
         <View>
           <Text style={styles.title}>Agent Computers</Text>
           <Text style={styles.subtitle}>Persistent Linux Docker Micro-Environments</Text>
         </View>
         <TouchableOpacity style={styles.refreshBtn} onPress={fetchComputers}>
-          <RefreshCw size={18} color="#94a3b8" />
+          <RefreshCw size={18} color="#aebac1" />
         </TouchableOpacity>
       </View>
 
@@ -83,13 +83,13 @@ export function ComputersScreen() {
         keyExtractor={(item) => item.agentId}
         contentContainerStyle={styles.list}
         refreshControl={
-          <RefreshControl refreshing={loading} onRefresh={fetchComputers} tintColor="#10b981" />
+          <RefreshControl refreshing={loading} onRefresh={fetchComputers} tintColor="#00a884" />
         }
         renderItem={({ item }) => (
           <View style={styles.card}>
             <View style={styles.cardTop}>
               <View style={styles.agentInfo}>
-                <Cpu size={20} color="#10b981" />
+                <Cpu size={20} color="#00a884" />
                 <View>
                   <Text style={styles.handle}>@{item.agentHandle}</Text>
                   <Text style={styles.containerName}>ID: {item.containerId}</Text>
@@ -105,19 +105,19 @@ export function ComputersScreen() {
 
             <View style={styles.detailsGrid}>
               <View style={styles.detailItem}>
-                <HardDrive size={13} color="#64748b" />
+                <HardDrive size={13} color="#8696a0" />
                 <Text style={styles.detailText}>Mount: /home/bot (Persistent)</Text>
               </View>
               <View style={styles.detailItem}>
-                <Globe size={13} color="#64748b" />
+                <Globe size={13} color="#8696a0" />
                 <Text style={styles.detailText}>Profile: {item.profile} (Chromium + Bash)</Text>
               </View>
             </View>
 
             <View style={styles.cardFooter}>
-              <Text style={styles.ipText}>IP: {item.ip || "127.0.0.1 (botnet)"}</Text>
+              <Text style={styles.ipText}>IP: {item.ip || "172.28.0.3 (botnet)"}</Text>
               <TouchableOpacity style={styles.powerBtn} onPress={() => handleTogglePower(item)}>
-                <Power size={14} color="#f43f5e" />
+                <Power size={13} color="#f43f5e" />
                 <Text style={styles.powerBtnText}>Sleep / Stop</Text>
               </TouchableOpacity>
             </View>
@@ -126,7 +126,7 @@ export function ComputersScreen() {
         ListEmptyComponent={
           !loading ? (
             <View style={styles.empty}>
-              <Server size={36} color="#334155" />
+              <Server size={36} color="#8696a0" />
               <Text style={styles.emptyText}>No active agent computers deployed.</Text>
             </View>
           ) : null
@@ -137,68 +137,60 @@ export function ComputersScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#060907" },
+  container: { flex: 1, backgroundColor: "#121b22" },
   header: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingHorizontal: 18,
-    paddingVertical: 14,
-    borderBottomWidth: 1,
-    borderColor: "#161f1a",
+    backgroundColor: "#1f2c34",
+    paddingHorizontal: 16,
+    paddingVertical: 12,
   },
-  title: { color: "#f8fafc", fontSize: 20, fontWeight: "800" },
-  subtitle: { color: "#10b981", fontSize: 12, fontWeight: "600", marginTop: 2 },
-  refreshBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: "#111814",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  list: { padding: 14 },
+  title: { color: "#e9edef", fontSize: 19, fontWeight: "700" },
+  subtitle: { color: "#00a884", fontSize: 12, fontWeight: "600", marginTop: 2 },
+  refreshBtn: { padding: 6 },
+  list: { padding: 12 },
   card: {
-    backgroundColor: "#111814",
-    borderRadius: 14,
+    backgroundColor: "#1f2c34",
+    borderRadius: 12,
     padding: 14,
-    marginVertical: 6,
+    marginVertical: 5,
     borderWidth: 1,
-    borderColor: "#1e2922",
+    borderColor: "#2a3942",
   },
   cardTop: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    marginBottom: 12,
+    marginBottom: 10,
   },
   agentInfo: { flexDirection: "row", alignItems: "center", gap: 10 },
-  handle: { color: "#f8fafc", fontSize: 16, fontWeight: "700" },
-  containerName: { color: "#64748b", fontSize: 11, fontFamily: "monospace" },
-  statusBadge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 },
+  handle: { color: "#e9edef", fontSize: 16, fontWeight: "700" },
+  containerName: { color: "#8696a0", fontSize: 11, fontFamily: "monospace" },
+  statusBadge: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 4 },
   bgRunning: { backgroundColor: "#064e3b" },
-  bgStopped: { backgroundColor: "#450a0a" },
+  bgStopped: { backgroundColor: "#3b1e1e" },
   statusText: { fontSize: 10, fontWeight: "700" },
-  textRunning: { color: "#34d399" },
+  textRunning: { color: "#25d366" },
   textStopped: { color: "#f87171" },
   detailsGrid: {
     gap: 6,
-    backgroundColor: "#0a0f0c",
+    backgroundColor: "#121b22",
     padding: 10,
     borderRadius: 8,
     marginBottom: 10,
   },
   detailItem: { flexDirection: "row", alignItems: "center", gap: 6 },
-  detailText: { color: "#94a3b8", fontSize: 12 },
+  detailText: { color: "#8696a0", fontSize: 12 },
   cardFooter: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     paddingTop: 8,
     borderTopWidth: 1,
-    borderColor: "#161f1a",
+    borderColor: "#2a3942",
   },
-  ipText: { color: "#64748b", fontSize: 11, fontFamily: "monospace" },
+  ipText: { color: "#8696a0", fontSize: 11, fontFamily: "monospace" },
   powerBtn: {
     flexDirection: "row",
     alignItems: "center",
@@ -206,9 +198,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 6,
-    backgroundColor: "#2b1111",
+    backgroundColor: "#3b1e1e",
   },
   powerBtnText: { color: "#f87171", fontSize: 11, fontWeight: "700" },
   empty: { padding: 40, alignItems: "center", gap: 12 },
-  emptyText: { color: "#64748b", fontSize: 14 },
+  emptyText: { color: "#8696a0", fontSize: 14 },
 })

@@ -7,7 +7,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native"
-import { Send } from "lucide-react-native"
+import { Send, Smile, Paperclip, Mic } from "lucide-react-native"
 
 interface ChatInputProps {
   onSend: (text: string) => Promise<void>
@@ -30,28 +30,47 @@ export function ChatInput({ onSend, disabled }: ChatInputProps) {
     }
   }
 
+  const hasContent = Boolean(text.trim())
+
   return (
     <KeyboardAvoidingView
       behavior={Platform.OS === "ios" ? "padding" : undefined}
       keyboardVerticalOffset={Platform.OS === "ios" ? 90 : 0}
     >
       <View style={styles.container}>
-        <TextInput
-          style={styles.input}
-          placeholder="Instruct agent (e.g. build feature, run test)..."
-          placeholderTextColor="#64748b"
-          value={text}
-          onChangeText={setText}
-          multiline
-          maxLength={10_000}
-        />
+        {/* WhatsApp Capsule Input Box */}
+        <View style={styles.capsule}>
+          <TouchableOpacity style={styles.iconBtn}>
+            <Smile size={22} color="#8696a0" />
+          </TouchableOpacity>
+
+          <TextInput
+            style={styles.input}
+            placeholder="Message"
+            placeholderTextColor="#8696a0"
+            value={text}
+            onChangeText={setText}
+            multiline
+            maxLength={10_000}
+          />
+
+          <TouchableOpacity style={styles.iconBtn}>
+            <Paperclip size={20} color="#8696a0" />
+          </TouchableOpacity>
+        </View>
+
+        {/* WhatsApp Detached Green Circle Action Button */}
         <TouchableOpacity
-          style={[styles.sendBtn, (!text.trim() || sending || disabled) && styles.sendBtnDisabled]}
-          onPress={handlePressSend}
-          disabled={!text.trim() || sending || disabled}
+          style={styles.actionCircle}
+          onPress={hasContent ? handlePressSend : undefined}
+          disabled={disabled || sending}
           activeOpacity={0.8}
         >
-          <Send size={18} color="#ffffff" />
+          {hasContent ? (
+            <Send size={18} color="#ffffff" style={styles.sendIcon} />
+          ) : (
+            <Mic size={20} color="#ffffff" />
+          )}
         </TouchableOpacity>
       </View>
     </KeyboardAvoidingView>
@@ -62,36 +81,49 @@ const styles = StyleSheet.create({
   container: {
     flexDirection: "row",
     alignItems: "flex-end",
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    backgroundColor: "#080c0a",
-    borderTopWidth: 1,
-    borderColor: "#161f1a",
-    gap: 8,
+    paddingHorizontal: 6,
+    paddingVertical: 6,
+    backgroundColor: "transparent",
+    gap: 6,
+  },
+  capsule: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "flex-end",
+    backgroundColor: "#202c33",
+    borderRadius: 24,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    minHeight: 46,
+    maxHeight: 120,
+  },
+  iconBtn: {
+    padding: 8,
+    justifyContent: "center",
+    alignItems: "center",
   },
   input: {
     flex: 1,
-    minHeight: 40,
-    maxHeight: 120,
-    backgroundColor: "#111814",
-    borderRadius: 20,
-    paddingHorizontal: 16,
-    paddingTop: 10,
-    paddingBottom: 10,
-    color: "#f8fafc",
-    fontSize: 15,
-    borderWidth: 1,
-    borderColor: "#1e2922",
+    color: "#e9edef",
+    fontSize: 16,
+    paddingVertical: 8,
+    paddingHorizontal: 6,
+    maxHeight: 110,
   },
-  sendBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: "#10b981",
+  actionCircle: {
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+    backgroundColor: "#00a884",
     alignItems: "center",
     justifyContent: "center",
+    elevation: 2,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.3,
+    shadowRadius: 2,
   },
-  sendBtnDisabled: {
-    opacity: 0.4,
+  sendIcon: {
+    marginLeft: 2,
   },
 })

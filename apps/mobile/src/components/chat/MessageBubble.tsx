@@ -1,10 +1,19 @@
 import React from "react"
 import { StyleSheet, Text, View } from "react-native"
-import { Bot, User, Sparkles } from "lucide-react-native"
+import { CheckCheck } from "lucide-react-native"
 import type { Message } from "../../types"
 
 interface MessageBubbleProps {
   message: Message
+}
+
+function formatTime(isoString: string): string {
+  try {
+    const date = new Date(isoString)
+    return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+  } catch {
+    return ""
+  }
 }
 
 export function MessageBubble({ message }: MessageBubbleProps) {
@@ -13,139 +22,121 @@ export function MessageBubble({ message }: MessageBubbleProps) {
 
   if (isSystem) {
     return (
-      <View style={styles.systemContainer}>
+      <View style={styles.systemPill}>
         <Text style={styles.systemText}>{message.content}</Text>
       </View>
     )
   }
 
+  const timeStr = formatTime(message.createdAt)
   const senderTag = isAgent
     ? message.senderHandle
       ? `@${message.senderHandle}`
-      : "Agent"
-    : message.senderName || "You"
+      : message.senderName || "Agent"
+    : null
 
   return (
-    <View style={[styles.container, isAgent ? styles.agentRow : styles.humanRow]}>
-      <View style={[styles.avatar, isAgent ? styles.agentAvatar : styles.humanAvatar]}>
-        {isAgent ? <Bot size={15} color="#10b981" /> : <User size={15} color="#60a5fa" />}
-      </View>
-
-      <View style={[styles.bubble, isAgent ? styles.agentBubble : styles.humanBubble]}>
-        <View style={styles.headerRow}>
-          <Text style={[styles.senderName, isAgent ? styles.agentName : styles.humanName]}>
-            {senderTag}
-          </Text>
-          {message.status === "streaming" && (
-            <View style={styles.streamingIndicator}>
-              <Sparkles size={11} color="#10b981" />
-              <Text style={styles.streamingText}>Streaming</Text>
-            </View>
-          )}
-        </View>
+    <View style={[styles.row, isAgent ? styles.rowAgent : styles.rowHuman]}>
+      <View style={[styles.bubble, isAgent ? styles.bubbleAgent : styles.bubbleHuman]}>
+        {/* Agent Name Tag inside bubble (like WhatsApp Group messages) */}
+        {isAgent && senderTag && (
+          <Text style={styles.agentSenderTag}>{senderTag}</Text>
+        )}
 
         <Text style={styles.content}>
           {message.content}
-          {message.status === "streaming" && <Text style={styles.cursor}> ▋</Text>}
+          {message.status === "streaming" && (
+            <Text style={styles.streamingCursor}> ▋</Text>
+          )}
         </Text>
+
+        {/* WhatsApp Bottom Timestamp & Checkmarks */}
+        <View style={styles.metaRow}>
+          <Text style={styles.timeText}>{timeStr}</Text>
+          {!isAgent && (
+            <CheckCheck size={14} color="#53bdeb" style={styles.tickIcon} />
+          )}
+        </View>
       </View>
     </View>
   )
 }
 
 const styles = StyleSheet.create({
-  container: {
+  row: {
     flexDirection: "row",
-    marginVertical: 6,
-    paddingHorizontal: 12,
-    gap: 8,
+    marginVertical: 3,
+    paddingHorizontal: 8,
   },
-  agentRow: {
-    alignSelf: "flex-start",
+  rowAgent: {
+    justifyContent: "flex-start",
   },
-  humanRow: {
-    alignSelf: "flex-end",
-    flexDirection: "row-reverse",
-  },
-  avatar: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    alignItems: "center",
-    justifyContent: "center",
-    marginTop: 4,
-  },
-  agentAvatar: {
-    backgroundColor: "#0d261b",
-    borderWidth: 1,
-    borderColor: "#10b981",
-  },
-  humanAvatar: {
-    backgroundColor: "#172554",
-    borderWidth: 1,
-    borderColor: "#3b82f6",
+  rowHuman: {
+    justifyContent: "flex-end",
   },
   bubble: {
-    maxWidth: "84%",
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: 16,
+    maxWidth: "80%",
+    paddingHorizontal: 11,
+    paddingTop: 6,
+    paddingBottom: 6,
+    borderRadius: 10,
+    minWidth: 70,
   },
-  agentBubble: {
-    backgroundColor: "#101713",
-    borderWidth: 1,
-    borderColor: "#1d2922",
+  // WhatsApp Incoming Bubble (Dark Gray / Slate)
+  bubbleAgent: {
+    backgroundColor: "#202c33",
+    borderTopLeftRadius: 0,
   },
-  humanBubble: {
-    backgroundColor: "#1e3a8a",
+  // WhatsApp Outgoing Bubble (Dark Emerald Green)
+  bubbleHuman: {
+    backgroundColor: "#005c4b",
+    borderTopRightRadius: 0,
   },
-  headerRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginBottom: 4,
-    gap: 8,
-  },
-  senderName: {
-    fontSize: 12,
+  agentSenderTag: {
+    color: "#25d366",
+    fontSize: 12.5,
     fontWeight: "700",
-  },
-  agentName: {
-    color: "#34d399",
-  },
-  humanName: {
-    color: "#93c5fd",
-  },
-  streamingIndicator: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-  },
-  streamingText: {
-    color: "#10b981",
-    fontSize: 10,
-    fontWeight: "600",
+    marginBottom: 2,
   },
   content: {
-    color: "#f8fafc",
+    color: "#e9edef",
     fontSize: 15,
-    lineHeight: 22,
+    lineHeight: 20,
   },
-  cursor: {
-    color: "#10b981",
+  streamingCursor: {
+    color: "#25d366",
     fontWeight: "900",
   },
-  systemContainer: {
+  metaRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "flex-end",
+    alignSelf: "flex-end",
+    marginTop: 2,
+    marginLeft: 12,
+    gap: 3,
+  },
+  timeText: {
+    color: "#8696a0",
+    fontSize: 10.5,
+  },
+  tickIcon: {
+    marginLeft: 1,
+  },
+  systemPill: {
     alignSelf: "center",
-    backgroundColor: "#1e293b",
+    backgroundColor: "#182229",
     paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 12,
+    paddingVertical: 5,
+    borderRadius: 8,
     marginVertical: 8,
+    borderWidth: 1,
+    borderColor: "#222d34",
+    maxWidth: "85%",
   },
   systemText: {
-    color: "#94a3b8",
-    fontSize: 12,
-    fontStyle: "italic",
+    color: "#8696a0",
+    fontSize: 11.5,
+    textAlign: "center",
   },
 })
