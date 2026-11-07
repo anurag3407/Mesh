@@ -50,6 +50,7 @@ create index if not exists memories_last_used_idx on public.memories (org_id, la
 -- 4. Row Level Security
 alter table public.memories enable row level security;
 
+drop policy if exists "memories_select_policy" on public.memories;
 create policy "memories_select_policy"
   on public.memories for select
   using (
@@ -60,6 +61,7 @@ create policy "memories_select_policy"
     )
   );
 
+drop policy if exists "memories_insert_policy" on public.memories;
 create policy "memories_insert_policy"
   on public.memories for insert
   with check (
@@ -70,6 +72,7 @@ create policy "memories_insert_policy"
     )
   );
 
+drop policy if exists "memories_update_policy" on public.memories;
 create policy "memories_update_policy"
   on public.memories for update
   using (
@@ -80,6 +83,7 @@ create policy "memories_update_policy"
     )
   );
 
+drop policy if exists "memories_delete_policy" on public.memories;
 create policy "memories_delete_policy"
   on public.memories for delete
   using (

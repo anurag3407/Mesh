@@ -49,11 +49,13 @@ create index if not exists agent_templates_org_idx on public.agent_templates (or
 
 alter table public.agent_templates enable row level security;
 
+drop policy if exists "agent_templates_read" on public.agent_templates;
 create policy "agent_templates_read" on public.agent_templates
   for select using (
     org_id is null or public.is_org_member(org_id)
   );
 
+drop policy if exists "agent_templates_write" on public.agent_templates;
 create policy "agent_templates_write" on public.agent_templates
   for all using (
     org_id is not null and public.is_org_admin(org_id)
@@ -165,6 +167,7 @@ create table if not exists public.org_quotas (
 );
 
 alter table public.org_quotas enable row level security;
+drop policy if exists "org_quotas_read" on public.org_quotas;
 create policy "org_quotas_read" on public.org_quotas
   for select using (public.is_org_member(org_id));
 
@@ -192,6 +195,7 @@ create index if not exists agent_computers_org_status_idx on public.agent_comput
 create index if not exists agent_computers_idle_sweeper_idx on public.agent_computers (status, last_active_at);
 
 alter table public.agent_computers enable row level security;
+drop policy if exists "agent_computers_read" on public.agent_computers;
 create policy "agent_computers_read" on public.agent_computers
   for select using (public.is_org_member(org_id));
 
@@ -217,6 +221,7 @@ create index if not exists room_invites_room_expires_idx on public.room_invites 
 create index if not exists room_invites_code_hash_idx on public.room_invites (code_hash);
 
 alter table public.room_invites enable row level security;
+drop policy if exists "room_invites_read" on public.room_invites;
 create policy "room_invites_read" on public.room_invites
   for select using (public.is_room_member(room_id));
 

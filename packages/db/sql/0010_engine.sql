@@ -41,6 +41,7 @@ create index if not exists run_steps_run_id_idx on public.run_steps (run_id);
 
 alter table public.run_steps enable row level security;
 
+drop policy if exists "run_steps_select_policy" on public.run_steps;
 create policy "run_steps_select_policy"
   on public.run_steps for select
   using (
@@ -75,6 +76,7 @@ create index if not exists run_transcripts_run_id_idx on public.run_transcripts 
 
 alter table public.run_transcripts enable row level security;
 
+drop policy if exists "run_transcripts_select_policy" on public.run_transcripts;
 create policy "run_transcripts_select_policy"
   on public.run_transcripts for select
   using (
@@ -114,6 +116,7 @@ create index if not exists skills_org_idx on public.skills (org_id);
 
 alter table public.skills enable row level security;
 
+drop policy if exists "skills_select_policy" on public.skills;
 create policy "skills_select_policy"
   on public.skills for select
   using (
@@ -123,6 +126,7 @@ create policy "skills_select_policy"
     )
   );
 
+drop policy if exists "skills_admin_policy" on public.skills;
 create policy "skills_admin_policy"
   on public.skills for all
   using (
