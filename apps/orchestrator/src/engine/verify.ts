@@ -67,8 +67,8 @@ export async function runCriticVerification(args: CriticReviewArgs): Promise<Cri
     orgId: args.orgId,
     roomId: args.roomId,
     agentId: args.agent.id,
-    runId: `critic-${Date.now()}`,
-    messageId: "",
+    runId: null,
+    messageId: null,
   })
 
   try {

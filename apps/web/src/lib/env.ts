@@ -28,6 +28,10 @@ export function getOrchestratorUrl(): string {
   return (process.env.ORCHESTRATOR_URL ?? "http://localhost:4000").replace(/\/+$/, "")
 }
 
+export function getComputerdUrl(): string {
+  return (process.env.COMPUTERD_URL ?? "http://localhost:4100").replace(/\/+$/, "")
+}
+
 export function getInternalSecret(): string {
   return requireEnv("ORCHESTRATOR_INTERNAL_SECRET")
 }

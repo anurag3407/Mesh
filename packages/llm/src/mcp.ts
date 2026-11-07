@@ -1,4 +1,5 @@
 import { createMCPClient } from "@ai-sdk/mcp"
+import { assertSafeEgressHost } from "@sayabot/core/server"
 import type { ToolSet } from "ai"
 
 export interface McpServerConfig {
@@ -43,6 +44,10 @@ export async function connectMcpServers(servers: McpServerConfig[]): Promise<Mcp
 
   for (const server of servers) {
     try {
+      const parsedUrl = new URL(server.url)
+      if (process.env.NODE_ENV !== "test" && process.env.ALLOW_LOCAL_MCP !== "true") {
+        await assertSafeEgressHost(parsedUrl.hostname)
+      }
       const client = await createMCPClient({
         transport: {
           type: server.transport,

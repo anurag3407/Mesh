@@ -18,11 +18,10 @@ import { createAdminClient } from "@/lib/supabase/admin"
 import type { ActionResult } from "@/lib/types"
 
 const secretKindSchema = z.enum([
-  "api_key",
-  "bearer_token",
+  "api_token",
   "basic_auth",
-  "oauth_refresh",
-  "ssh_key",
+  "password",
+  "header_set",
   "github_app",
 ])
 

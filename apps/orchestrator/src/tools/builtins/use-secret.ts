@@ -1,6 +1,7 @@
 import { agentSecretGrants, vaultSecrets } from "@sayabot/db"
 import { openSecret } from "@sayabot/llm"
 import { createRunScrubber, matchesHostPattern } from "@sayabot/core"
+import { assertSafeEgressHost } from "@sayabot/core/server"
 import { and, eq, gt, isNull, or } from "drizzle-orm"
 import { z } from "zod"
 import { getDb } from "../../db"
@@ -62,6 +63,8 @@ export function useSecretTool(args: { agentId: string; orgId: string }): ToolSpe
       }
 
       const requestedHost = parsedUrl.hostname.toLowerCase()
+      await assertSafeEgressHost(requestedHost)
+
       const isAllowedHost = row.grant.allowedHosts.some((pattern) =>
         matchesHostPattern(requestedHost, pattern),
       )

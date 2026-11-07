@@ -1,6 +1,6 @@
 import "server-only"
 import { notFound, redirect } from "next/navigation"
-import type { User } from "@supabase/supabase-js"
+import type { SupabaseClient, User } from "@supabase/supabase-js"
 import { createSupabaseServerClient } from "@/lib/supabase/server"
 import type { OrgAccess, OrgRole, OrgSummary, RoomAccess, RoomRole, RoomView } from "@/lib/types"
 
@@ -30,8 +30,8 @@ function displayNameOf(user: User): string {
   )
 }
 
-export async function getProfile(user: User): Promise<OrgAccess["user"]> {
-  const supabase = await createSupabaseServerClient()
+export async function getProfile(user: User, client?: SupabaseClient<any>): Promise<OrgAccess["user"]> {
+  const supabase = client ?? (await createSupabaseServerClient())
   const { data } = await supabase
     .from("profiles")
     .select("display_name, avatar_url, preferences")
@@ -71,10 +71,13 @@ export async function listUserOrgs(userId: string): Promise<OrgSummary[]> {
   }))
 }
 
-export async function getOrgAccess(slug: string): Promise<OrgAccess | null> {
-  const user = await getCurrentUser()
+export async function getOrgAccess(
+  slug: string,
+  options?: { client?: SupabaseClient<any>; user?: User },
+): Promise<OrgAccess | null> {
+  const user = options?.user ?? (await getCurrentUser())
   if (!user) return null
-  const supabase = await createSupabaseServerClient()
+  const supabase = options?.client ?? (await createSupabaseServerClient())
   const { data } = await supabase
     .from("org_members")
     .select("role, orgs!inner(id, slug, name, sso_enabled)")
@@ -94,7 +97,7 @@ export async function getOrgAccess(slug: string): Promise<OrgAccess | null> {
       ssoEnabled: row.orgs.sso_enabled,
     },
     role: row.role,
-    user: await getProfile(user),
+    user: await getProfile(user, supabase),
   }
 }
 
@@ -108,10 +111,14 @@ export function isOrgAdmin(role: OrgRole): boolean {
   return role === "owner" || role === "admin"
 }
 
-export async function getRoomAccess(slug: string, roomId: string): Promise<RoomAccess | null> {
-  const org = await getOrgAccess(slug)
+export async function getRoomAccess(
+  slug: string,
+  roomId: string,
+  options?: { client?: SupabaseClient<any>; user?: User },
+): Promise<RoomAccess | null> {
+  const org = await getOrgAccess(slug, options)
   if (!org) return null
-  const supabase = await createSupabaseServerClient()
+  const supabase = options?.client ?? (await createSupabaseServerClient())
   const { data: room } = await supabase
     .from("rooms")
     .select(

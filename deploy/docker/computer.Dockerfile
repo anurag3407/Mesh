@@ -18,10 +18,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     unzip \
   && rm -rf /var/lib/apt/lists/*
 
-# Install Node.js 24
+# Install Node.js 24 and tsx
 RUN curl -fsSL https://deb.nodesource.com/setup_24.x | bash - \
   && apt-get install -y --no-install-recommends nodejs \
-  && npm install -g pnpm \
+  && npm install -g pnpm tsx \
   && rm -rf /var/lib/apt/lists/*
 
 # Create bot user (uid 10001)
@@ -34,6 +34,13 @@ RUN mkdir -p /opt/agentd /run /home/bot/.saaya \
 
 # Bundle agentd and entrypoint
 COPY apps/computerd/agentd/ /opt/agentd/
+
+RUN cat << 'EOF' > /opt/agentd/agentd-cli
+#!/bin/bash
+exec tsx /opt/agentd/agentd-cli.ts "$@"
+EOF
+
+RUN chmod +x /opt/agentd/agentd-cli && ln -sf /opt/agentd/agentd-cli /usr/local/bin/agentd-cli
 
 RUN cat << 'EOF' > /opt/agentd/entrypoint.sh
 #!/bin/bash
@@ -50,7 +57,7 @@ if ! grep -q ".saaya/env" /home/bot/.bashrc 2>/dev/null; then
 fi
 
 # Start agentd in background
-exec node /opt/agentd/agentd.js
+exec tsx /opt/agentd/agentd.ts
 EOF
 
 RUN chmod +x /opt/agentd/entrypoint.sh

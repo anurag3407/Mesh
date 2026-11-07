@@ -1,4 +1,4 @@
-import { isDestructiveCommand } from "@sayabot/core"
+import { isDestructiveCommand, redactSecrets } from "@sayabot/core"
 import { canvases, canvasVersions } from "@sayabot/db"
 import { z } from "zod"
 import { getComputerClient } from "../../computer/client"
@@ -48,7 +48,7 @@ export function computerTools(args: ComputerToolsArgs): ToolSpec[] {
               type: "tool.output",
               toolCallId: effectiveToolCallId,
               seq: seq++,
-              chunk,
+              chunk: redactSecrets(chunk).text,
             })
           },
         },

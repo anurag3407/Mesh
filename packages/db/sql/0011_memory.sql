@@ -54,42 +54,34 @@ drop policy if exists "memories_select_policy" on public.memories;
 create policy "memories_select_policy"
   on public.memories for select
   using (
-    exists (
-      select 1 from public.org_members om
-      where om.org_id = memories.org_id
-        and om.user_id = auth.uid()
-    )
+    public.is_org_member(org_id)
+    and (room_id is null or public.can_read_room(room_id))
   );
 
 drop policy if exists "memories_insert_policy" on public.memories;
 create policy "memories_insert_policy"
   on public.memories for insert
   with check (
-    exists (
-      select 1 from public.org_members om
-      where om.org_id = memories.org_id
-        and om.user_id = auth.uid()
-    )
+    public.is_org_member(org_id)
+    and (room_id is null or public.can_read_room(room_id))
   );
 
 drop policy if exists "memories_update_policy" on public.memories;
 create policy "memories_update_policy"
   on public.memories for update
   using (
-    exists (
-      select 1 from public.org_members om
-      where om.org_id = memories.org_id
-        and om.user_id = auth.uid()
-    )
+    public.is_org_member(org_id)
+    and (room_id is null or public.can_read_room(room_id))
   );
 
 drop policy if exists "memories_delete_policy" on public.memories;
 create policy "memories_delete_policy"
   on public.memories for delete
   using (
-    exists (
-      select 1 from public.org_members om
-      where om.org_id = memories.org_id
-        and om.user_id = auth.uid()
-    )
+    public.is_org_member(org_id)
+    and (room_id is null or public.can_read_room(room_id))
   );
+
+-- 5. Grants
+grant select, insert, update, delete on public.memories to authenticated;
+grant all on public.memories to service_role;

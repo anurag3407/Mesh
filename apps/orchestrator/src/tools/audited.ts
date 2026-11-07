@@ -12,8 +12,8 @@ export interface ToolRuntime {
   orgId: string
   roomId: string
   agentId: string
-  runId: string
-  messageId: string
+  runId?: string | null
+  messageId?: string | null
   approvalTimeoutMs?: number
   scrub?: (s: string) => string
 }
@@ -64,6 +64,14 @@ function isDangerous(spec: ToolSpec, args: Record<string, unknown>): boolean {
   return typeof spec.dangerous === "function" ? spec.dangerous(args) : spec.dangerous
 }
 
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+function toSafeUuid(val?: string | null): string | null {
+  if (typeof val === "string" && UUID_REGEX.test(val.trim())) {
+    return val.trim()
+  }
+  return null
+}
+
 /**
  * Runs every tool through one path: persist the call, ask a human when the tool
  * is dangerous, execute, persist the result, and return something the model can
@@ -82,9 +90,9 @@ export function toAuditedTools(specs: ToolSpec[], runtime: ToolRuntime): ToolSet
         const [row] = await getDb()
           .insert(toolCalls)
           .values({
-            runId: runtime.runId,
+            runId: toSafeUuid(runtime.runId),
             roomId: runtime.roomId,
-            messageId: runtime.messageId,
+            messageId: toSafeUuid(runtime.messageId),
             toolName: spec.name,
             args: storedArgs as Record<string, unknown>,
             status: dangerous ? "pending_approval" : "running",

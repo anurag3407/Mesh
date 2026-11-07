@@ -158,6 +158,8 @@ services:
     read_only: true
     tmpfs:
       - /tmp
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
     depends_on:
       orchestrator:
         condition: service_healthy

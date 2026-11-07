@@ -1,13 +1,232 @@
-import { getOrchestratorUrl } from "@/lib/env"
+import { createClient, type User } from "@supabase/supabase-js"
+import { audit } from "@/lib/actions/shared"
+import {
+  getComputerdUrl,
+  getOrchestratorUrl,
+  getSupabaseAnonKey,
+  getSupabaseUrl,
+} from "@/lib/env"
+import { createAdminClient } from "@/lib/supabase/admin"
+import { createSupabaseServerClient } from "@/lib/supabase/server"
 
 export const maxDuration = 300
+
+async function authenticateUser(request: Request): Promise<User | null> {
+  const authHeader = request.headers.get("authorization")
+  if (authHeader && authHeader.slice(0, 7).toLowerCase() === "bearer ") {
+    const token = authHeader.slice(7).trim()
+    const tokenClient = createClient<any>(getSupabaseUrl(), getSupabaseAnonKey(), {
+      global: { headers: { Authorization: `Bearer ${token}` } },
+      auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
+    })
+    const { data, error } = await tokenClient.auth.getUser(token)
+    if (!error && data?.user) return data.user
+  }
+  const supabase = await createSupabaseServerClient()
+  const { data } = await supabase.auth.getUser()
+  return data?.user ?? null
+}
+
+async function handleToolApproval(request: Request, toolCallId: string): Promise<Response> {
+  const user = await authenticateUser(request)
+  if (!user) {
+    return new Response(JSON.stringify({ error: "unauthorized" }), {
+      status: 401,
+      headers: { "content-type": "application/json" },
+    })
+  }
+
+  const body = (await request.json().catch(() => ({}))) as { approved?: boolean }
+  const decision: "approved" | "rejected" = body.approved ? "approved" : "rejected"
+
+  const admin = createAdminClient()
+  const { data: toolCall } = await admin
+    .from("tool_calls")
+    .select("id, room_id, status, tool_name")
+    .eq("id", toolCallId)
+    .maybeSingle()
+
+  if (!toolCall) {
+    return new Response(JSON.stringify({ error: "Tool call not found" }), {
+      status: 404,
+      headers: { "content-type": "application/json" },
+    })
+  }
+
+  if (toolCall.status !== "pending_approval") {
+    return new Response(
+      JSON.stringify({
+        ok: false,
+        error: "Tool call is not pending approval",
+        status: toolCall.status,
+      }),
+      { status: 400, headers: { "content-type": "application/json" } },
+    )
+  }
+
+  const { data: room } = await admin
+    .from("rooms")
+    .select("id, org_id")
+    .eq("id", toolCall.room_id)
+    .single()
+
+  if (!room) {
+    return new Response(JSON.stringify({ error: "Room not found" }), {
+      status: 404,
+      headers: { "content-type": "application/json" },
+    })
+  }
+
+  const { data: roomMember } = await admin
+    .from("room_members")
+    .select("role")
+    .eq("room_id", room.id)
+    .eq("user_id", user.id)
+    .maybeSingle()
+
+  const { data: orgMember } = await admin
+    .from("org_members")
+    .select("role")
+    .eq("org_id", room.org_id)
+    .eq("user_id", user.id)
+    .maybeSingle()
+
+  const canAdmin =
+    roomMember?.role === "admin" ||
+    orgMember?.role === "owner" ||
+    orgMember?.role === "admin"
+
+  if (!canAdmin) {
+    return new Response(
+      JSON.stringify({ error: "Only room or organization admins can approve tool calls" }),
+      { status: 403, headers: { "content-type": "application/json" } },
+    )
+  }
+
+  const { error: updateError } = await admin
+    .from("tool_calls")
+    .update({
+      status: decision,
+      approved_by: user.id,
+      resolved_at: new Date().toISOString(),
+    })
+    .eq("id", toolCallId)
+    .eq("status", "pending_approval")
+
+  if (updateError) {
+    return new Response(JSON.stringify({ error: updateError.message }), {
+      status: 500,
+      headers: { "content-type": "application/json" },
+    })
+  }
+
+  await admin.rpc("notify_tool_resolution", {
+    p_tool_call: toolCallId,
+    p_status: decision,
+  })
+
+  await audit({
+    orgId: room.org_id,
+    actorId: user.id,
+    action: `tool.${decision}`,
+    target: toolCallId,
+    metadata: { tool: toolCall.tool_name, roomId: toolCall.room_id },
+  })
+
+  return new Response(JSON.stringify({ ok: true, status: decision }), {
+    status: 200,
+    headers: { "content-type": "application/json" },
+  })
+}
+
+async function handleComputerStop(request: Request, agentId: string): Promise<Response> {
+  const user = await authenticateUser(request)
+  if (!user) {
+    return new Response(JSON.stringify({ error: "unauthorized" }), {
+      status: 401,
+      headers: { "content-type": "application/json" },
+    })
+  }
+
+  const admin = createAdminClient()
+  const { data: computer } = await admin
+    .from("agent_computers")
+    .select("org_id")
+    .eq("agent_id", agentId)
+    .maybeSingle()
+
+  if (!computer) {
+    return new Response(JSON.stringify({ error: "Computer not found" }), {
+      status: 404,
+      headers: { "content-type": "application/json" },
+    })
+  }
+
+  const { data: orgMember } = await admin
+    .from("org_members")
+    .select("role")
+    .eq("org_id", computer.org_id)
+    .eq("user_id", user.id)
+    .maybeSingle()
+
+  if (!orgMember || (orgMember.role !== "owner" && orgMember.role !== "admin")) {
+    return new Response(
+      JSON.stringify({ error: "Only organization admins can stop computers" }),
+      { status: 403, headers: { "content-type": "application/json" } },
+    )
+  }
+
+  const computerdUrl = getComputerdUrl()
+  const secret = process.env.ORCHESTRATOR_INTERNAL_SECRET || ""
+
+  try {
+    await fetch(`${computerdUrl}/v1/computers/${agentId}/stop`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-internal-secret": secret,
+      },
+      signal: AbortSignal.timeout(5000),
+    })
+  } catch (err) {
+    console.error(`[computers/stop] failed to call computerd stop:`, err)
+  }
+
+  await admin.from("agent_computers").update({ status: "stopped" }).eq("agent_id", agentId)
+
+  await audit({
+    orgId: computer.org_id,
+    actorId: user.id,
+    action: "computer.stopped",
+    target: agentId,
+  })
+
+  return new Response(JSON.stringify({ ok: true, status: "stopped" }), {
+    status: 200,
+    headers: { "content-type": "application/json" },
+  })
+}
 
 async function forward(request: Request, path: string[]) {
   if (!path.length || !path.every((segment) => /^[A-Za-z0-9_-]+$/.test(segment))) {
     return new Response("not found", { status: 404 })
   }
+
+  // Handle mobile tool approval endpoint
+  if (path[0] === "tools" && path[2] === "approve" && path.length === 3 && request.method === "POST" && path[1]) {
+    return handleToolApproval(request, path[1])
+  }
+
+  // Handle mobile computer stop endpoint
+  if (path[0] === "computers" && path[2] === "stop" && path.length === 3 && request.method === "POST" && path[1]) {
+    return handleComputerStop(request, path[1])
+  }
+
   const url = new URL(request.url)
-  const target = `${getOrchestratorUrl()}/v1/${path.join("/")}${url.search}`
+  const isComputerRoute = path[0] === "computers"
+  const baseTarget = isComputerRoute ? getComputerdUrl() : getOrchestratorUrl()
+  const target = `${baseTarget}/v1/${path.join("/")}${url.search}`
+
   const headers = new Headers()
   for (const name of [
     "authorization",
@@ -23,6 +242,11 @@ async function forward(request: Request, path: string[]) {
     const value = request.headers.get(name)
     if (value) headers.set(name, value)
   }
+
+  if (isComputerRoute && process.env.ORCHESTRATOR_INTERNAL_SECRET) {
+    headers.set("x-internal-secret", process.env.ORCHESTRATOR_INTERNAL_SECRET)
+  }
+
   const init: RequestInit & { duplex?: "half" } = {
     method: request.method,
     headers,
@@ -39,6 +263,9 @@ async function forward(request: Request, path: string[]) {
     const value = response.headers.get(name)
     if (value) responseHeaders.set(name, value)
   }
+  // Disable buffering for live streaming
+  responseHeaders.set("x-accel-buffering", "no")
+
   return new Response(response.body, { status: response.status, headers: responseHeaders })
 }
 

@@ -2,8 +2,11 @@ import { drizzle } from "drizzle-orm/node-postgres"
 import pg from "pg"
 import * as schema from "./schema"
 
-export function createDb(connectionString: string) {
-  const pool = new pg.Pool({ connectionString, max: 10 })
+export function createDb(connectionString: string, options?: { max?: number }) {
+  const max =
+    options?.max ??
+    (process.env.DATABASE_POOL_MAX ? parseInt(process.env.DATABASE_POOL_MAX, 10) : 30)
+  const pool = new pg.Pool({ connectionString, max })
   const db = drizzle(pool, { schema })
   return { pool, db }
 }

@@ -1,5 +1,5 @@
 import { redactSecrets } from "@sayabot/core"
-import { agents } from "@sayabot/db"
+import { agents, toolCalls } from "@sayabot/db"
 import { generateText } from "ai"
 import { and, eq } from "drizzle-orm"
 import { Hono } from "hono"
@@ -7,6 +7,7 @@ import { bodyLimit } from "hono/body-limit"
 import { z } from "zod"
 import { abortRun, activeRunIds } from "./active-runs"
 import { canUserReadRoom } from "./authz"
+import { resolveApprovalWaiter } from "./tools/approvals"
 import { interruptRoom } from "./coordinator/interrupt"
 import { botRoutes } from "./bot/routes"
 import { mcpRoutes } from "./mcp/server"
@@ -184,6 +185,34 @@ export function createApp() {
       snapshot: parsed.data.snapshot,
     })
     return c.json(result)
+  })
+
+  app.post("/v1/tools/:toolCallId/approve", async (c) => {
+    const toolCallId = c.req.param("toolCallId")
+    const body = await c.req.json().catch(() => ({}))
+    const approved = Boolean(body.approved)
+    const status = approved ? "approved" : "rejected"
+
+    const [toolCall] = await getDb()
+      .select()
+      .from(toolCalls)
+      .where(eq(toolCalls.id, toolCallId))
+      .limit(1)
+
+    if (!toolCall) return c.json({ error: "tool call not found" }, 404)
+
+    await getDb()
+      .update(toolCalls)
+      .set({
+        status,
+        resolvedAt: new Date(),
+      })
+      .where(and(eq(toolCalls.id, toolCallId), eq(toolCalls.status, "pending_approval")))
+
+    await notify("tool_call_resolved", { toolCallId, status })
+    resolveApprovalWaiter(toolCallId, status)
+
+    return c.json({ ok: true, status })
   })
 
   app.route("/", botRoutes)

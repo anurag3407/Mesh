@@ -2,3 +2,4 @@ export { generateWebhookSecret, signWebhook, verifyWebhook, WEBHOOK_TOLERANCE_SE
 export type { WebhookSignatureInput, WebhookVerifyInput } from "./webhook"
 export { agentKeyPrefix, generateAgentApiKey, hashAgentApiKey } from "./agent-key"
 export type { GeneratedAgentApiKey } from "./agent-key"
+export { assertSafeEgressHost, isPrivateIp } from "./ssrf"

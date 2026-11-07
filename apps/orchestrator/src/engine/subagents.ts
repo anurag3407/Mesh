@@ -143,7 +143,7 @@ export function spawnSubagentTool(args: SpawnSubagentToolArgs): ToolSpec {
         roomId: args.roomId,
         agentId: args.agent.id,
         runId: childRun.id,
-        messageId: "",
+        messageId: null,
         scrub: args.scrub,
       })
 

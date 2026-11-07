@@ -71,7 +71,7 @@ export async function saveAgentAsTemplate(
       description,
       category,
       system_prompt: agent.system_prompt || "",
-      default_capabilities: parseCapabilities(agent.capabilities),
+      capabilities: parseCapabilities(agent.capabilities),
       default_model: agent.model,
       secret_slots: secretSlots,
       starter_tasks: [],

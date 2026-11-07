@@ -456,7 +456,7 @@ export async function processRoomMessage(
 
       const trip = await breakerTrip(room, botTurnsUsed, session.taskId)
       if (trip) {
-        if (session.taskId && trip.reason === "turn_cap") {
+        if (session.taskId && trip.code === "turn_cap") {
           await db
             .update(tasks)
             .set({

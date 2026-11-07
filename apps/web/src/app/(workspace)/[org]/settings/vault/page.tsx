@@ -52,12 +52,12 @@ export default async function VaultSettingsPage({
           </Field>
 
           <Field label="Secret Kind">
-            <Select name="kind" defaultValue="api_key">
-              <option value="api_key">API Key</option>
-              <option value="bearer_token">Bearer Token</option>
+            <Select name="kind" defaultValue="api_token">
+              <option value="api_token">API Token</option>
               <option value="basic_auth">Basic Auth (user:password)</option>
-              <option value="oauth_refresh">OAuth Refresh Token</option>
-              <option value="ssh_key">SSH Private Key</option>
+              <option value="password">Password</option>
+              <option value="header_set">Header Set (JSON)</option>
+              <option value="github_app">GitHub App (Private Key / PEM)</option>
             </Select>
           </Field>
 

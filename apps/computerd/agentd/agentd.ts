@@ -1,15 +1,60 @@
 import { spawn } from "node:child_process"
 import { createServer, type Socket } from "node:net"
-import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, unlinkSync, writeFileSync } from "node:fs"
-import { dirname, resolve } from "node:path"
+import { existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, readlinkSync, realpathSync, statSync, unlinkSync, writeFileSync } from "node:fs"
+import { dirname, resolve, sep } from "node:path"
 
 const SOCKET_PATH = process.env.AGENTD_SOCK || "/run/agentd.sock"
 const BOT_HOME = process.env.BOT_HOME || "/home/bot"
 const MAX_OUTPUT_BYTES = 1024 * 1024 // 1 MB cap
 
-function isSafePath(targetPath: string): boolean {
-  const resolved = resolve(targetPath)
-  return resolved.startsWith("/home/bot") || resolved.startsWith("/tmp")
+function getAllowedRoots(): string[] {
+  const roots = ["/home/bot", "/tmp"]
+  const botHome = process.env.BOT_HOME || "/home/bot"
+  roots.push(botHome)
+
+  for (const r of [botHome, "/home/bot", "/tmp"]) {
+    try {
+      if (existsSync(r)) {
+        roots.push(realpathSync(r))
+      }
+    } catch {}
+  }
+
+  try {
+    if (existsSync("/home")) {
+      roots.push(resolve(realpathSync("/home"), "bot"))
+    }
+  } catch {}
+
+  return [...new Set(roots)]
+}
+
+export function isSafePath(targetPath: string): boolean {
+  try {
+    const allowedRoots = getAllowedRoots()
+    const resolved = resolve(targetPath)
+    const segments = resolved.split(sep).filter(Boolean)
+
+    let curr: string = sep // "/" on posix
+    for (const segment of segments) {
+      curr = resolve(curr, segment)
+      let hops = 0
+      while (lstatSync(curr, { throwIfNoEntry: false })?.isSymbolicLink()) {
+        if (++hops > 40) return false
+        const target = readlinkSync(curr)
+        curr = resolve(dirname(curr), target)
+      }
+      try {
+        if (existsSync(curr)) {
+          curr = realpathSync(curr)
+        }
+      } catch {}
+    }
+
+    return allowedRoots.some((root) => curr === root || curr.startsWith(root + "/"))
+  } catch {
+    return false
+  }
 }
 
 interface BackgroundJob {
