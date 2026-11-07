@@ -12,6 +12,8 @@
     "db:migrate": "pnpm --filter @sayabot/db migrate",
     "db:seed": "pnpm --filter @sayabot/db seed",
     "format": "prettier --write .",
+    "mobile:dev": "turbo run dev --filter=@sayabot/mobile",
+    "mobile:typecheck": "turbo run typecheck --filter=@sayabot/mobile",
     "e2e": "playwright test",
     "typecheck:e2e": "tsc -p tsconfig.e2e.json"
   },
