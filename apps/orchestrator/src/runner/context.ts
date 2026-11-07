@@ -1,4 +1,4 @@
-import { debateRoleInstruction, parseCapabilities, type TurnRole } from "@mesh/core"
+import { debateRoleInstruction, parseCapabilities, type TurnRole } from "@sayabot/core"
 import {
   agents,
   canvases,
@@ -8,7 +8,7 @@ import {
   rooms,
   taskComments,
   tasks,
-} from "@mesh/db"
+} from "@sayabot/db"
 import { and, asc, desc, eq, inArray, isNull, ne, or } from "drizzle-orm"
 import { getDb } from "../db"
 

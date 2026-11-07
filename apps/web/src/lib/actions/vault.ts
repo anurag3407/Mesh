@@ -1,7 +1,7 @@
 "use server"
 
-import { isValidHostPattern } from "@mesh/core"
-import { last4, sealSecret } from "@mesh/llm"
+import { isValidHostPattern } from "@sayabot/core"
+import { last4, sealSecret } from "@sayabot/llm"
 import { randomBytes } from "node:crypto"
 import { z } from "zod"
 import {

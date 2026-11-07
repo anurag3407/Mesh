@@ -1,4 +1,4 @@
-import { botStreamLineSchema } from "@mesh/core"
+import { botStreamLineSchema } from "@sayabot/core"
 
 export interface ParsedBotChunk {
   deltas: string[]

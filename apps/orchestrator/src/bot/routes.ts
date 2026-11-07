@@ -1,5 +1,5 @@
-import { botMessageBodySchema, redactSecrets } from "@mesh/core"
-import { messages } from "@mesh/db"
+import { botMessageBodySchema, redactSecrets } from "@sayabot/core"
+import { messages } from "@sayabot/db"
 import { eq } from "drizzle-orm"
 import type { Context } from "hono"
 import { Hono } from "hono"
@@ -111,8 +111,8 @@ botRoutes.post("/v1/rooms/:roomId/messages/stream", async (c) => {
 
   const thread = await resolveThread(
     room.roomId,
-    c.req.query("thread_id") ?? c.req.header("x-mesh-thread-id") ?? null,
-    c.req.query("reply_to") ?? c.req.header("x-mesh-reply-to") ?? null,
+    c.req.query("thread_id") ?? c.req.header("x-sayabot-thread-id") ?? c.req.header("x-mesh-thread-id") ?? null,
+    c.req.query("reply_to") ?? c.req.header("x-sayabot-reply-to") ?? c.req.header("x-mesh-reply-to") ?? null,
   )
   if (!thread.ok) return c.json({ error: thread.error }, 400)
 

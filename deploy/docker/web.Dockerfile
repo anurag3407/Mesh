@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1.7
-# Mesh web (Next.js). Build context: repository root.
-#   docker build -f deploy/docker/web.Dockerfile -t mesh/web .
+# Sayabot web (Next.js). Build context: repository root.
+#   docker build -f deploy/docker/web.Dockerfile -t sayabot/web .
 
 ARG NODE_VERSION=24.21.0
 ARG PNPM_VERSION=10.33.0
@@ -65,7 +65,7 @@ COPY --from=build --chown=node:node /repo/apps/web/.next/static ./apps/web/.next
 COPY --from=build --chown=node:node /repo/apps/web/public ./apps/web/public
 RUN mkdir -p apps/web/.next/cache && chown -R node:node apps/web/.next/cache
 
-LABEL org.opencontainers.image.title="mesh-web" \
+LABEL org.opencontainers.image.title="sayabot-web" \
       org.opencontainers.image.revision=$GIT_COMMIT_SHA
 
 USER node

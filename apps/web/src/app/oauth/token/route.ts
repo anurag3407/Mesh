@@ -1,5 +1,5 @@
 import { createAdminClient } from "@/lib/supabase/admin"
-import { hashAgentApiKey } from "@mesh/core/server"
+import { hashAgentApiKey } from "@sayabot/core/server"
 import { createHash, randomBytes } from "node:crypto"
 import { type NextRequest, NextResponse } from "next/server"
 

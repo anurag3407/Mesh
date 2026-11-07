@@ -1,4 +1,4 @@
-import { agents, orgMembers, orgs, pushSubscriptions, roomMembers, rooms } from "@mesh/db"
+import { agents, orgMembers, orgs, pushSubscriptions, roomMembers, rooms } from "@sayabot/db"
 import { and, eq, inArray } from "drizzle-orm"
 import webpush from "web-push"
 import { getDb } from "./db"

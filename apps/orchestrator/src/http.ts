@@ -1,5 +1,5 @@
-import { redactSecrets } from "@mesh/core"
-import { agents } from "@mesh/db"
+import { redactSecrets } from "@sayabot/core"
+import { agents } from "@sayabot/db"
 import { generateText } from "ai"
 import { and, eq } from "drizzle-orm"
 import { Hono } from "hono"

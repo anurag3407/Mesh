@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import type { PlanItem } from "@mesh/core"
+import type { PlanItem } from "@sayabot/core"
 import { isPlanFinished, shouldNudgePlan } from "./plan-tool"
 
 describe("Planning Tool (E8)", () => {

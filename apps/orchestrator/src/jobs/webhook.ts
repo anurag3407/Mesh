@@ -1,7 +1,7 @@
-import { redactSecrets, type WebhookPayload } from "@mesh/core"
-import { signWebhook } from "@mesh/core/server"
-import { agents, webhookDeliveries } from "@mesh/db"
-import { openSecret } from "@mesh/llm"
+import { redactSecrets, type WebhookPayload } from "@sayabot/core"
+import { signWebhook } from "@sayabot/core/server"
+import { agents, webhookDeliveries } from "@sayabot/db"
+import { openSecret } from "@sayabot/llm"
 import { randomUUID } from "node:crypto"
 import { eq } from "drizzle-orm"
 import { getDb } from "../db"
@@ -83,7 +83,7 @@ export async function deliverWebhook(data: WebhookJobData, attempt: number): Pro
       method: "POST",
       headers: {
         "content-type": "application/json",
-        "user-agent": "mesh-webhook/1.0",
+        "user-agent": "sayabot-webhook/1.0",
         "webhook-id": webhookId,
         "webhook-timestamp": String(timestamp),
         "webhook-signature": signature,

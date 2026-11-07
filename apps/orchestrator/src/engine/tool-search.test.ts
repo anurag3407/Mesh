@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest"
 import { z } from "zod"
 import type { ToolSpec } from "../tools/audited"
 import {
-  ALWAYS_CORE_TOOLS,
   partitionToolsForSearch,
   TOOL_SEARCH_THRESHOLD,
   ToolIndex,

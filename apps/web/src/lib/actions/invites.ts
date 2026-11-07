@@ -3,10 +3,10 @@
 import {
   getClientConfigSnippet,
   normalizeClient,
-} from "@mesh/core"
+} from "@sayabot/core"
 import {
   generateAgentApiKey,
-} from "@mesh/core/server"
+} from "@sayabot/core/server"
 import { randomBytes } from "node:crypto"
 import {
   adminRoomAccess,

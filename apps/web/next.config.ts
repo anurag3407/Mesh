@@ -28,7 +28,7 @@ const nextConfig: NextConfig = {
         outputFileTracingRoot: fileURLToPath(new URL("../../", import.meta.url)),
       }
     : {}),
-  transpilePackages: ["@mesh/core", "@mesh/db", "@mesh/llm"],
+  transpilePackages: ["@sayabot/core", "@sayabot/db", "@sayabot/llm"],
   serverExternalPackages: ["pg", "pg-boss", "@e2b/code-interpreter"],
   poweredByHeader: false,
   turbopack: {},

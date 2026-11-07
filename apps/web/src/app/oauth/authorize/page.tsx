@@ -1,6 +1,6 @@
 import { createAdminClient } from "@/lib/supabase/admin"
 import { getCurrentUser } from "@/lib/auth"
-import { hashAgentApiKey } from "@mesh/core/server"
+import { hashAgentApiKey } from "@sayabot/core/server"
 import { randomBytes } from "node:crypto"
 import { redirect } from "next/navigation"
 

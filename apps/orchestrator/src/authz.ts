@@ -1,4 +1,4 @@
-import { orgMembers, roomAgents, roomMembers, rooms } from "@mesh/db"
+import { orgMembers, roomAgents, roomMembers, rooms } from "@sayabot/db"
 import { and, eq } from "drizzle-orm"
 import { getDb } from "./db"
 

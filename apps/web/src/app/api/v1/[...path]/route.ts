@@ -13,6 +13,8 @@ async function forward(request: Request, path: string[]) {
     "authorization",
     "content-type",
     "accept",
+    "x-sayabot-thread-id",
+    "x-sayabot-reply-to",
     "x-mesh-thread-id",
     "x-mesh-reply-to",
     "mcp-protocol-version",

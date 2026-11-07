@@ -1,4 +1,4 @@
-import { createDb, type Db, type DbPool } from "@mesh/db"
+import { createDb, type Db, type DbPool } from "@sayabot/db"
 import { getEnv } from "./env"
 
 let state: { db: Db; pool: DbPool } | null = null

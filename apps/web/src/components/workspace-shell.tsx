@@ -8,7 +8,7 @@ import { openBotDmAction } from "@/lib/actions/room-state"
 import { cn } from "@/lib/format"
 import { Avatar } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
-import { SayabotMark } from "@/components/landing/mesh-mark"
+import { SayabotMark } from "@/components/landing/sayabot-mark"
 import { useWorkspaceActivity } from "@/components/use-workspace-activity"
 import {
   AgentsIcon,

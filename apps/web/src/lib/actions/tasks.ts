@@ -1,7 +1,7 @@
 "use server"
 
 import { revalidatePath } from "next/cache"
-import { extractHandles } from "@mesh/core"
+import { extractHandles } from "@sayabot/core"
 import { getRoomAccess, requireUser } from "@/lib/auth"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { ensureBotDmRoom } from "@/lib/bot-dm"

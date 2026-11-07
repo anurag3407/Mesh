@@ -1,5 +1,5 @@
-import { type PlanItem, reducePlan, updatePlanSchema } from "@mesh/core"
-import { runTranscripts } from "@mesh/db"
+import { type PlanItem, reducePlan, updatePlanSchema } from "@sayabot/core"
+import { runTranscripts } from "@sayabot/db"
 import { eq } from "drizzle-orm"
 import { getDb } from "../db"
 import { broadcast } from "../realtime"

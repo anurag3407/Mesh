@@ -1,5 +1,5 @@
 import "server-only"
-import { extractHandles } from "@mesh/core"
+import { extractHandles } from "@sayabot/core"
 import { z } from "zod"
 
 const contentSchema = z.string().min(1).max(100_000)

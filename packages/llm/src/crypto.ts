@@ -6,11 +6,11 @@ export interface EncryptedSecret {
   tag: string
 }
 
-/** MESH_KEK is a base64-encoded 32-byte key; never log it. */
+/** SAYABOT_KEK (or MESH_KEK) is a base64-encoded 32-byte key; never log it. */
 export function parseKek(kek: string): Buffer {
   const key = Buffer.from(kek, "base64")
   if (key.length !== 32) {
-    throw new Error("MESH_KEK must decode to exactly 32 bytes (generate with: openssl rand -base64 32)")
+    throw new Error("SAYABOT_KEK (or MESH_KEK) must decode to exactly 32 bytes (generate with: openssl rand -base64 32)")
   }
   return key
 }

@@ -1,4 +1,4 @@
-import type { RoomEvent } from "@mesh/core"
+import type { RoomEvent } from "@sayabot/core"
 import { getEnv } from "./env"
 
 /**

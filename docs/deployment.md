@@ -92,7 +92,7 @@ changing them.
 
 - Import the monorepo. Set the root directory to `apps/web` and enable "include files
   outside the root" so `packages/*` resolves. Build command:
-  `pnpm --filter @mesh/web build`. Output: `.next`.
+  `pnpm --filter @sayabot/web build`. Output: `.next`.
 - Add the environment variables above. Do not add `MESH_KEK` to any `NEXT_PUBLIC_*` name.
 - The build uses webpack because Serwist injects the service worker; the `build` script
   already passes `--webpack`.
@@ -102,7 +102,7 @@ changing them.
 ## 4. Orchestrator on Fly.io / Railway / VPS
 
 - Build/run with Node 24 and pnpm. The process runs TypeScript through `tsx`:
-  `pnpm --filter @mesh/orchestrator start` (no compile step).
+  `pnpm --filter @sayabot/orchestrator start` (no compile step).
 - Expose port 4000. Health: `GET /health`.
 - Expose WebSocket upgrades for `/collab`. On Fly.io, a plain `http_service` with an
   internal port works; ensure the proxy does not buffer or strip the upgrade.

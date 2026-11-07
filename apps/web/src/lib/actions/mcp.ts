@@ -2,7 +2,7 @@
 
 import { z } from "zod"
 import { createMCPClient } from "@ai-sdk/mcp"
-import { openSecret, sealSecret } from "@mesh/llm"
+import { openSecret, sealSecret } from "@sayabot/llm"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { getKek } from "@/lib/env"
 import {

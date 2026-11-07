@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1.7
-# Mesh orchestrator (Hono + pg-boss + Hocuspocus). Also runs migrations and seeds.
+# Sayabot orchestrator (Hono + pg-boss + Hocuspocus). Also runs migrations and seeds.
 # Build context: repository root.
-#   docker build -f deploy/docker/orchestrator.Dockerfile -t mesh/orchestrator .
+#   docker build -f deploy/docker/orchestrator.Dockerfile -t sayabot/orchestrator .
 
 ARG NODE_VERSION=24.21.0
 ARG PNPM_VERSION=10.33.0
@@ -26,7 +26,7 @@ COPY packages ./packages
 COPY apps/orchestrator ./apps/orchestrator
 RUN --mount=type=cache,id=pnpm-store,target=/pnpm/store \
     pnpm install --frozen-lockfile --offline --prod \
-      --filter "@mesh/orchestrator..." --filter "@mesh/db" \
+      --filter "@sayabot/orchestrator..." --filter "@sayabot/db" \
  && find apps packages -name "*.test.ts" -not -path "*/node_modules/*" -delete
 
 FROM node:${NODE_VERSION}-bookworm-slim AS runtime
@@ -37,7 +37,7 @@ ENV NODE_ENV=production \
 WORKDIR /app
 COPY --from=install --chown=node:node /repo ./
 
-LABEL org.opencontainers.image.title="mesh-orchestrator" \
+LABEL org.opencontainers.image.title="sayabot-orchestrator" \
       org.opencontainers.image.revision=$GIT_COMMIT_SHA
 
 USER node

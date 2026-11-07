@@ -7,8 +7,8 @@ import {
   uniqueIndex,
   uuid,
 } from "drizzle-orm/pg-core"
-import type { AgentCapabilities } from "@mesh/core"
-import { DEFAULT_CAPABILITIES } from "@mesh/core"
+import type { AgentCapabilities } from "@sayabot/core"
+import { DEFAULT_CAPABILITIES } from "@sayabot/core"
 import { providerEnum } from "./enums"
 import { orgs, profiles } from "./identity"
 

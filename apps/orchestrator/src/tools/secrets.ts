@@ -1,5 +1,5 @@
-import { agentSecretGrants, orgToolConfigs, vaultSecrets } from "@mesh/db"
-import { openSecret } from "@mesh/llm"
+import { agentSecretGrants, orgToolConfigs, vaultSecrets } from "@sayabot/db"
+import { openSecret } from "@sayabot/llm"
 import { and, eq, isNull, or, gt } from "drizzle-orm"
 import { getDb } from "../db"
 import { getEnv } from "../env"

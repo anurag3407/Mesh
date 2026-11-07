@@ -15,7 +15,7 @@ export async function startJobs(): Promise<PgBoss> {
   const env = getEnv()
   const instance = new PgBoss({
     connectionString: env.DATABASE_URL,
-    application_name: "mesh-orchestrator",
+    application_name: "sayabot-orchestrator",
     max: 5,
   })
   instance.on("error", (error) => console.error("[pg-boss] error", error))

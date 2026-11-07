@@ -1,4 +1,4 @@
-import { matchesHostPattern } from "@mesh/core"
+import { matchesHostPattern } from "@sayabot/core"
 
 const ORCHESTRATOR_URL = process.env.ORCHESTRATOR_URL || "http://orchestrator:4000"
 const INTERNAL_SECRET = process.env.ORCHESTRATOR_INTERNAL_SECRET || ""

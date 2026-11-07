@@ -35,7 +35,7 @@ export const TOOL_CALL_STATUSES = [
 ] as const
 export type ToolCallStatus = (typeof TOOL_CALL_STATUSES)[number]
 
-/** Minimal agent descriptor the coordinator needs; full rows live in @mesh/db. */
+/** Minimal agent descriptor the coordinator needs; full rows live in @sayabot/db. */
 export interface AgentRef {
   id: string
   handle: string

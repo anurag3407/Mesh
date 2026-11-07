@@ -3,7 +3,7 @@ import {
   createRunScrubber,
   parseCapabilities,
   redactSecrets,
-} from "@mesh/core"
+} from "@sayabot/core"
 import {
   agentRuns,
   messages,
@@ -12,8 +12,8 @@ import {
   runTranscripts,
   tasks,
   usageEvents,
-} from "@mesh/db"
-import { buildProviderOptions } from "@mesh/llm"
+} from "@sayabot/db"
+import { buildProviderOptions } from "@sayabot/llm"
 import {
   stepCountIs,
   streamText,
@@ -40,7 +40,7 @@ import {
   type TurnResult,
 } from "../runner/llm"
 import { buildTools } from "../tools"
-import { buildEngineContext, sortToolSpecs } from "./context"
+import { buildEngineContext } from "./context"
 import { getAvailableSkills } from "./skills"
 import { getVerifyMode, runCriticVerification } from "./verify"
 
@@ -72,7 +72,7 @@ export async function runEngineTurn(args: RunLlmTurnArgs): Promise<TurnResult> {
     threadRootId: args.threadRootId,
   })
 
-  const [canvasContext, taskContext, taskBrief] = await Promise.all([
+  const [_canvasContext, _taskContext, taskBrief] = await Promise.all([
     loadCanvasContext(room.id),
     loadTaskContext(room.id),
     args.taskId ? loadTaskBriefContext(args.taskId) : Promise.resolve(""),

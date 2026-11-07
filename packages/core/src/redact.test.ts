@@ -21,8 +21,11 @@ const secrets = [
   join("gs", "k_", "abcdefghijklmnopqrstuvwxyz0123456789ABCD"),
   join("mesh_", "ak_", "abcdefghijklmnopqrstuvwx"),
   join("saaya_", "ak_", "abcdefghijklmnopqrstuvwx"),
+  join("sayabot_", "ak_", "abcdefghijklmnopqrstuvwx"),
   join("mesh_", "at_", "abcdefghijklmnopqrstuvwx"),
+  join("sayabot_", "at_", "abcdefghijklmnopqrstuvwx"),
   join("mesh_", "rt_", "abcdefghijklmnopqrstuvwx"),
+  join("sayabot_", "rt_", "abcdefghijklmnopqrstuvwx"),
   join("sinv_", "abcdefghijklmnopqrstuvwx"),
   join(
     "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9",

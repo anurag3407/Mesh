@@ -4,7 +4,7 @@ import {
   roomSchedules,
   taskEvents,
   type Db,
-} from "@mesh/db"
+} from "@sayabot/db"
 import { getDb } from "../db"
 import { type CollabAgent, postAgentMessage, resolveAgentRoomId } from "./index"
 import { autoCloseMootRequests } from "./tasks-service"

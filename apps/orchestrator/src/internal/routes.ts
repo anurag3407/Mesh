@@ -1,4 +1,4 @@
-import { hashAgentApiKey } from "@mesh/core/server"
+import { hashAgentApiKey } from "@sayabot/core/server"
 import {
   agentComputers,
   agents,
@@ -7,8 +7,8 @@ import {
   roomAgents,
   toolCalls,
   vaultSecrets,
-} from "@mesh/db"
-import { openSecret } from "@mesh/llm"
+} from "@sayabot/db"
+import { openSecret } from "@sayabot/llm"
 import { and, eq, isNull, or, gt } from "drizzle-orm"
 import { Hono } from "hono"
 import { streamSSE } from "hono/streaming"

@@ -47,7 +47,7 @@ importers:
       '@hono/node-server':
         specifier: ^2.1.5
         version: 2.1.5(hono@4.13.14)
-      '@mesh/core':
+      '@sayabot/core':
         specifier: workspace:*
         version: link:../../packages/core
       dotenv-cli:
@@ -75,7 +75,7 @@ importers:
       '@hono/node-server':
         specifier: ^2.1.5
         version: 2.1.5(hono@4.13.14)
-      '@mesh/core':
+      '@sayabot/core':
         specifier: workspace:*
         version: link:../../packages/core
       dotenv-cli:
@@ -112,13 +112,13 @@ importers:
       '@hono/node-server':
         specifier: ^2.1.5
         version: 2.1.5(hono@4.13.14)
-      '@mesh/core':
+      '@sayabot/core':
         specifier: workspace:*
         version: link:../../packages/core
-      '@mesh/db':
+      '@sayabot/db':
         specifier: workspace:*
         version: link:../../packages/db
-      '@mesh/llm':
+      '@sayabot/llm':
         specifier: workspace:*
         version: link:../../packages/llm
       '@supabase/supabase-js':
@@ -191,18 +191,18 @@ importers:
       '@hocuspocus/provider':
         specifier: ^4.8.0
         version: 4.8.0(y-protocols@1.0.7(yjs@13.6.33))(yjs@13.6.33)
-      '@mesh/core':
-        specifier: workspace:*
-        version: link:../../packages/core
-      '@mesh/db':
-        specifier: workspace:*
-        version: link:../../packages/db
-      '@mesh/llm':
-        specifier: workspace:*
-        version: link:../../packages/llm
       '@monaco-editor/react':
         specifier: ^4.7.0
         version: 4.7.0(monaco-editor@0.52.2)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
+      '@sayabot/core':
+        specifier: workspace:*
+        version: link:../../packages/core
+      '@sayabot/db':
+        specifier: workspace:*
+        version: link:../../packages/db
+      '@sayabot/llm':
+        specifier: workspace:*
+        version: link:../../packages/llm
       '@streamdown/code':
         specifier: ^2.0.0
         version: 2.0.0(react@19.3.1)
@@ -322,7 +322,7 @@ importers:
 
   packages/db:
     dependencies:
-      '@mesh/core':
+      '@sayabot/core':
         specifier: workspace:*
         version: link:../core
       dotenv:
@@ -371,7 +371,7 @@ importers:
       '@ai-sdk/openai-compatible':
         specifier: ^3.0.82
         version: 3.0.82(zod@4.6.7)
-      '@mesh/core':
+      '@sayabot/core':
         specifier: workspace:*
         version: link:../core
       ai:

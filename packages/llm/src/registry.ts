@@ -5,7 +5,7 @@ import { createGroq } from "@ai-sdk/groq"
 import { createOpenAI } from "@ai-sdk/openai"
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible"
 import type { LanguageModel } from "ai"
-import type { Provider } from "@mesh/core"
+import type { Provider } from "@sayabot/core"
 import { decryptSecret } from "./crypto"
 
 export interface LanguageModelConfig {
@@ -39,7 +39,7 @@ export function createLanguageModel(config: LanguageModelConfig): LanguageModel 
       if (!baseURL) {
         throw new MissingModelConfigError("openai-compatible providers require a base URL")
       }
-      return createOpenAICompatible({ name: "mesh-compatible", baseURL, apiKey })(model)
+      return createOpenAICompatible({ name: "sayabot-compatible", baseURL, apiKey })(model)
     default:
       throw new MissingModelConfigError(`unsupported provider: ${String(provider)}`)
   }

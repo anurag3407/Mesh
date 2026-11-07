@@ -1,4 +1,4 @@
-import { messages } from "@mesh/db"
+import { messages } from "@sayabot/db"
 import { and, asc, eq, gte, isNull } from "drizzle-orm"
 import type { PoolClient } from "pg"
 import { getDb, getPool, notify } from "./db"

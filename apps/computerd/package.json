@@ -1,5 +1,5 @@
 {
-  "name": "@mesh/computerd",
+  "name": "@sayabot/computerd",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -11,7 +11,7 @@
   },
   "dependencies": {
     "@hono/node-server": "^2.1.5",
-    "@mesh/core": "workspace:*",
+    "@sayabot/core": "workspace:*",
     "dotenv-cli": "^11.1.0",
     "hono": "^4.13.14",
     "tsx": "^4.23.15",

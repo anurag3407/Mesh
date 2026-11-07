@@ -46,7 +46,7 @@ All of `docs/bot-platform/plan.md` §0 still applies. In particular:
    - Generate migrations with `pnpm db:generate`.
    - Hand-written SQL goes in `packages/db/sql/00NN_*.sql`. **The next free number is 0010** (`0009_bot_platform.sql` exists).
    - A human applies migrations.
-2. **Reuse, don't duplicate.** One approval path (`apps/orchestrator/src/tools/audited.ts`), one crypto helper (`@mesh/llm` `crypto.ts`), one redaction pass (`@mesh/core` `redact.ts` plus `createRunScrubber`), one SSRF guard, one push sender (`apps/orchestrator/src/push.ts`).
+2. **Reuse, don't duplicate.** One approval path (`apps/orchestrator/src/tools/audited.ts`), one crypto helper (`@sayabot/llm` `crypto.ts`), one redaction pass (`@sayabot/core` `redact.ts` plus `createRunScrubber`), one SSRF guard, one push sender (`apps/orchestrator/src/push.ts`).
 3. **No raw secret ever reaches** a prompt, a tool result, a bot computer, a log, `audit_logs`, `tool_calls` or the browser. §19 is required for every ticket that touches secrets, CLI credentials, voice keys or inbound webhooks.
 4. **Behaviour flags.** Every behaviour change to the agent loop ships behind a per-agent `engine` setting (§6.1). Existing agents stay on `engine: "v1"` until an admin flips them or the WS12 eval gate passes. Then the default for *new* agents changes.
 5. **Provider-neutral first.** The runner uses the Vercel AI SDK (`ai` 7). Provider-specific features go through `providerOptions` in `packages/llm/src/registry.ts` capability flags, never through `if (provider === …)` scattered in the runner. Examples: Anthropic prompt caching, compaction, context editing and effort; OpenAI reasoning effort.
@@ -195,7 +195,7 @@ New code lives in:
 - `apps/orchestrator/src/triggers/` and `scheduler/routines.ts` (WS6)
 - `apps/orchestrator/src/voice/` (WS8)
 - `packages/core/src/{engine,speech,policy,team-package,cron}.ts` (pure logic, unit-tested)
-- `apps/cli` (`@mesh/cli`, WS10)
+- `apps/cli` (`@sayabot/cli`, WS10)
 
 ---
 
@@ -221,7 +221,7 @@ This is the workstream that makes Sayabot's bots better than OMB's. Everything e
 
 ### 6.1 Engine selection
 
-`agents.params.engine: "v1" | "v2" | "cli"` (zod-validated in `@mesh/core`; default `"v1"` for existing agents, `"v2"` for agents created after the WS12 gate).
+`agents.params.engine: "v1" | "v2" | "cli"` (zod-validated in `@sayabot/core`; default `"v1"` for existing agents, `"v2"` for agents created after the WS12 gate).
 
 - `v1` is today's `runLlmTurn`, unchanged.
 - `v2` is `engine/run.ts`.
@@ -270,7 +270,7 @@ Rules:
 ```ts
 // apps/orchestrator/src/engine/run.ts (shape, not final code)
 while (!done) {
-  budget.check()                     // steps, tokens, USD, wall clock; breakers from @mesh/core
+  budget.check()                     // steps, tokens, USD, wall clock; breakers from @sayabot/core
   ctx = await contextBuilder.render(state)          // §6.3
   if (ctx.tokens > policy.compactAt) state = await compact(state)   // §6.5
   const step = await model.step(ctx, tools, { effort: policy.effortFor(state) })
@@ -380,7 +380,7 @@ apps/orchestrator/src/engine/
   run.ts            loop (§6.4)          context.ts     builder (§6.3)
   compaction.ts     §6.5                 plan.ts        §6.6
   verify.ts         §6.8                 subagents.ts   §6.9
-  recovery.ts       retries/fallbacks    budget.ts      wraps @mesh/core breakers
+  recovery.ts       retries/fallbacks    budget.ts      wraps @sayabot/core breakers
   interrupts.ts     mid-run steering     persist.ts     run_steps/run_transcripts/heartbeat
   resume.ts         boot + run.resume job
   tool-docs/*.md    model-facing tool docs
@@ -645,7 +645,7 @@ The new `routines` table:
   - `id`, `org_id`, `room_id`, `agent_id?`, `kind` (`webhook` | `app_event`), `name`, `secret_enc` (for HMAC), `filter` (jsonb: JSONPath conditions), `prompt_template` (Mustache-style with `{{payload.x}}`, rendered **as data inside a fenced block, never as instructions**);
   - `rate_limit_per_min`, `enabled`, `unattended_policy_id`.
 - **Endpoint:** `POST /hooks/:triggerId` on the orchestrator, routed by the web reverse proxy.
-  - **Auth:** Standard Webhooks HMAC verification (reuse `@mesh/core/server` signing helpers in reverse), or a bearer token, with a 5-minute replay tolerance.
+  - **Auth:** Standard Webhooks HMAC verification (reuse `@sayabot/core/server` signing helpers in reverse), or a bearer token, with a 5-minute replay tolerance.
   - **Limits:** a 256 KB body cap, a per-trigger rate limit, and payloads stored redacted in `trigger_receipts` (7-day retention).
 - **Prompt-injection posture:** webhook content is untrusted. The rendered prompt wraps it as `<external_event source="…">…</external_event>`, the agent is told it is data, and policies can force `confined` mode for trigger-started runs.
 - **UI:** per-room Automations settings let you create a trigger, copy its URL and secret, view recent receipts and replay one.
@@ -775,7 +775,7 @@ It also chunks into sentences for streaming TTS and keeps a mapping back to mess
 - **Gallery** (later): publish packages org-internally first; public listing is out of scope (§21).
 - The existing 9 markdown templates are converted to single-agent packages so there is one format.
 
-**`saya` CLI (`apps/cli`, `@mesh/cli`, published to npm):**
+**`saya` CLI (`apps/cli`, `@sayabot/cli`, published to npm):**
 - Authenticates with an agent API key or a user PAT (new `user_api_tokens` table, hashed like `agent_api_keys`).
 - Commands:
   - `saya login`
@@ -826,7 +826,7 @@ This is the gate for every engine change. **Bots are "better" only if the evals 
 
 | Area | Requirement |
 |---|---|
-| `@mesh/core` pure modules (`policy`, `cron`, `speech`, `team-package`, `engine`) | ≥ 90% line coverage |
+| `@sayabot/core` pure modules (`policy`, `cron`, `speech`, `team-package`, `engine`) | ≥ 90% line coverage |
 | Engine loop | Mock-model tests (AI SDK mock providers) for: parallel tools, compaction, resume after crash, interrupt fold, budget wrap-up, retry/backoff, fallback model, refusal |
 | agentd | Unit tests per op, including `proc.*`, browser and fs_edit uniqueness |
 | RLS | SQL tests (pgTAP or Vitest against a test DB) for every new table |

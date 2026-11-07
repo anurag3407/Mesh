@@ -1,5 +1,5 @@
 {
-  "name": "mesh",
+  "name": "sayabot",
   "private": true,
   "packageManager": "pnpm@10.33.0",
   "scripts": {
@@ -8,9 +8,9 @@
     "typecheck": "turbo run typecheck",
     "lint": "turbo run lint",
     "test": "turbo run test",
-    "db:generate": "pnpm --filter @mesh/db generate",
-    "db:migrate": "pnpm --filter @mesh/db migrate",
-    "db:seed": "pnpm --filter @mesh/db seed",
+    "db:generate": "pnpm --filter @sayabot/db generate",
+    "db:migrate": "pnpm --filter @sayabot/db migrate",
+    "db:seed": "pnpm --filter @sayabot/db seed",
     "format": "prettier --write .",
     "e2e": "playwright test",
     "typecheck:e2e": "tsc -p tsconfig.e2e.json"

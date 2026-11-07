@@ -11,7 +11,7 @@ vi.mock("../realtime", () => ({
   },
 }))
 
-let insertedToolCallId = "tool-call-123"
+const insertedToolCallId = "tool-call-123"
 
 vi.mock("../db", () => ({
   getDb: () => ({

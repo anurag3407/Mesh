@@ -1,6 +1,6 @@
 import { and, eq, or } from "drizzle-orm"
 import { z } from "zod"
-import { skills } from "@mesh/db"
+import { skills } from "@sayabot/db"
 import { getDb } from "../db"
 import type { ToolSpec } from "../tools/audited"
 

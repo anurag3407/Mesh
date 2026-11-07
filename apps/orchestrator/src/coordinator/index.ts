@@ -13,7 +13,7 @@ import {
   HUMAN_TURN,
   type PlannedTurn,
   type WebhookPayload,
-} from "@mesh/core"
+} from "@sayabot/core"
 import {
   agentRuns,
   agents,
@@ -22,7 +22,7 @@ import {
   tasks,
   turnSessions,
   usageEvents,
-} from "@mesh/db"
+} from "@sayabot/db"
 import { generateObject } from "ai"
 import { and, desc, eq, gte, isNull, ne, sql } from "drizzle-orm"
 import { z } from "zod"
@@ -45,7 +45,7 @@ import {
   type RoomRow,
 } from "../runner/context"
 import { startAgentTurn } from "../engine"
-import { resolveAgentModel, runLlmTurn } from "../runner/llm"
+import { resolveAgentModel } from "../runner/llm"
 import { interruptRoom } from "./interrupt"
 
 export interface CoordinatorDeps {

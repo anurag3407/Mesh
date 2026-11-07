@@ -1,9 +1,9 @@
 "use server"
 
 import { z } from "zod"
-import { DEFAULT_CAPABILITIES, parseCapabilities, redactSecrets } from "@mesh/core"
-import { generateWebhookSecret } from "@mesh/core/server"
-import { sealSecret } from "@mesh/llm"
+import { DEFAULT_CAPABILITIES, parseCapabilities, redactSecrets } from "@sayabot/core"
+import { generateWebhookSecret } from "@sayabot/core/server"
+import { sealSecret } from "@sayabot/llm"
 import { randomBytes } from "node:crypto"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { getKek } from "@/lib/env"

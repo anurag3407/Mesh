@@ -11,6 +11,8 @@ async function forward(request: Request, token: string) {
     "content-type",
     "accept",
     "user-agent",
+    "x-sayabot-thread-id",
+    "x-sayabot-reply-to",
     "x-mesh-thread-id",
     "x-mesh-reply-to",
     "mcp-protocol-version",

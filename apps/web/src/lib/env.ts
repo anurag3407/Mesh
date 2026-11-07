@@ -19,7 +19,9 @@ export function getServiceRoleKey(): string {
 }
 
 export function getKek(): string {
-  return requireEnv("MESH_KEK")
+  const kek = process.env.SAYABOT_KEK || process.env.MESH_KEK
+  if (!kek) throw new Error("SAYABOT_KEK (or MESH_KEK) is not set")
+  return kek
 }
 
 export function getOrchestratorUrl(): string {

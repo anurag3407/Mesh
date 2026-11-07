@@ -41,7 +41,7 @@
 
    §13.2 is a required pass for every ticket that touches secrets.
 5. Each ticket is done when `pnpm typecheck && pnpm lint && pnpm test` pass, its acceptance criteria are met, and its tests are added.
-6. **Package names.** The workspace is still `@mesh/*` (`@mesh/core`, `@mesh/db`, `@mesh/llm`). New apps are `@mesh/computerd` and `@mesh/egress`. The product name in the UI is **Sayabot**.
+6. **Package names.** The workspace is still `@sayabot/*` (`@sayabot/core`, `@sayabot/db`, `@sayabot/llm`). New apps are `@sayabot/computerd` and `@sayabot/egress`. The product name in the UI is **Sayabot**.
 7. **Check library versions before use.** AI SDK 7, pg-boss 12, Next 16, Vitest 5, zod 4, mockttp, Playwright and gVisor are all newer than many models know well. Read the installed type definitions before writing integration code.
 
 ---
@@ -441,7 +441,7 @@ use_secret: {
 
 ### 5.4 Egress proxy (`apps/egress`)
 
-**Package:** `@mesh/egress`, Node 24, `mockttp` (check the current version), zod. Ports:
+**Package:** `@sayabot/egress`, Node 24, `mockttp` (check the current version), zod. Ports:
 - `:8080`: proxy listener on `botnet`;
 - `:8081`: internal admin/health on `mesh`. Only the orchestrator reaches it, at `GET /health` and `POST /flush`.
 
@@ -529,7 +529,7 @@ A tiny daemon inside each container. computerd talks to it **only** via `docker 
 
 Every command runs as uid 10001 with `HOME=/home/bot`, the proxy env, and the placeholder env. agentd keeps no secrets.
 
-### 6.3 computerd (`apps/computerd`, `@mesh/computerd`)
+### 6.3 computerd (`apps/computerd`, `@sayabot/computerd`)
 
 Hono on Node 24, port 4100, on the `mesh` network only. Auth: every route requires `isInternalRequest`, with the same shared secret as the orchestrator. Copy or import the helper; don't reimplement the comparison.
 
@@ -623,7 +623,7 @@ They're added by `buildTools` when `capabilities.computer` is set. All are `Tool
 | `computer_publish` | `{path, as: "canvas"\|"file", title?}` | false. Copies a file into a new canvas (via `canvas_write`) or into room files. |
 
 - `isDestructiveCommand` goes in `packages/core/src/commands.ts`. Patterns: `rm -rf` on `/`, `~` or `/home/bot` top level; `mkfs`, `dd of=/dev`; fork bombs; known miner binaries (`xmrig`, …); `curl … | sh` from non-allowlisted hosts. Unit-tested. It's a speed bump for honest mistakes, not a security boundary (gVisor is the boundary).
-- Streaming: `computer_shell` streams output to the room as a collapsible log block, reusing the sandbox log UI by broadcasting `tool.output` deltas: `{toolCallId, seq, chunk}`. Add that event to the zod room events in `@mesh/core`.
+- Streaming: `computer_shell` streams output to the room as a collapsible log block, reusing the sandbox log UI by broadcasting `tool.output` deltas: `{toolCallId, seq, chunk}`. Add that event to the zod room events in `@sayabot/core`.
 - When an agent has `computer` enabled, **drop `code_sandbox`** from its tool set to avoid confusion.
 - Add a system prompt addendum for computer agents (in `runner/context.ts` `buildSystemPrompt`). It describes the computer, `/home/bot` persistence, that secrets appear as `$ENV_NAME` placeholders that "just work" for allowed hosts, the proxy limits (HTTPS only, no SSH), and to publish deliverables with `computer_publish`.
 
@@ -1060,7 +1060,7 @@ Format: **ID: title** · depends on · files · acceptance. Tickets inside a wor
 - ✅ New patterns are covered. `createRunScrubber` removes exact, base64 and URL-encoded values. The provider key is in the scrub list for every run.
 
 **T2.3: Vault actions and UI** · T2.1 · `lib/actions/vault.ts` (`saveVaultSecret`, `rotateVaultSecret`, `deleteVaultSecret`, `grantSecret`, `revokeGrant`), `/[org]/settings/vault`, wizard step 3 secret slots
-- ✅ The plaintext is never returned or logged. Host patterns are validated (`isValidHostPattern` in `@mesh/core`, unit-tested: rejects `*`, IPs, empty). Audit rows are written.
+- ✅ The plaintext is never returned or logged. Host patterns are validated (`isValidHostPattern` in `@sayabot/core`, unit-tested: rejects `*`, IPs, empty). Audit rows are written.
 
 **T2.4: `tools/secrets.ts` and vault-backed built-ins** · T2.1 · move `loadOrgToolConfig`, add `resolveToolCredential`, update `github.ts` and `postgres.ts`
 - ✅ An agent grant takes precedence over the org config. The existing org-config behaviour doesn't change.

@@ -1,14 +1,15 @@
 import { describe, expect, it, vi } from "vitest"
 import { buildTools } from "./index"
 import type { ToolRuntime } from "./audited"
-import type { agents } from "@mesh/db"
-import { DEFAULT_CAPABILITIES } from "@mesh/core"
+import type { agents } from "@sayabot/db"
+import { DEFAULT_CAPABILITIES } from "@sayabot/core"
 
 vi.mock("../env", () => ({
   getEnv: () => ({
     PORT: 4000,
     DATABASE_URL: "postgres://mock",
     MESH_KEK: "01234567890123456789012345678901",
+    SAYABOT_KEK: "01234567890123456789012345678901",
     SUPABASE_URL: "https://mock.supabase.co",
     SUPABASE_SERVICE_ROLE_KEY: "mock-key",
     ORCHESTRATOR_INTERNAL_SECRET: "mock-secret",
@@ -29,7 +30,7 @@ vi.mock("../db", () => ({
   }),
 }))
 
-vi.mock("@mesh/llm", () => ({
+vi.mock("@sayabot/llm", () => ({
   connectMcpServers: vi.fn().mockResolvedValue({
     tools: {},
     meta: {},

@@ -1,4 +1,4 @@
-import { turnSessions } from "@mesh/db"
+import { turnSessions } from "@sayabot/db"
 import { and, eq } from "drizzle-orm"
 import { abortRoomRuns } from "../active-runs"
 import { getDb, notify } from "../db"

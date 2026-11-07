@@ -1,5 +1,5 @@
-import { redactSecrets, type TurnRole } from "@mesh/core"
-import { agentRuns, messages } from "@mesh/db"
+import { redactSecrets, type TurnRole } from "@sayabot/core"
+import { agentRuns, messages } from "@sayabot/db"
 import { eq } from "drizzle-orm"
 import { registerRun, unregisterRun } from "../active-runs"
 import { waitForBotReply } from "../bot-reply"

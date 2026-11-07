@@ -1,4 +1,4 @@
-import { isWithinWindow, minutesInTimeZone } from "@mesh/core"
+import { isWithinWindow, minutesInTimeZone } from "@sayabot/core"
 import {
   meetings,
   messages,
@@ -8,7 +8,7 @@ import {
   rooms,
   taskEvents,
   tasks,
-} from "@mesh/db"
+} from "@sayabot/db"
 import { and, desc, eq, gt, gte, isNull, lte, or, sql } from "drizzle-orm"
 import { getDb, getPool } from "../db"
 import { enqueueRoomMessage } from "../jobs"

@@ -5,7 +5,7 @@ import { z } from "zod"
 import {
   formatMinutes,
   parseTimeToMinutes,
-} from "@mesh/core"
+} from "@sayabot/core"
 import { requireUser } from "@/lib/auth"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { queueRoomMessage } from "@/lib/orchestrator"

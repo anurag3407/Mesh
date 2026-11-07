@@ -1,5 +1,5 @@
-import { debateRoleInstruction, parseCapabilities, type TurnRole } from "@mesh/core"
-import { getProviderCapabilities } from "@mesh/llm"
+import { debateRoleInstruction, parseCapabilities, type TurnRole } from "@sayabot/core"
+import { getProviderCapabilities } from "@sayabot/llm"
 import type { ModelMessage, SystemModelMessage, UserModelMessage } from "ai"
 import type { AgentRow, ContextMessage, RoomRow } from "../runner/context"
 import type { ToolSpec } from "../tools/audited"

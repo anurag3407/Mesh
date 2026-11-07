@@ -1,4 +1,4 @@
-import { canvases } from "@mesh/db"
+import { canvases } from "@sayabot/db"
 import { Hocuspocus } from "@hocuspocus/server"
 import { createClient } from "@supabase/supabase-js"
 import { eq } from "drizzle-orm"

@@ -7,8 +7,8 @@ import {
   encryptSecret,
   last4,
   providerKeyToApiKey,
-} from "@mesh/llm"
-import { PROVIDERS, redactSecrets } from "@mesh/core"
+} from "@sayabot/llm"
+import { PROVIDERS, redactSecrets } from "@sayabot/core"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { getKek } from "@/lib/env"
 import { defaultModel } from "@/lib/model-options"

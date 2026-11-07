@@ -48,7 +48,7 @@ describe("Memory Service and Tools (M2, M3, M4)", () => {
       },
     ]
 
-    const selectMock = vi.fn().mockReturnValue({
+    const _selectMock = vi.fn().mockReturnValue({
       from: vi.fn().mockReturnValue({
         where: vi.fn().mockReturnValue({
           orderBy: vi.fn().mockReturnValue({
@@ -58,7 +58,7 @@ describe("Memory Service and Tools (M2, M3, M4)", () => {
       }),
     })
 
-    const updateMock = vi.fn().mockReturnValue({
+    const _updateMock = vi.fn().mockReturnValue({
       set: vi.fn().mockReturnValue({
         where: vi.fn().mockResolvedValue([]),
       }),

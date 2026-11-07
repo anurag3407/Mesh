@@ -10,7 +10,7 @@ import {
   startScheduledMeetingAction,
   wakeBotsAction,
 } from "@/lib/actions/meetings"
-import { formatMinutes } from "@mesh/core"
+import { formatMinutes } from "@sayabot/core"
 import { dateTimeLocalToIso, toDateTimeLocalValue } from "@/lib/datetime"
 import { Button } from "@/components/ui/button"
 import { ConfirmButton } from "@/components/ui/confirm-button"

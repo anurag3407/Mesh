@@ -3,6 +3,7 @@ import { z } from "zod"
 const envSchema = z.object({
   DATABASE_URL: z.string().min(1),
   MESH_KEK: z.string().min(1),
+  SAYABOT_KEK: z.string().min(1).optional(),
   SUPABASE_URL: z.string().url(),
   SUPABASE_SERVICE_ROLE_KEY: z.string().min(1),
   ORCHESTRATOR_INTERNAL_SECRET: z.string().min(16),
@@ -20,6 +21,10 @@ const envSchema = z.object({
     .string()
     .optional()
     .transform((v) => v === "true"),
+  SAYABOT_ALLOW_PRIVATE_WEBHOOKS: z
+    .string()
+    .optional()
+    .transform((v) => v === "true"),
   DEV_OPENAI_COMPAT_BASE_URL: z.string().optional(),
   DEV_OPENAI_COMPAT_API_KEY: z.string().optional(),
   DEV_OPENAI_COMPAT_MODEL: z.string().optional(),
@@ -34,9 +39,15 @@ let cached: Env | null = null
 
 export function getEnv(): Env {
   if (cached) return cached
+  const rawKek = process.env.SAYABOT_KEK || process.env.MESH_KEK
+  const rawAllowPrivate =
+    process.env.SAYABOT_ALLOW_PRIVATE_WEBHOOKS ?? process.env.MESH_ALLOW_PRIVATE_WEBHOOKS
   const parsed = envSchema.safeParse({
     ...process.env,
+    MESH_KEK: rawKek,
+    SAYABOT_KEK: rawKek,
     SUPABASE_URL: process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL,
+    MESH_ALLOW_PRIVATE_WEBHOOKS: rawAllowPrivate,
   })
   if (!parsed.success) {
     const issues = parsed.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("\n")

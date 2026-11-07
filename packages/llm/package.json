@@ -1,5 +1,5 @@
 {
-  "name": "@mesh/llm",
+  "name": "@sayabot/llm",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -19,7 +19,7 @@
     "@ai-sdk/mcp": "^2.0.88",
     "@ai-sdk/openai": "^4.0.106",
     "@ai-sdk/openai-compatible": "^3.0.82",
-    "@mesh/core": "workspace:*",
+    "@sayabot/core": "workspace:*",
     "ai": "^7.0.159",
     "zod": "^4.6.7"
   },

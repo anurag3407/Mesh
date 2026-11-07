@@ -8,7 +8,7 @@ import {
   startScheduledMeetingAction,
   wakeBotsAction,
 } from "@/lib/actions/meetings"
-import { formatMinutes } from "@mesh/core"
+import { formatMinutes } from "@sayabot/core"
 import { Button } from "@/components/ui/button"
 import { ConfirmButton } from "@/components/ui/confirm-button"
 import { InlineAlert } from "@/components/ui/empty"

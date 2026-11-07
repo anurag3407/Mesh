@@ -1,5 +1,5 @@
-import { redactSecrets } from "@mesh/core"
-import { toolCalls } from "@mesh/db"
+import { redactSecrets } from "@sayabot/core"
+import { toolCalls } from "@sayabot/db"
 import { tool, type ToolSet } from "ai"
 import { eq } from "drizzle-orm"
 import { z } from "zod"

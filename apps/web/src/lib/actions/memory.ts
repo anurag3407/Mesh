@@ -1,7 +1,7 @@
 "use server"
 
 import { revalidatePath } from "next/cache"
-import { redactSecrets } from "@mesh/core"
+import { redactSecrets } from "@sayabot/core"
 import { getOrgAccess, getRoomAccess } from "@/lib/auth"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { errorMessage, fail, ok } from "@/lib/actions/shared"

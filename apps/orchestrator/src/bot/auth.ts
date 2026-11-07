@@ -1,5 +1,5 @@
-import { agentKeyPrefix, hashAgentApiKey } from "@mesh/core/server"
-import { agentApiKeys, agents, oauthTokens } from "@mesh/db"
+import { agentKeyPrefix, hashAgentApiKey } from "@sayabot/core/server"
+import { agentApiKeys, agents, oauthTokens } from "@sayabot/db"
 import { and, eq, gt, isNull } from "drizzle-orm"
 import { getDb } from "../db"
 
@@ -25,8 +25,8 @@ export async function authenticateAgentKey(
   if (!authorization?.startsWith("Bearer ")) return null
   const token = authorization.slice(7).trim()
 
-  // 1. OAuth Access Token path (mesh_at_...)
-  if (token.startsWith("mesh_at_")) {
+  // 1. OAuth Access Token path (mesh_at_... or sayabot_at_...)
+  if (token.startsWith("mesh_at_") || token.startsWith("sayabot_at_")) {
     const tokenHash = hashAgentApiKey(token)
     const now = new Date()
     const [row] = await getDb()
@@ -55,8 +55,8 @@ export async function authenticateAgentKey(
     }
   }
 
-  // 2. Direct API Key path (mesh_ak_... or saaya_ak_...)
-  if (!token.startsWith("mesh_ak_") && !token.startsWith("saaya_ak_")) return null
+  // 2. Direct API Key path (mesh_ak_... or saaya_ak_... or sayabot_ak_...)
+  if (!token.startsWith("mesh_ak_") && !token.startsWith("saaya_ak_") && !token.startsWith("sayabot_ak_")) return null
   const prefix = agentKeyPrefix(token)
   const now = new Date()
 

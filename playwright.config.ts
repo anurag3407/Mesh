@@ -19,13 +19,13 @@ export default defineConfig({
   },
   webServer: [
     {
-      command: "pnpm --filter @mesh/web dev",
+      command: "pnpm --filter @sayabot/web dev",
       url: baseURL,
       reuseExistingServer: true,
       timeout: 180_000,
     },
     {
-      command: "pnpm --filter @mesh/orchestrator dev",
+      command: "pnpm --filter @sayabot/orchestrator dev",
       url: `${process.env.ORCHESTRATOR_URL ?? "http://localhost:4000"}/health`,
       reuseExistingServer: true,
       timeout: 180_000,

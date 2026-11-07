@@ -1,4 +1,4 @@
-import { agents, messages, rooms, tasks } from "@mesh/db"
+import { agents, messages, rooms, tasks } from "@sayabot/db"
 import { eq } from "drizzle-orm"
 import { randomUUID } from "node:crypto"
 import { getDb, notify } from "../db"

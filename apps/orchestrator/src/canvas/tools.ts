@@ -1,5 +1,5 @@
-import { planCanvasPatch } from "@mesh/core"
-import { canvasVersions } from "@mesh/db"
+import { planCanvasPatch } from "@sayabot/core"
+import { canvasVersions } from "@sayabot/db"
 import { z } from "zod"
 import { getDb } from "../db"
 import type { ToolSpec } from "../tools/audited"

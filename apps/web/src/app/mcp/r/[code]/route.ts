@@ -1,7 +1,7 @@
 import { createAdminClient } from "@/lib/supabase/admin"
 import { getAppUrl } from "@/lib/env"
-import { generateSetupInstructions } from "@mesh/core"
-import { hashAgentApiKey } from "@mesh/core/server"
+import { generateSetupInstructions } from "@sayabot/core"
+import { hashAgentApiKey } from "@sayabot/core/server"
 import { type NextRequest, NextResponse } from "next/server"
 
 export async function GET(

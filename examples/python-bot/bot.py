@@ -1,7 +1,7 @@
-"""Reference Mesh external bot.
+"""Reference Sayabot external bot.
 
 Receives a signed webhook, verifies the signature, then streams a reply back into
-the room using a Mesh agent API key.
+the room using a Sayabot agent API key.
 """
 
 from __future__ import annotations
@@ -17,12 +17,19 @@ import time
 import httpx
 from fastapi import BackgroundTasks, FastAPI, HTTPException, Request
 
-ORCHESTRATOR_URL = os.environ.get("MESH_ORCHESTRATOR_URL", "http://localhost:4000").rstrip("/")
-AGENT_API_KEY = os.environ["MESH_AGENT_API_KEY"]
-WEBHOOK_SECRET = os.environ["MESH_WEBHOOK_SECRET"]
+ORCHESTRATOR_URL = (
+    os.environ.get("SAYABOT_ORCHESTRATOR_URL")
+    or os.environ.get("MESH_ORCHESTRATOR_URL", "http://localhost:4000")
+).rstrip("/")
+AGENT_API_KEY = os.environ.get("SAYABOT_AGENT_API_KEY") or os.environ.get("MESH_AGENT_API_KEY", "")
+WEBHOOK_SECRET = os.environ.get("SAYABOT_WEBHOOK_SECRET") or os.environ.get("MESH_WEBHOOK_SECRET", "")
+if not AGENT_API_KEY:
+    raise RuntimeError("Set SAYABOT_AGENT_API_KEY (or MESH_AGENT_API_KEY)")
+if not WEBHOOK_SECRET:
+    raise RuntimeError("Set SAYABOT_WEBHOOK_SECRET (or MESH_WEBHOOK_SECRET)")
 TOLERANCE_SECONDS = 300
 
-app = FastAPI(title="Mesh example bot")
+app = FastAPI(title="Sayabot example bot")
 
 
 def _secret_bytes() -> bytes:

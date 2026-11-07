@@ -1,6 +1,6 @@
 "use server"
 
-import { parseCapabilities } from "@mesh/core"
+import { parseCapabilities } from "@sayabot/core"
 import {
   adminOrgAccess,
   audit,

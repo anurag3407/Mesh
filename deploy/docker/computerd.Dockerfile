@@ -17,7 +17,7 @@ FROM base AS install
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml tsconfig.base.json ./
 COPY packages ./packages
 COPY apps/computerd ./apps/computerd
-RUN pnpm install --filter "@mesh/computerd..." --filter "@mesh/core"
+RUN pnpm install --filter "@sayabot/computerd..." --filter "@sayabot/core"
 
 FROM node:${NODE_VERSION}-bookworm-slim AS runtime
 ARG GIT_COMMIT_SHA=unknown

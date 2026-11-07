@@ -1,4 +1,4 @@
-import { computeFoldKey, extractHandles, redactSecrets, resolveMentions } from "@mesh/core"
+import { computeFoldKey, extractHandles, redactSecrets, resolveMentions } from "@sayabot/core"
 import {
   agentReads,
   agentRuns,
@@ -12,7 +12,7 @@ import {
   tasks,
   type OutcomeKind,
   type UnblockNeeds,
-} from "@mesh/db"
+} from "@sayabot/db"
 import { and, asc, desc, eq, gt, gte, inArray, isNull, ne, or, sql } from "drizzle-orm"
 import { notifyBotReply } from "../bot-reply"
 import { getDb } from "../db"

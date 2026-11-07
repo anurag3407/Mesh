@@ -1,5 +1,5 @@
 {
-  "name": "@mesh/db",
+  "name": "@sayabot/db",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -15,7 +15,7 @@
     "lint": "eslint src"
   },
   "dependencies": {
-    "@mesh/core": "workspace:*",
+    "@sayabot/core": "workspace:*",
     "drizzle-orm": "^0.45.4",
     "pg": "^8.23.1",
     "dotenv": "^17.2.0",

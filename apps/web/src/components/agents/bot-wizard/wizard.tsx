@@ -3,8 +3,8 @@
 import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { createBotFromTemplate } from "@/lib/actions/agents"
-import type { AgentCapabilities } from "@mesh/core"
-import { DEFAULT_CAPABILITIES } from "@mesh/core"
+import type { AgentCapabilities } from "@sayabot/core"
+import { DEFAULT_CAPABILITIES } from "@sayabot/core"
 
 export interface TemplateSummary {
   id: string

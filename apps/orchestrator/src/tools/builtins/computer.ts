@@ -1,5 +1,5 @@
-import { isDestructiveCommand } from "@mesh/core"
-import { canvases, canvasVersions } from "@mesh/db"
+import { isDestructiveCommand } from "@sayabot/core"
+import { canvases, canvasVersions } from "@sayabot/db"
 import { z } from "zod"
 import { getComputerClient } from "../../computer/client"
 import { getDb } from "../../db"

@@ -70,7 +70,7 @@ AI SDK 7, pg-boss 12, Next 16 and Vitest 5 are newer than the APIs I know well. 
 └── .env.example
 ```
 
-Packages are consumed as TypeScript source (`exports: "./src/index.ts"`): Next uses `transpilePackages`, and the orchestrator runs on `tsx`. `@mesh/core` exposes `.` (isomorphic) and `./server` (node-only helpers such as webhook signing).
+Packages are consumed as TypeScript source (`exports: "./src/index.ts"`): Next uses `transpilePackages`, and the orchestrator runs on `tsx`. `@sayabot/core` exposes `.` (isomorphic) and `./server` (node-only helpers such as webhook signing).
 
 ---
 
@@ -135,7 +135,7 @@ Packages are consumed as TypeScript source (`exports: "./src/index.ts"`): Next u
 
 ### 5.1 Human message
 1. The `sendMessage` server action validates input with zod and inserts the row through RLS-checked Supabase.
-2. It runs `parseMentions()` from `@mesh/core` and enqueues the pg-boss job `room.message` with `{roomId, messageId}`.
+2. It runs `parseMentions()` from `@sayabot/core` and enqueues the pg-boss job `room.message` with `{roomId, messageId}`.
 3. Clients receive the row through `postgres_changes`. Presence and typing go over the Realtime Presence channel.
 
 ### 5.2 Turn coordinator (`apps/orchestrator/src/coordinator/`)
@@ -154,7 +154,7 @@ Packages are consumed as TypeScript source (`exports: "./src/index.ts"`): Next u
 - Live queue state is broadcast as a `turn.state` event so the UI can show who is speaking next.
 
 ### 5.3 LLM run (`apps/orchestrator/src/runner/llm.ts`)
-1. Load the agent, decrypt its BYOK key (`MESH_KEK`), and build the AI SDK model through the `@mesh/llm` registry.
+1. Load the agent, decrypt its BYOK key (`MESH_KEK`), and build the AI SDK model through the `@sayabot/llm` registry.
 2. Build the context:
    - room system directive
    - agent system prompt
@@ -225,7 +225,7 @@ Replies carry `thread_root_id` and open in a side sheet. Turn sessions are scope
 | `POST /internal/runs/:runId/stop` | Service JWT | Cancel an in-flight generation |
 | `WS /collab` | Supabase JWT | Hocuspocus canvas sync |
 
-### Realtime channel `room:{id}` (Broadcast events, zod-validated in `@mesh/core`)
+### Realtime channel `room:{id}` (Broadcast events, zod-validated in `@sayabot/core`)
 - `message.delta`: `{messageId, seq, delta}`
 - `message.done`: `{messageId, status}`
 - `turn.state`: `{sessionId, activeAgentId, queue[]}`
@@ -305,7 +305,7 @@ Each milestone ends with typecheck, lint and tests green, plus a manual check.
 
 ### M1: Phase 1, real-time chat core
 1. Monorepo scaffold: Turborepo, `create-next-app`, shadcn init, workspace packages, prettier/eslint, `.env.example`.
-2. `@mesh/core`, pure logic with unit tests:
+2. `@sayabot/core`, pure logic with unit tests:
    - zod types and room events
    - mention parser
    - redaction
@@ -313,10 +313,10 @@ Each milestone ends with typecheck, lint and tests green, plus a manual check.
    - breakers and cost
    - turn planner
    - canvas patch planner
-3. `@mesh/db`: Drizzle schema, migrations and RLS SQL, applied to the user's Supabase project.
+3. `@sayabot/db`: Drizzle schema, migrations and RLS SQL, applied to the user's Supabase project.
 4. Supabase Auth with SSR cookies (`@supabase/ssr`), onboarding, org and room CRUD.
 5. Realtime chat: send, `postgres_changes` feed, presence, typing.
-6. `@mesh/llm` provider registry for OpenAI, Anthropic, Gemini and OpenAI-compatible, with an env fallback for dev.
+6. `@sayabot/llm` provider registry for OpenAI, Anthropic, Gemini and OpenAI-compatible, with an env fallback for dev.
 7. Orchestrator: pg-boss worker, sequential mention coordinator, delta broadcast, and Streamdown rendering of the streaming bubble.
 
 ### M2: Phase 2, canvas and BYOK
@@ -394,7 +394,7 @@ I generate `MESH_KEK` locally.
 
 | Risk | Mitigation |
 |---|---|
-| New major versions (AI SDK 7, pg-boss 12, Next 16, Vitest 5) differ from known APIs | Check installed type definitions before each integration; keep adapters thin in `@mesh/llm` and in the orchestrator |
+| New major versions (AI SDK 7, pg-boss 12, Next 16, Vitest 5) differ from known APIs | Check installed type definitions before each integration; keep adapters thin in `@sayabot/llm` and in the orchestrator |
 | Supabase Realtime broadcast rate limits during heavy streaming | Batch deltas (~40 ms) and persist partials so clients can recover from the DB |
 | Model prices go stale | Prices live in an admin-editable `model_pricing` table, not hard-coded |
 | Moderator mode loops | It goes through the same breakers as every other mode, with the turn cap as the hard stop |

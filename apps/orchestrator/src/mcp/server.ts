@@ -1,5 +1,5 @@
-import { planCanvasPatch, redactSecrets } from "@mesh/core"
-import { canvasVersions, profiles, rooms } from "@mesh/db"
+import { planCanvasPatch, redactSecrets } from "@sayabot/core"
+import { canvasVersions, profiles, rooms } from "@sayabot/db"
 import { eq } from "drizzle-orm"
 import type { Context } from "hono"
 import { Hono } from "hono"

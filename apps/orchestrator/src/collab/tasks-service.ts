@@ -7,7 +7,7 @@ import {
   tasks,
   type OutcomeKind,
   type UnblockNeeds,
-} from "@mesh/db"
+} from "@sayabot/db"
 import { getDb } from "../db"
 import { enqueueTaskWake } from "../jobs"
 

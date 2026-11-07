@@ -3,7 +3,7 @@
 import Link from "next/link"
 import { useEffect, useRef, useState } from "react"
 import { ArrowUpRight, Menu, X } from "lucide-react"
-import { MeshMark } from "./mesh-mark"
+import { SayabotMark } from "./sayabot-mark"
 
 const NAV = [
   { href: "/#crew", label: "Crew" },
@@ -37,7 +37,7 @@ export function SiteHeader() {
     <header ref={ref} className="l-header fixed inset-x-0 top-0 z-50 px-3 pt-3 sm:px-5 sm:pt-4">
       <div className="l-header-bar mx-auto flex h-14 max-w-[1320px] items-center justify-between rounded-full pl-4 pr-2 sm:pl-5">
         <Link href="/" className="flex items-center gap-2.5" aria-label="Sayabot home">
-          <MeshMark className="h-7 w-7" />
+          <SayabotMark className="h-7 w-7" />
           <span className="text-[17px] font-semibold tracking-[-0.03em] text-text">sayabot</span>
         </Link>
 

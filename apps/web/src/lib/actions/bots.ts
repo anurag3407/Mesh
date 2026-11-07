@@ -1,7 +1,7 @@
 "use server"
 
-import { generateAgentApiKey, generateWebhookSecret } from "@mesh/core/server"
-import { sealSecret } from "@mesh/llm"
+import { generateAgentApiKey, generateWebhookSecret } from "@sayabot/core/server"
+import { sealSecret } from "@sayabot/llm"
 import { getKek } from "@/lib/env"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { adminOrgAccess, audit, errorMessage, fail, ok, revalidateOrg } from "@/lib/actions/shared"
