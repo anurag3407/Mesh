@@ -25,6 +25,15 @@ export const ALWAYS_CORE_TOOLS = new Set([
   "find_tools",
   "load_skill",
   "propose_skill",
+  "search_skills",
+  "code_outline",
+  "code_definition",
+  "code_references",
+  "code_diagnostics",
+  "workspace_detect",
+  "workspace_fork",
+  "workspace_inspect",
+  "verify_workspace",
 ])
 
 export interface IndexedToolDoc {
@@ -171,6 +180,7 @@ export function partitionToolsForSearch(
   searchTool?: ToolSpec
   activeToolNames: () => string[] | undefined
 } {
+  specs = [...specs].sort((a, b) => a.name.localeCompare(b.name))
   if (specs.length <= TOOL_SEARCH_THRESHOLD) {
     return { exposed: specs, all: specs, activeToolNames: () => undefined }
   }
@@ -197,8 +207,8 @@ export function partitionToolsForSearch(
   const exposed = [...core, searchTool]
   return {
     exposed,
-    all: [...exposed, ...nonCore],
+    all: [...exposed, ...nonCore].sort((a, b) => a.name.localeCompare(b.name)),
     searchTool,
-    activeToolNames: () => [...exposed.map((s) => s.name), ...activated],
+    activeToolNames: () => [...exposed.map((s) => s.name), ...activated].sort(),
   }
 }

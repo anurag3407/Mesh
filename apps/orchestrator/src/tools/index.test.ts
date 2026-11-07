@@ -124,7 +124,10 @@ describe("buildTools capability filtering", () => {
     })
 
     const toolNames = Object.keys(result.tools)
-    expect(toolNames).toEqual(["web_search"])
+    expect(toolNames).toContain("web_search")
+    expect(toolNames).toContain("update_plan")
+    expect(toolNames).toContain("load_skill")
+    expect(toolNames).not.toContain("fs_read")
 
     await result.close()
   })

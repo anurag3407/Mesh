@@ -116,6 +116,20 @@ describe("capToolOutputForModel", () => {
     expect(capToolOutputForModel(value)).toBe(value)
   })
 
+  it("retains diagnostics buried in the middle of long logs", () => {
+    const output = Array.from({ length: 5000 }, (_, i) => i === 2500
+      ? "src/auth.ts(42,7): error TS2322: string is not assignable to number"
+      : `progress ${i}: building module`).join("\n")
+    const result = capToolOutputForModel({ stdout: output, exit_code: 1 })
+    expect(JSON.stringify(result)).toContain("error TS2322")
+    expect(JSON.stringify(result).length).toBeLessThanOrEqual(MODEL_OUTPUT_CHAR_LIMIT)
+  })
+
+  it("honors small custom budgets including JSON envelope overhead", () => {
+    const result = capToolOutputForModel({ rows: Array(1000).fill({ text: "x".repeat(500) }) }, 500)
+    expect(JSON.stringify(result).length).toBeLessThanOrEqual(500)
+  })
+
   it("keeps head and tail of long strings", () => {
     const stdout = "HEAD" + "x".repeat(100_000) + "TAIL"
     const capped = capToolOutputForModel({ stdout, exit_code: 1 }) as { stdout: string; exit_code: number }

@@ -13,6 +13,8 @@ export interface CompactTranscriptArgs {
   messages: ModelMessage[]
   keepLastKTools?: number
   summary?: CompactedSummary
+  protectedPrefixCount?: number
+  keepLastMessages?: number
 }
 
 export interface CompactTranscriptResult {
@@ -23,6 +25,41 @@ export interface CompactTranscriptResult {
 }
 
 export const ELIDED_PREFIX = "[result elided:"
+
+function summarizeToolOutcome(output: unknown): string {
+  if (!output || typeof output !== "object") return "output omitted, success not inferred"
+  const wrapped = output as { type?: string; value?: unknown }
+  if (wrapped.type?.startsWith("error")) return `failed: ${String(wrapped.value).slice(0, 240)}`
+  if (wrapped.value && typeof wrapped.value === "object") {
+    const value = wrapped.value as Record<string, unknown>
+    const exit = value.exit_code ?? value.exitCode
+    if (value.ok === false || value.error || (typeof exit === "number" && exit !== 0)) {
+      return `failed: ${String(value.error ?? `exit ${exit}`).slice(0, 240)}`
+    }
+    if (exit === 0) return "exit 0"
+  }
+  return "output omitted, success not inferred"
+}
+
+export function compactionBoundary(messages: ModelMessage[], protectedPrefixCount = 0, keepLastMessages = 8): number {
+  let boundary = Math.max(protectedPrefixCount, messages.length - keepLastMessages)
+  const callLocations = new Map<string, number>()
+  messages.forEach((message, index) => {
+    if (message.role === "assistant" && Array.isArray(message.content)) {
+      for (const part of message.content) if (part.type === "tool-call") callLocations.set(part.toolCallId, index)
+    }
+  })
+  for (let index = boundary; index < messages.length; index++) {
+    const message = messages[index]!
+    if (message.role !== "tool") continue
+    for (const part of message.content) {
+      if (part.type !== "tool-result") continue
+      const callIndex = callLocations.get(part.toolCallId)
+      if (callIndex !== undefined && callIndex >= protectedPrefixCount && callIndex < boundary) boundary = callIndex
+    }
+  }
+  return boundary
+}
 
 function isElided(output: unknown): boolean {
   return (
@@ -71,7 +108,7 @@ export function elideOldToolResults(
           ...part,
           output: {
             type: "text" as const,
-            value: `${ELIDED_PREFIX} completed; full record in tool_calls/${part.toolCallId}]`,
+            value: `${ELIDED_PREFIX} ${summarizeToolOutcome(part.output)}; call ${part.toolCallId}. Re-read the source or rerun the check if needed.]`,
           },
         }
       }
@@ -145,13 +182,16 @@ export function compactTranscript(args: CompactTranscriptArgs): CompactTranscrip
     content: summaryText,
   }
 
-  // Keep the most recent 4 messages as active working tail
-  const tailCount = Math.min(4, elidedMessages.length)
-  const compactedThroughIdx = elidedMessages.length - tailCount
-  const activeTail = elidedMessages.slice(-tailCount)
+  const firstNonSystem = elidedMessages.findIndex((message) => message.role !== "system")
+  const protectedPrefixCount = args.protectedPrefixCount ?? (firstNonSystem < 0 ? elidedMessages.length : firstNonSystem)
+  const compactedThroughIdx = compactionBoundary(elidedMessages, protectedPrefixCount, args.keepLastMessages ?? 4)
+  if (compactedThroughIdx <= protectedPrefixCount) {
+    return { messages: elidedMessages, elidedCount, compactedThroughIdx: 0, extractedFacts: [] }
+  }
+  const activeTail = elidedMessages.slice(compactedThroughIdx)
 
   return {
-    messages: [summaryMessage, ...activeTail],
+    messages: [...elidedMessages.slice(0, protectedPrefixCount), summaryMessage, ...activeTail],
     elidedCount,
     compactedThroughIdx,
     extractedFacts: args.summary.factsLearned,

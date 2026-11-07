@@ -1,50 +1,68 @@
-import { generateText, stepCountIs, type ToolSet } from "ai"
-import { eq, sql } from "drizzle-orm"
+import { createRunScrubber } from "@sayabot/core"
+import { generateText, stepCountIs, type ModelMessage, type ToolSet } from "ai"
+import { and, eq, sql } from "drizzle-orm"
 import { z } from "zod"
 import { agentRuns, runSteps, runTranscripts } from "@sayabot/db"
 import { getDb } from "../db"
 import { broadcast } from "../realtime"
 import type { AgentRow } from "../runner/context"
 import { resolveAgentCheapModel, resolveAgentModel } from "../runner/llm"
-import { toAuditedTools, type ToolSpec } from "../tools/audited"
+import { redactValue, toAuditedTools, type ToolSpec } from "../tools/audited"
+import { workspaceScopeSchema } from "../tools/builtins/workspace"
 
 export const MAX_CONCURRENT_SUBAGENTS = 4
 export const MAX_TOTAL_SUBAGENTS = 12
+export const SUBAGENT_HEARTBEAT_MS = 10_000
 
 export const spawnSubagentSchema = z.object({
-  task: z.string().min(1).describe("Clear, self-contained task description for the subagent"),
-  tools: z
-    .enum(["read_only", "same"])
-    .default("read_only")
-    .describe("Tool permissions: 'read_only' (recommended) or 'same' as parent"),
-  model: z
-    .enum(["cheap", "same"])
-    .default("cheap")
-    .describe("Model choice: 'cheap' (recommended for reading/research) or 'same' as parent"),
-  maxSteps: z
-    .number()
-    .int()
-    .min(1)
-    .max(30)
-    .default(10)
-    .optional()
-    .describe("Maximum steps for the subagent (default 10)"),
+  task: z.string().min(1).max(30_000).describe("Clear, self-contained task description"),
+  role: z.enum(["researcher", "planner", "worker", "critic"]).default("researcher"),
+  tools: z.enum(["read_only", "same"]).default("read_only")
+    .describe("Only a worker may request 'same'; all other roles are always read-only"),
+  model: z.enum(["cheap", "same"]).default("cheap"),
+  maxSteps: z.number().int().min(1).max(30).default(10),
+  workspace: workspaceScopeSchema.optional()
+    .describe("Explicit workspace_fork scope for a worker. Shared tools are NOT sandboxed to this path."),
+}).strict().refine((input) => !input.workspace || input.role === "worker", {
+  message: "Only workers may be assigned a worktree scope",
+  path: ["workspace"],
 })
 
 export type SpawnSubagentInput = z.infer<typeof spawnSubagentSchema>
 
 export const READ_ONLY_TOOL_NAMES = new Set([
-  "fs_read",
-  "fs_glob",
-  "fs_grep",
-  "git_status",
-  "git_diff",
-  "web_search",
-  "canvas_read",
-  "recall",
+  "fs_read", "fs_glob", "fs_grep", "git_status", "git_diff", "web_search",
+  "canvas_read", "recall", "code_outline", "code_definition", "code_references",
+  "code_diagnostics", "code_rename_preview", "workspace_inspect",
 ])
 
-const SUBAGENT_EXCLUDED_TOOLS = new Set(["spawn_subagent", "update_plan", "propose_skill", "find_tools"])
+const SUBAGENT_EXCLUDED_TOOLS = new Set([
+  "spawn_subagent", "update_plan", "find_tools", "propose_skill", "load_skill",
+  "install_skill", "approve_skill", "skill_install", "skill_approve", "workspace_fork",
+])
+
+const ROLE_PROMPTS: Record<SpawnSubagentInput["role"], string> = {
+  researcher: "Research the assigned question only. Read relevant evidence, distinguish facts from inference, and return findings with sources. Do not implement changes or perform unrelated actions.",
+  planner: "Plan the assigned task only. Inspect relevant evidence, then return ordered implementation steps, dependencies, risks and verification criteria. Do not implement the plan or modify anything.",
+  worker: "Carry out only the assigned implementation or investigation. Preserve unrelated work, verify your changes when permitted, and report changed paths, checks performed and remaining limitations. Do not merge, reset, deploy or expand the task scope.",
+  critic: "Review the assigned work only. Identify concrete defects, regressions, missing tests and unsupported claims with file/line evidence and severity. Do not fix findings, install anything, approve anything or perform unrelated side effects. If no defects are supported by evidence, say so.",
+}
+
+async function abortable<T>(promise: Promise<T>, signal: AbortSignal): Promise<T> {
+  let onAbort: () => void = () => {}
+  try {
+    return await Promise.race([
+      promise,
+      new Promise<never>((_, reject) => {
+        onAbort = () => reject(signal.reason)
+        if (signal.aborted) onAbort()
+        else signal.addEventListener("abort", onAbort, { once: true })
+      }),
+    ])
+  } finally {
+    signal.removeEventListener("abort", onAbort)
+  }
+}
 
 export interface SpawnSubagentToolArgs {
   parentRunId: string
@@ -60,191 +78,213 @@ export interface SpawnSubagentToolArgs {
 export function spawnSubagentTool(args: SpawnSubagentToolArgs): ToolSpec {
   return {
     name: "spawn_subagent",
-    description:
-      "Spawns a child subagent to perform focused background reading, research, or evaluation. Returns only the final summary to keep context concise.",
+    description: "Run and await a focused researcher, planner, worker or critic subtask. Returns the child run ID, terminal status and result; this is not detached background work. Defaults to read-only research. Only workers may share parent tools, which are not isolated or sandboxed.",
     schema: spawnSubagentSchema,
     dangerous: false,
-    execute: async (input: SpawnSubagentInput, signal?: AbortSignal) => {
+    execute: async (rawInput: SpawnSubagentInput, signal?: AbortSignal) => {
+      const input = spawnSubagentSchema.parse(rawInput)
+      signal?.throwIfAborted()
       const db = getDb()
+      let scrub = (text: string) => args.scrub ? args.scrub(text) : text
+      const safe = (value: unknown) => redactValue(value, scrub)
+      const readOnly = input.role !== "worker" || input.tools !== "same"
+      const transcript: ModelMessage[] = [{ role: "user", content: input.task }]
 
-      // 1. Check fan-out concurrency and total limits
-      const [counts] = await db
-        .select({
+      // Serialize reservation on the parent. READ COMMITTED makes a waiter see
+      // children committed by the previous lock holder before it counts them.
+      const childRun = await db.transaction(async (tx) => {
+        const [parent] = await tx.select().from(agentRuns)
+          .where(eq(agentRuns.id, args.parentRunId)).for("update")
+        signal?.throwIfAborted()
+        if (!parent || parent.roomId !== args.roomId || parent.agentId !== args.agent.id) {
+          throw new Error("Subagent parent run not found in this agent/room")
+        }
+        if (parent.parentRunId) throw new Error("Recursive subagent spawning is not allowed")
+        if (parent.status !== "running" && parent.status !== "waiting") {
+          throw new Error("Cannot spawn from a terminated parent run")
+        }
+        const [counts] = await tx.select({
           total: sql<number>`count(*)`,
-          active: sql<number>`count(*) filter (where ${agentRuns.status} = 'running')`,
-        })
-        .from(agentRuns)
-        .where(eq(agentRuns.parentRunId, args.parentRunId))
-
-      const total = Number(counts?.total ?? 0)
-      const active = Number(counts?.active ?? 0)
-
-      if (active >= MAX_CONCURRENT_SUBAGENTS) {
-        throw new Error(
-          `Subagent concurrency limit reached (${active}/${MAX_CONCURRENT_SUBAGENTS} running). Wait for existing subagents to finish.`,
-        )
-      }
-      if (total >= MAX_TOTAL_SUBAGENTS) {
-        throw new Error(
-          `Total subagent limit reached for this run (${total}/${MAX_TOTAL_SUBAGENTS}). No more subagents can be spawned.`,
-        )
-      }
-
-      // 2. Insert child agent_runs row
-      const [childRun] = await db
-        .insert(agentRuns)
-        .values({
-          roomId: args.roomId,
-          agentId: args.agent.id,
-          step: 0,
-          role: "responder",
-          status: "running",
-          engine: "v2",
-          parentRunId: args.parentRunId,
-          heartbeatAt: new Date(),
-          steps: 0,
-        })
-        .returning()
-
-      if (!childRun) {
-        throw new Error("Failed to create child run for subagent")
-      }
-
-      // 3. Initialize child transcript
-      await db.insert(runTranscripts).values({
-        runId: childRun.id,
-        messages: [],
-        compactedThroughIdx: 0,
-        plan: null,
-        version: 1,
-      })
-
-      broadcast(args.roomId, {
-        type: "run.step",
-        runId: args.parentRunId,
-        step: 0,
-        kind: "tool",
-        label: `Spawned subagent: "${input.task.slice(0, 50)}"`,
-      })
-
-      // 4. Resolve subagent model
-      const resolved =
-        input.model === "same"
-          ? await resolveAgentModel(args.agent)
-          : await resolveAgentCheapModel(args.agent)
-
-      // 5. Filter available tools
-      const available = args.getAvailableToolSpecs?.() ?? args.availableToolSpecs ?? []
-      const allowedSpecs = available.filter((spec) => {
-        // No recursive spawns, no planning/skill-authoring side effects, no tool search.
-        if (SUBAGENT_EXCLUDED_TOOLS.has(spec.name)) return false
-        if (input.tools === "read_only") {
-          return READ_ONLY_TOOL_NAMES.has(spec.name)
+          active: sql<number>`count(*) filter (where ${agentRuns.status} in ('running', 'waiting'))`,
+        }).from(agentRuns).where(eq(agentRuns.parentRunId, args.parentRunId))
+        const total = Number(counts?.total ?? 0)
+        const active = Number(counts?.active ?? 0)
+        if (active >= MAX_CONCURRENT_SUBAGENTS) {
+          throw new Error(`Subagent concurrency limit reached (${active}/${MAX_CONCURRENT_SUBAGENTS})`)
         }
-        return true
-      })
+        if (total >= MAX_TOTAL_SUBAGENTS) {
+          throw new Error(`Total subagent limit reached (${total}/${MAX_TOTAL_SUBAGENTS})`)
+        }
+        const [child] = await tx.insert(agentRuns).values({
+          roomId: args.roomId, agentId: args.agent.id, step: 0, role: "responder",
+          status: "running", engine: "v2", parentRunId: args.parentRunId,
+          heartbeatAt: new Date(), steps: 0,
+        }).returning()
+        if (!child) throw new Error("Failed to create child run for subagent")
+        await tx.insert(runTranscripts).values({
+          runId: child.id, messages: safe(transcript), compactedThroughIdx: 0,
+          plan: null, version: 1,
+        })
+        return child
+      }, { isolationLevel: "read committed" })
 
-      const childTools: ToolSet = toAuditedTools(allowedSpecs, {
-        orgId: args.orgId,
-        roomId: args.roomId,
-        agentId: args.agent.id,
-        runId: childRun.id,
-        messageId: null,
-        scrub: args.scrub,
-      })
+      const controller = new AbortController()
+      const onAbort = () => controller.abort(signal?.reason)
+      signal?.addEventListener("abort", onAbort, { once: true })
+      if (signal?.aborted) onAbort()
+      let steps = 0
+      let lastStepHadTools = false
+      let stepStartedAt = new Date()
+      let heartbeatError: unknown = null
+      let heartbeatPending: Promise<void> | undefined
+      const heartbeatTimer = setInterval(() => {
+        if (heartbeatPending) return
+        heartbeatPending = (async () => {
+          try {
+            await db.update(agentRuns).set({ heartbeatAt: new Date() })
+              .where(and(eq(agentRuns.id, childRun.id), eq(agentRuns.status, "running")))
+          } catch (error) {
+            heartbeatError = error
+            controller.abort(error)
+          }
+        })().finally(() => { heartbeatPending = undefined })
+      }, SUBAGENT_HEARTBEAT_MS)
+      heartbeatTimer.unref?.()
 
-      const maxSteps = input.maxSteps ?? 10
+      const send = async (status: string, finishReason?: string, error?: string) => {
+        // Keep the existing run.step event; attach machine-readable child data.
+        const event = {
+          type: "run.step" as const, runId: args.parentRunId, step: steps,
+          kind: "subagent" as const, label: `Subagent ${input.role} ${status}${finishReason ? ` (${finishReason})` : ""}`,
+          subagent: {
+            runId: childRun.id, parentRunId: args.parentRunId, role: input.role,
+            status, finishReason, steps, readOnly, isolation: "shared_tools", error,
+          },
+        }
+        await broadcast(args.roomId, event).catch(() => {})
+      }
+      let status: "complete" | "error" | "halted" = "error"
+      let finishReason = "error"
       let error: string | null = null
-
+      let summary = ""
+      let inputTokens: number | null = null
+      let outputTokens: number | null = null
       try {
-        const result = await generateText({
-          model: resolved.model,
-          system: [
-            `You are a focused subagent working for agent @${args.agent.handle}. Nobody else reads your output: @${args.agent.handle} will use your final message as the result of this subtask.`,
-            "Work autonomously with your tools. Do not ask questions; make reasonable assumptions and state them.",
-            "Your final message must be the complete answer: concrete findings with file paths, line numbers, commands or URLs as evidence. Say plainly what you could not verify.",
-            input.tools === "read_only"
-              ? "You have read-only tools. Do not attempt to modify anything."
-              : "",
-          ]
-            .filter(Boolean)
-            .join("\n"),
-          prompt: input.task,
-          tools: childTools,
-          stopWhen: stepCountIs(maxSteps),
-          abortSignal: signal,
+        controller.signal.throwIfAborted()
+        await send("started")
+        const resolved = await abortable(input.model === "same"
+          ? resolveAgentModel(args.agent) : resolveAgentCheapModel(args.agent), controller.signal)
+        const modelScrubber = createRunScrubber(resolved.apiKey ? [resolved.apiKey] : [])
+        scrub = (text) => modelScrubber(args.scrub ? args.scrub(text) : text)
+        const available = args.getAvailableToolSpecs?.() ?? args.availableToolSpecs ?? []
+        const allowedSpecs = available.filter((spec) => {
+          if (SUBAGENT_EXCLUDED_TOOLS.has(spec.name) || /(?:^|_)skills?(?:_|$)/i.test(spec.name)) return false
+          return !readOnly || (READ_ONLY_TOOL_NAMES.has(spec.name) && spec.dangerous === false)
         })
-
-        // Persist steps
-        let idx = 0
-        for (const step of result.steps) {
-          idx += 1
-          await db
-            .insert(runSteps)
-            .values({
-              runId: childRun.id,
-              idx,
-              kind: step.toolCalls && step.toolCalls.length > 0 ? "tool" : "model",
-              inputRef: null,
-              output: {
-                text: step.text,
-                toolCalls: step.toolCalls,
-                toolResults: step.toolResults,
-                finishReason: step.finishReason,
-              },
-              usage: step.usage,
-              startedAt: new Date(),
-              finishedAt: new Date(),
-            })
-            .catch(() => {})
+        if (input.workspace) {
+          const inspect = available.find((spec) => spec.name === "workspace_inspect")
+          if (!inspect || inspect.dangerous !== false) throw new Error("Worktree scope requires workspace_inspect")
+          const inspection = await inspect.execute(input.workspace, controller.signal)
+          if (!inspection || typeof inspection !== "object" ||
+              (inspection as Record<string, unknown>).repo !== input.workspace.repo ||
+              (inspection as Record<string, unknown>).worktree !== input.workspace.worktree ||
+              (inspection as Record<string, unknown>).baseSha !== input.workspace.baseSha) {
+            throw new Error("Worktree scope could not be verified")
+          }
         }
-
-        await db
-          .update(agentRuns)
-          .set({
-            status: "complete",
-            finishReason: result.finishReason,
-            steps: idx,
-            inputTokens: result.totalUsage?.inputTokens ?? null,
-            outputTokens: result.totalUsage?.outputTokens ?? null,
-            heartbeatAt: new Date(),
-          })
-          .where(eq(agentRuns.id, childRun.id))
-
-        broadcast(args.roomId, {
-          type: "run.step",
-          runId: args.parentRunId,
-          step: 0,
-          kind: "tool",
-          label: `Subagent completed (${idx} steps)`,
+        const childTools: ToolSet = toAuditedTools(allowedSpecs, {
+          orgId: args.orgId, roomId: args.roomId, agentId: args.agent.id,
+          runId: childRun.id, messageId: null, scrub,
         })
-
-        return {
-          status: "complete",
-          task: input.task,
-          stepsTaken: idx,
-          summary: result.text || "Subagent finished with no textual output.",
+        const system = [
+          `You are a ${input.role} subagent for @${args.agent.handle}. The parent awaits your result; you are not a detached background task.`,
+          ROLE_PROMPTS[input.role],
+          "Do not ask questions. State assumptions and verification limits. Your final answer must contain concrete evidence, not an unsupported success claim.",
+          "Never spawn other agents, install or approve skills, merge workspaces or perform unrelated side effects.",
+          readOnly ? "You have read-only tools. Do not attempt to modify anything." :
+            "You share the parent's tools and permissions. This is NOT an isolated environment. Preserve all unrelated work.",
+          input.workspace ? `Worktree task scope: ${JSON.stringify(input.workspace)}. Read and edit project files only within that worktree; never edit the original repo. This path is an instruction, not a sandbox boundary; shared tools are not path-constrained.` :
+            "No worktree scope was supplied. Do not claim worktree isolation or assume that a separate checkout exists.",
+        ].join("\n")
+        transcript.unshift({ role: "system", content: system })
+        await db.update(runTranscripts).set({ messages: safe(transcript), updatedAt: new Date() })
+          .where(eq(runTranscripts.runId, childRun.id))
+        controller.signal.throwIfAborted()
+        const result = await generateText({
+          model: resolved.model, system, prompt: input.task, tools: childTools,
+          stopWhen: stepCountIs(input.maxSteps), abortSignal: controller.signal,
+          onStepEnd: async (step) => {
+            const idx = steps + 1
+            const nextTranscript = [...transcript, ...step.response.messages as ModelMessage[]]
+            await db.transaction(async (tx) => {
+              await tx.insert(runSteps).values({
+                runId: childRun.id, idx, kind: step.toolCalls.length ? "tool" : "model", inputRef: null,
+                output: safe({ text: step.text, toolCalls: step.toolCalls, toolResults: step.toolResults, finishReason: step.finishReason }),
+                usage: safe(step.usage), startedAt: stepStartedAt, finishedAt: new Date(),
+              })
+              await tx.update(runTranscripts).set({
+                messages: safe(nextTranscript), updatedAt: new Date(), version: sql`version + 1`,
+              }).where(eq(runTranscripts.runId, childRun.id))
+              await tx.update(agentRuns).set({ steps: idx, heartbeatAt: new Date() })
+                .where(eq(agentRuns.id, childRun.id))
+            })
+            steps = idx
+            lastStepHadTools = step.toolCalls.length > 0
+            transcript.splice(0, transcript.length, ...nextTranscript)
+            stepStartedAt = new Date()
+            await send("running", step.finishReason)
+            controller.signal.throwIfAborted()
+          },
+        })
+        controller.signal.throwIfAborted()
+        summary = safe(result.text) as string
+        inputTokens = result.totalUsage?.inputTokens ?? null
+        outputTokens = result.totalUsage?.outputTokens ?? null
+        finishReason = result.finishReason
+        if (steps >= input.maxSteps && lastStepHadTools && finishReason !== "error") {
+          status = "halted"
+          finishReason = "tool_step_limit"
+        } else if (finishReason === "stop" && summary.trim()) status = "complete"
+        else if (finishReason === "error") {
+          status = "error"
+          error = "Subagent model reported an error"
+        } else {
+          status = "halted"
+          if (finishReason === "tool-calls") finishReason = steps >= input.maxSteps ? "tool_step_limit" : "incomplete_tool_calls"
+          else if (finishReason === "length") finishReason = "output_token_limit"
+          else if (finishReason === "stop") finishReason = "no_output"
         }
       } catch (err) {
-        error = err instanceof Error ? err.message : String(err)
-        await db
-          .update(agentRuns)
-          .set({
-            status: "error",
-            error,
-            heartbeatAt: new Date(),
-          })
-          .where(eq(agentRuns.id, childRun.id))
-
-        broadcast(args.roomId, {
-          type: "run.step",
-          runId: args.parentRunId,
-          step: 0,
-          kind: "tool",
-          label: `Subagent error: ${error.slice(0, 40)}`,
-        })
-
-        throw new Error(`Subagent failed: ${error}`)
+        status = heartbeatError ? "error" : controller.signal.aborted || (err instanceof Error && err.name === "AbortError") ? "halted" : "error"
+        finishReason = status === "halted" ? "abort" : "error"
+        error = safe(err instanceof Error ? err.message : String(err)) as string
+      } finally {
+        clearInterval(heartbeatTimer)
+        await heartbeatPending
+        signal?.removeEventListener("abort", onAbort)
+      }
+      if (heartbeatError) {
+        status = "error"
+        finishReason = "error"
+        error = safe(heartbeatError instanceof Error ? heartbeatError.message : String(heartbeatError)) as string
+      } else if (signal?.aborted) {
+        status = "halted"
+        finishReason = "abort"
+      }
+      // Do not hide a failed terminal write: include the child ID for recovery.
+      try {
+        await db.update(agentRuns).set({
+          status, finishReason, error, steps, inputTokens, outputTokens, heartbeatAt: new Date(),
+        }).where(eq(agentRuns.id, childRun.id))
+      } catch (err) {
+        await send("error", "persistence_error")
+        throw new Error(`Subagent ${childRun.id} terminal persistence failed: ${safe(err instanceof Error ? err.message : String(err))}`)
+      }
+      await send(status, finishReason, error ?? undefined)
+      return {
+        ok: status === "complete", runId: childRun.id, status, finishReason,
+        role: input.role, readOnly, isolation: "shared_tools", workspace: input.workspace,
+        task: safe(input.task), stepsTaken: steps, summary, error,
       }
     },
   }

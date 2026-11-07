@@ -1,72 +1,20 @@
 import { spawn } from "node:child_process"
 import { createServer, type Socket } from "node:net"
-import { existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, readlinkSync, realpathSync, statSync, unlinkSync, writeFileSync } from "node:fs"
-import { dirname, resolve, sep } from "node:path"
+import { existsSync, mkdirSync, readdirSync, statSync, unlinkSync, writeFileSync } from "node:fs"
+import { dirname, resolve } from "node:path"
+import { constants as osConstants } from "node:os"
+import { StringDecoder } from "node:string_decoder"
+import { codeIntelligence } from "./code-intelligence"
+import { editFileAtomic, isSafePath, readFilePage, writeFileAtomic } from "./files"
+export { isSafePath } from "./files"
 
 const SOCKET_PATH = process.env.AGENTD_SOCK || "/run/agentd.sock"
 const BOT_HOME = process.env.BOT_HOME || "/home/bot"
 const MAX_OUTPUT_BYTES = 1024 * 1024 // 1 MB cap
 
-function getAllowedRoots(): string[] {
-  const roots = ["/home/bot", "/tmp"]
-  const botHome = process.env.BOT_HOME || "/home/bot"
-  roots.push(botHome)
-
-  for (const r of [botHome, "/home/bot", "/tmp"]) {
-    try {
-      if (existsSync(r)) {
-        roots.push(realpathSync(r))
-      }
-    } catch {}
-  }
-
-  try {
-    if (existsSync("/home")) {
-      roots.push(resolve(realpathSync("/home"), "bot"))
-    }
-  } catch {}
-
-  return [...new Set(roots)]
+function signalNumber(signal: NodeJS.Signals): number | undefined {
+  return (osConstants.signals as Record<string, number>)[signal]
 }
-
-export function isSafePath(targetPath: string): boolean {
-  try {
-    const allowedRoots = getAllowedRoots()
-    const resolved = resolve(targetPath)
-    const segments = resolved.split(sep).filter(Boolean)
-
-    let curr: string = sep // "/" on posix
-    for (const segment of segments) {
-      curr = resolve(curr, segment)
-      let hops = 0
-      while (lstatSync(curr, { throwIfNoEntry: false })?.isSymbolicLink()) {
-        if (++hops > 40) return false
-        const target = readlinkSync(curr)
-        curr = resolve(dirname(curr), target)
-      }
-      try {
-        if (existsSync(curr)) {
-          curr = realpathSync(curr)
-        }
-      } catch {}
-    }
-
-    return allowedRoots.some((root) => curr === root || curr.startsWith(root + "/"))
-  } catch {
-    return false
-  }
-}
-
-interface BackgroundJob {
-  id: string
-  cmd: string
-  child: ReturnType<typeof spawn>
-  startedAt: number
-  output: string
-  exitCode: number | null
-}
-
-const bgJobs = new Map<string, BackgroundJob>()
 
 export function startAgentd(socketPath = SOCKET_PATH) {
   try {
@@ -75,9 +23,15 @@ export function startAgentd(socketPath = SOCKET_PATH) {
 
   const server = createServer((client: Socket) => {
     let buffer = ""
+    const decoder = new StringDecoder("utf8")
+    client.on("error", () => {})
 
     client.on("data", (chunk) => {
-      buffer += chunk.toString()
+      buffer += decoder.write(chunk)
+      if (Buffer.byteLength(buffer) > 16 * 1024 * 1024) {
+        client.end(JSON.stringify({ error: "Request exceeds byte limit" }) + "\n")
+        return
+      }
       const lines = buffer.split("\n")
       buffer = lines.pop() || ""
 
@@ -104,11 +58,18 @@ async function handleRequest(client: Socket, jsonStr: string) {
     return
   }
 
+  if (!req || typeof req !== "object" || Array.isArray(req)) {
+    client.write(JSON.stringify({ error: "Request must be an object" }) + "\n")
+    return
+  }
   const { op } = req
 
+  try {
   switch (op) {
     case "exec": {
       const { cmd, cwd = BOT_HOME, env = {}, timeoutMs = 60_000, stdin } = req
+      if (req.background) throw new Error("Background execution is not supported by this RPC")
+      if (typeof cmd !== "string" || !cmd || !Number.isFinite(timeoutMs) || timeoutMs < 1 || timeoutMs > 300_000) throw new Error("Invalid exec command or timeout")
       const started = Date.now()
       let totalBytes = 0
       let truncated = false
@@ -123,108 +84,83 @@ async function handleRequest(client: Socket, jsonStr: string) {
       const child = spawn("bash", ["-c", cmd], {
         cwd,
         env: finalEnv,
+        detached: true,
         uid: process.getuid && process.getuid() === 0 ? 10001 : undefined,
         gid: process.getgid && process.getgid() === 0 ? 10001 : undefined,
       })
 
+      // Kill the whole process group on timeout so test runners/servers spawned
+      // by the command don't outlive it.
+      let timedOut = false
+      const killGroup = (signal: NodeJS.Signals) => {
+        try {
+          if (child.pid) process.kill(-child.pid, signal)
+        } catch {
+          child.kill(signal)
+        }
+      }
+      let forceKill: NodeJS.Timeout | undefined
       const timeout = setTimeout(() => {
-        child.kill("SIGTERM")
+        timedOut = true
+        killGroup("SIGTERM")
+        forceKill = setTimeout(() => killGroup("SIGKILL"), 5_000)
+        forceKill.unref()
       }, timeoutMs)
 
-      if (req.background) {
-        const jobId = `job_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`
-        const job: BackgroundJob = {
-          id: jobId,
-          cmd,
-          child,
-          startedAt: started,
-          output: "",
-          exitCode: null,
-        }
-        bgJobs.set(jobId, job)
-        child.stdout?.on("data", (d) => { job.output += d.toString("utf8") })
-        child.stderr?.on("data", (d) => { job.output += d.toString("utf8") })
-        child.on("close", (code) => { job.exitCode = code ?? 1 })
-        client.write(JSON.stringify({ t: "started", jobId, pid: child.pid }) + "\n")
-        break
-      }
-
-      if (stdin) {
-        child.stdin.write(stdin)
-        child.stdin.end()
-      }
-
-      child.stdout.on("data", (data: Buffer) => {
-        if (totalBytes >= MAX_OUTPUT_BYTES) {
-          truncated = true
-          return
-        }
-        totalBytes += data.length
-        client.write(JSON.stringify({ t: "out", d: data.toString("utf8") }) + "\n")
-      })
-
-      child.stderr.on("data", (data: Buffer) => {
-        if (totalBytes >= MAX_OUTPUT_BYTES) {
-          truncated = true
-          return
-        }
-        totalBytes += data.length
-        client.write(JSON.stringify({ t: "err", d: data.toString("utf8") }) + "\n")
-      })
-
-      child.on("close", (code) => {
+      child.on("error", (error) => {
         clearTimeout(timeout)
+        client.write(JSON.stringify({ error: error.message }) + "\n")
+      })
+      child.stdin.on("error", () => {})
+      child.stdin.end(stdin)
+
+      // Per-stream decoders so multibyte characters split across chunks survive.
+      const decoders = { out: new StringDecoder("utf8"), err: new StringDecoder("utf8") }
+      const forward = (t: "out" | "err") => (data: Buffer) => {
+        if (totalBytes >= MAX_OUTPUT_BYTES) {
+          truncated = true
+          return
+        }
+        totalBytes += data.length
+        const d = decoders[t].write(data)
+        if (d) client.write(JSON.stringify({ t, d }) + "\n")
+      }
+      child.stdout.on("data", forward("out"))
+      child.stderr.on("data", forward("err"))
+
+      child.on("close", (code, signal) => {
+        clearTimeout(timeout)
+        if (forceKill) clearTimeout(forceKill)
+        for (const t of ["out", "err"] as const) {
+          const d = decoders[t].end()
+          if (d && totalBytes < MAX_OUTPUT_BYTES) client.write(JSON.stringify({ t, d }) + "\n")
+        }
         client.write(
           JSON.stringify({
             t: "exit",
-            code: code ?? 1,
+            // 124 matches coreutils `timeout`; signals map to 128+n like a shell.
+            code: timedOut ? 124 : (code ?? (signal ? 128 + (signalNumber(signal) ?? 15) : 1)),
             durationMs: Date.now() - started,
             truncated,
+            ...(timedOut ? { timedOut: true } : {}),
           }) + "\n",
         )
       })
       break
     }
 
-    case "read": {
-      const { path, maxBytes = 2 * 1024 * 1024, encoding = "utf8" } = req
-      if (!isSafePath(path)) {
-        client.write(JSON.stringify({ error: "access denied: path must be inside /home/bot or /tmp" }) + "\n")
-        return
-      }
-      try {
-        const stats = statSync(path)
-        const size = stats.size
-        const truncated = size > maxBytes
-        const content = readFileSync(path, { encoding: encoding === "base64" ? "base64" : "utf8" })
-        client.write(
-          JSON.stringify({
-            content: truncated ? content.slice(0, maxBytes) : content,
-            size,
-            truncated,
-          }) + "\n",
-        )
-      } catch (e: any) {
-        client.write(JSON.stringify({ error: e.message }) + "\n")
-      }
+    case "read":
+      client.write(JSON.stringify(readFilePage(req)) + "\n")
       break
-    }
-
-    case "write": {
-      const { path, content, encoding = "utf8", mode = 0o644 } = req
-      if (!isSafePath(path)) {
-        client.write(JSON.stringify({ error: "access denied: path must be inside /home/bot or /tmp" }) + "\n")
-        return
-      }
-      try {
-        mkdirSync(dirname(path), { recursive: true })
-        writeFileSync(path, content, { encoding: encoding as any, mode })
-        client.write(JSON.stringify({ bytes: Buffer.byteLength(content) }) + "\n")
-      } catch (e: any) {
-        client.write(JSON.stringify({ error: e.message }) + "\n")
-      }
+    case "write":
+      client.write(JSON.stringify(writeFileAtomic(req)) + "\n")
       break
-    }
+    case "edit":
+      client.write(JSON.stringify(editFileAtomic(req)) + "\n")
+      break
+    case "code":
+      client.write(JSON.stringify(codeIntelligence(req)) + "\n")
+      break
 
     case "list": {
       const { path = BOT_HOME, depth = 2 } = req
@@ -242,6 +178,7 @@ async function handleRequest(client: Socket, jsonStr: string) {
             if (item.startsWith(".git") && curDepth > 0) continue
             const full = resolve(dir, item)
             try {
+              if (!isSafePath(full)) continue
               const stat = statSync(full)
               const isDir = stat.isDirectory()
               entries.push({
@@ -294,55 +231,6 @@ async function handleRequest(client: Socket, jsonStr: string) {
       break
     }
 
-    case "job.status": {
-      const { jobId } = req
-      const job = bgJobs.get(jobId)
-      if (!job) {
-        client.write(JSON.stringify({ error: "Job not found" }) + "\n")
-        return
-      }
-      client.write(
-        JSON.stringify({
-          jobId,
-          status: job.exitCode === null ? "running" : "exited",
-          exitCode: job.exitCode,
-          durationMs: Date.now() - job.startedAt,
-        }) + "\n",
-      )
-      break
-    }
-
-    case "job.output": {
-      const { jobId, sinceBytes = 0 } = req
-      const job = bgJobs.get(jobId)
-      if (!job) {
-        client.write(JSON.stringify({ error: "Job not found" }) + "\n")
-        return
-      }
-      const chunk = job.output.slice(sinceBytes)
-      client.write(
-        JSON.stringify({
-          jobId,
-          output: chunk,
-          totalBytes: job.output.length,
-          status: job.exitCode === null ? "running" : "exited",
-        }) + "\n",
-      )
-      break
-    }
-
-    case "job.kill": {
-      const { jobId, signal = "SIGTERM" } = req
-      const job = bgJobs.get(jobId)
-      if (!job) {
-        client.write(JSON.stringify({ error: "Job not found" }) + "\n")
-        return
-      }
-      job.child.kill(signal)
-      client.write(JSON.stringify({ ok: true, jobId }) + "\n")
-      break
-    }
-
     case "browser": {
       const { action } = req
       client.write(JSON.stringify({ ok: true, action: action || "ready", message: "browser session ready" }) + "\n")
@@ -351,6 +239,9 @@ async function handleRequest(client: Socket, jsonStr: string) {
 
     default:
       client.write(JSON.stringify({ error: `unknown op: ${op}` }) + "\n")
+  }
+  } catch (error) {
+    client.write(JSON.stringify({ error: error instanceof Error ? error.message : String(error) }) + "\n")
   }
 }
 

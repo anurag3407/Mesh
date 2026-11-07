@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs"
 import { isDestructiveCommand, redactSecrets } from "@sayabot/core"
 import { canvases, canvasVersions } from "@sayabot/db"
 import { z } from "zod"
-import { getComputerClient } from "../../computer/client"
+import { getComputerClient, type CodeIntelligenceArgs, type EditFileArgs, type ReadFileArgs } from "../../computer/client"
 import { getDb } from "../../db"
 import { broadcast } from "../../realtime"
 import type { ToolSpec } from "../audited"
@@ -51,16 +51,15 @@ export function computerTools(args: ComputerToolsArgs): ToolSpec[] {
   const shellTool: ToolSpec = {
     name: "computer_shell",
     description:
-      "Execute a command in your persistent container shell. Working directory defaults to /home/bot. Output is streamed in real-time. Supports background jobs for servers and long tests.",
+      "Execute a foreground command in your persistent container shell. Working directory defaults to /home/bot. Returns stdout, stderr and a verified exit code. Background jobs are not supported.",
     schema: z.object({
       command: z.string().min(1).max(20_000),
       cwd: z.string().optional(),
       timeoutSeconds: z.number().int().min(1).max(300).default(60),
-      background: z.boolean().optional().default(false),
     }),
     dangerous: (input) => isDestructiveCommand((input as { command: string }).command),
     execute: async (
-      input: { command: string; cwd?: string; timeoutSeconds?: number; background?: boolean },
+      input: { command: string; cwd?: string; timeoutSeconds?: number },
       signal,
       ctx,
     ) => {
@@ -92,97 +91,73 @@ export function computerTools(args: ComputerToolsArgs): ToolSpec[] {
         exit_code: result.exitCode,
         duration_ms: result.durationMs,
         truncated: result.truncated,
+        ...(result.timedOut
+          ? { timed_out: true, note: `Command was killed after ${input.timeoutSeconds || 60}s. Raise timeoutSeconds (max 300) or narrow the command.` }
+          : {}),
       }
     },
   }
 
+  const readSchema = z.object({
+    path: z.string().min(1),
+    startLine: z.number().int().positive().optional(),
+    endLine: z.number().int().positive().optional(),
+    maxBytes: z.number().int().positive().max(2_000_000).default(256_000),
+  }).refine((input) => input.endLine === undefined || input.endLine >= (input.startLine ?? 1), { message: "endLine must be >= startLine" })
   const fsReadTool: ToolSpec = {
     name: "fs_read",
-    description:
-      describeWithDoc(
-      "fs_read",
-      "Read a text file from the persistent container environment with numbered lines. Supports line ranges and refuses binaries.",
-    ),
-    schema: z.object({
-      path: z.string().min(1),
-      startLine: z.number().int().positive().optional(),
-      endLine: z.number().int().positive().optional(),
-    }),
+    description: describeWithDoc("fs_read", "Read a UTF-8 file page with numbered lines. startLine/endLine are 1-based inclusive; pages contain at most 2000 complete lines and maxBytes source bytes (numbering adds display bytes). Returns full-file SHA-256 hash, exact totalLines/size, bytesReturned, startLine/endLine, truncated, hasMore and nextStartLine. Files over 32 MiB and binaries are refused. A page hash can guard fs_edit; omitted content is never treated as the whole file."),
+    schema: readSchema,
     dangerous: false,
-    execute: async (input: { path: string; startLine?: number; endLine?: number }) => {
+    execute: async (input: ReadFileArgs) => {
       await client.ensure(agentId, orgId, profile)
-      const file = await client.readFile(agentId, { path: input.path, maxBytes: 2_000_000 })
-      if (file.content.includes("\0")) {
-        throw new Error("Cannot read binary file")
-      }
-      const lines = file.content.split("\n")
-      const start = Math.max(1, input.startLine ?? 1)
-      const end = Math.min(lines.length, input.endLine ?? lines.length)
-      const sliced = lines.slice(start - 1, end)
-      const cap = 2000
-      const capped = sliced.slice(0, cap)
-      const numbered = capped.map((line, idx) => `${start + idx} | ${line}`).join("\n")
-      const continuation =
-        sliced.length > cap
-          ? `\n[2000 lines shown. To read more, specify startLine: ${start + cap}]`
-          : ""
-      return {
-        path: input.path,
-        totalLines: lines.length,
-        linesReturned: capped.length,
-        content: numbered + continuation,
-      }
+      const file = await client.readFile(agentId, input)
+      if (file.encoding !== "utf8" || file.linesReturned === undefined || file.startLine === undefined) throw new Error("Invalid text page response")
+      return { ...file, content: file.linesReturned ? file.content.split("\n").map((line, idx) => `${file.startLine! + idx} | ${line}`).join("\n") : "" }
     },
   }
 
   const fsEditTool: ToolSpec = {
     name: "fs_edit",
-    description:
-      describeWithDoc(
-      "fs_edit",
-      "Exact string replacement in a file. Fails if oldString is not found or ambiguous. Returns a diff of the change.",
-    ),
+    description: describeWithDoc("fs_edit", "Atomically edit a complete UTF-8 file up to 5 MiB, guarded by expectedHash from fs_read. Tries exact literal matching first; duplicate matches require replaceAll. whitespace=true permits a fallback only for one unique complete line block, ignoring leading/trailing spaces/tabs and CRLF differences, not internal whitespace. Ambiguous/overlapping matches, stale hashes and oversized files are rejected without writing. Returns matchMode, replacements and new hash."),
     schema: z.object({
       path: z.string().min(1),
-      oldString: z.string().min(1),
-      newString: z.string(),
-      replaceAll: z.boolean().optional().default(false),
+      oldString: z.string().min(1).max(5_000_000),
+      newString: z.string().max(5_000_000),
+      expectedHash: z.string().regex(/^[a-f0-9]{64}$/),
+      replaceAll: z.boolean().default(false),
+      whitespace: z.boolean().default(false),
     }),
     dangerous: false,
-    execute: async (input: {
-      path: string
-      oldString: string
-      newString: string
-      replaceAll?: boolean
-    }) => {
+    execute: async (input: EditFileArgs) => {
       await client.ensure(agentId, orgId, profile)
-      const file = await client.readFile(agentId, { path: input.path, maxBytes: 5_000_000 })
-      const occurrences = file.content.split(input.oldString).length - 1
-      if (occurrences === 0) {
-        throw new Error(`Could not find exact match for oldString in ${input.path}`)
-      }
-      if (occurrences > 1 && !input.replaceAll) {
-        throw new Error(
-          `Found ${occurrences} occurrences of oldString in ${input.path}. Pass replaceAll: true or provide more surrounding context.`,
-        )
-      }
-      const newContent = replaceLiteral(
-        file.content,
-        input.oldString,
-        input.newString,
-        Boolean(input.replaceAll),
-      )
-
-      await client.writeFile(agentId, { path: input.path, content: newContent })
-      const diff = `--- ${input.path}\n+++ ${input.path}\n- ${input.oldString}\n+ ${input.newString}`
-      return {
-        ok: true,
-        path: input.path,
-        replacements: occurrences,
-        diff,
-      }
+      return client.editFile(agentId, input)
     },
   }
+
+  const codeBase = {
+    path: z.string().min(1),
+    projectRoot: z.string().min(1).optional(),
+    maxResults: z.number().int().min(1).max(1000).default(200),
+  }
+  const codePosition = { line: z.number().int().positive(), column: z.number().int().positive() }
+  const codeTool = (name: string, action: CodeIntelligenceArgs["action"], description: string, schema: ToolSpec["schema"]): ToolSpec => ({
+    name,
+    description: `${description} TypeScript/JavaScript only, using the TypeScript compiler language service. Paths are absolute. Positions are 1-based UTF-16; range ends are exclusive. projectRoot defaults to the nearest tsconfig/jsconfig directory, or the file's directory if absent. Confined to that root (including imports/config symlinks); no plugins/scripts run. Bounded to 512 files, 24 MiB total, 2 MiB/file. maxResults defaults to 200 (max 1000).`,
+    schema,
+    dangerous: false,
+    execute: async (input: Omit<CodeIntelligenceArgs, "action">) => {
+      await client.ensure(agentId, orgId, profile)
+      return client.codeIntelligence(agentId, { ...input, action })
+    },
+  })
+  const codeTools = [
+    codeTool("code_outline", "outline", "Return AST-derived declaration outlines: items with name, kind, container and range, plus total/truncated and file hash.", z.object(codeBase)),
+    codeTool("code_definition", "definition", "Resolve the symbol at line/column to definition locations. Returns items, total/truncated and file hash.", z.object({ ...codeBase, ...codePosition })),
+    codeTool("code_references", "references", "Find semantic references to the symbol at line/column, including write-access markers. Returns items, total/truncated and file hash.", z.object({ ...codeBase, ...codePosition })),
+    codeTool("code_diagnostics", "diagnostics", "Return file syntax/semantic and compiler-option diagnostics with codes, categories, messages and ranges; items, total/truncated and hash. Does not run builds or linters.", z.object(codeBase)),
+    codeTool("code_rename_preview", "rename_preview", "Preview semantic identifier rename to newName without writing. Returns canRename, preview, edits with oldText/newText, exclusive ranges and per-file hashes. Comments/strings are excluded. Refuses partial previews exceeding maxResults. Review edits; this is not a collision-free refactoring guarantee.", z.object({ ...codeBase, ...codePosition, newName: z.string().min(1).max(200) })),
+  ]
 
   const fsWriteTool: ToolSpec = {
     name: "fs_write",
@@ -195,18 +170,8 @@ export function computerTools(args: ComputerToolsArgs): ToolSpec[] {
     dangerous: false,
     execute: async (input: { path: string; content: string }) => {
       await client.ensure(agentId, orgId, profile)
-      let existed = false
-      try {
-        await client.readFile(agentId, { path: input.path, maxBytes: 10 })
-        existed = true
-      } catch {}
-      await client.writeFile(agentId, { path: input.path, content: input.content })
-      return {
-        ok: true,
-        path: input.path,
-        action: existed ? "overwritten" : "created",
-        bytes: input.content.length,
-      }
+      const result = await client.writeFile(agentId, { path: input.path, content: input.content })
+      return { ok: true, path: input.path, ...result }
     },
   }
 
@@ -320,7 +285,7 @@ export function computerTools(args: ComputerToolsArgs): ToolSpec[] {
       await client.ensure(agentId, orgId, profile)
       const flag = input.all ? "-a" : ""
       const res = await client.exec(agentId, {
-        cmd: `git commit ${flag} -m ${JSON.stringify(input.message)}`,
+        cmd: `git commit ${flag} -m ${shellQuote(input.message)}`,
         cwd: input.cwd,
       })
       return { output: res.stdout || res.stderr, exitCode: res.exitCode }
@@ -339,9 +304,9 @@ export function computerTools(args: ComputerToolsArgs): ToolSpec[] {
     dangerous: true,
     execute: async (input: { cwd?: string; remote?: string; branch?: string }) => {
       await client.ensure(agentId, orgId, profile)
-      const branch = input.branch || ""
+      const branch = input.branch ? ` ${shellQuote(input.branch)}` : ""
       const res = await client.exec(agentId, {
-        cmd: `git push ${input.remote || "origin"} ${branch}`.trim(),
+        cmd: `git push -- ${shellQuote(input.remote || "origin")}${branch}`,
         cwd: input.cwd,
       })
       return { output: res.stdout || res.stderr, exitCode: res.exitCode }
@@ -351,15 +316,12 @@ export function computerTools(args: ComputerToolsArgs): ToolSpec[] {
   // Aliases for backwards compatibility
   const readFileTool: ToolSpec = {
     name: "computer_read_file",
-    description: "Read a file from your persistent container environment (alias to fs_read).",
-    schema: z.object({
-      path: z.string().min(1),
-      maxBytes: z.number().int().positive().max(2_000_000).default(500_000),
-    }),
+    description: "Read a raw UTF-8 page (compatibility alias to fs_read, without line-number prefixes). Returns the same full-file hash, totalLines, truncated and nextStartLine metadata. Use startLine/endLine and maxBytes for pagination.",
+    schema: readSchema,
     dangerous: false,
-    execute: async (input: { path: string; maxBytes?: number }) => {
+    execute: async (input: ReadFileArgs) => {
       await client.ensure(agentId, orgId, profile)
-      return client.readFile(agentId, { path: input.path, maxBytes: input.maxBytes })
+      return client.readFile(agentId, input)
     },
   }
 
@@ -404,6 +366,7 @@ export function computerTools(args: ComputerToolsArgs): ToolSpec[] {
     execute: async (input: { path: string; as: "canvas" | "file"; title?: string }) => {
       await client.ensure(agentId, orgId, profile)
       const file = await client.readFile(agentId, { path: input.path })
+      if (file.truncated) throw new Error("Cannot publish a truncated file; publish a smaller file")
 
       const inferredKind = input.path.endsWith(".md")
         ? "markdown"
@@ -451,6 +414,7 @@ export function computerTools(args: ComputerToolsArgs): ToolSpec[] {
     fsWriteTool,
     fsGlobTool,
     fsGrepTool,
+    ...codeTools,
     gitStatusTool,
     gitDiffTool,
     gitCommitTool,

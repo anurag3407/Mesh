@@ -1,6 +1,7 @@
 import type { ModelMessage, UserModelMessage } from "ai"
 import type { RunInterrupt } from "../active-runs"
 import { elideOldToolResults } from "./compaction"
+import { estimateMessageTokens } from "./budget"
 
 /**
  * Pure helpers that drive the Engine v2 agent loop between steps. Everything in
@@ -9,11 +10,7 @@ import { elideOldToolResults } from "./compaction"
 
 /** Rough token estimate (~4 chars/token) used for context budgeting. */
 export function estimateTokens(messages: ModelMessage[]): number {
-  let chars = 0
-  for (const m of messages) {
-    chars += typeof m.content === "string" ? m.content.length : JSON.stringify(m.content).length
-  }
-  return Math.ceil(chars / 4)
+  return estimateMessageTokens(messages)
 }
 
 export interface StepToolCall {
@@ -168,17 +165,37 @@ export function decidePrepareStep(input: PrepareStepInput): PrepareStepDecision 
 export const MODEL_OUTPUT_CHAR_LIMIT = 40_000
 const STRING_FIELD_LIMIT = 16_000
 
-function truncateString(value: string, limit: number): string {
+const DIAGNOSTIC_LINE = /\b(error|exception|traceback|panic|fatal|failed|assertionerror|expected|received)\b|^\s+at .+[:(]\d+/i
+
+export function foldOutput(value: string, limit: number): string {
   if (value.length <= limit) return value
-  const head = Math.floor(limit * 0.7)
-  const tail = limit - head
-  const omitted = value.length - head - tail
-  return `${value.slice(0, head)}\n\n[... ${omitted} characters truncated ...]\n\n${value.slice(-tail)}`
+  const lines = value.split("\n")
+  const diagnostics: string[] = []
+  const included = new Set<number>()
+  let diagnosticChars = 0
+  const diagnosticBudget = Math.floor(limit * 0.35)
+  for (let i = 0; i < lines.length && diagnosticChars < diagnosticBudget; i++) {
+    if (!DIAGNOSTIC_LINE.test(lines[i]!)) continue
+    for (let j = Math.max(0, i - 1); j <= Math.min(lines.length - 1, i + 2); j++) {
+      if (included.has(j)) continue
+      const line = `${j + 1} | ${lines[j]}`.slice(0, Math.max(0, diagnosticBudget - diagnosticChars))
+      if (!line) break
+      diagnostics.push(line)
+      diagnosticChars += line.length + 1
+      included.add(j)
+    }
+  }
+  const excerpt = diagnostics.length ? `\n[Diagnostic excerpts]\n${diagnostics.join("\n")}\n` : ""
+  const marker = `\n[... characters truncated from ${value.length}-character output ...]\n`
+  const remaining = Math.max(0, limit - excerpt.length - marker.length)
+  const head = Math.floor(remaining * 0.65)
+  const tail = remaining - head
+  return `${value.slice(0, head)}${excerpt}${marker}${tail ? value.slice(-tail) : ""}`.slice(0, limit)
 }
 
 function truncateDeep(value: unknown, limit: number, depth = 0): unknown {
-  if (typeof value === "string") return truncateString(value, limit)
-  if (depth > 6) return value
+  if (typeof value === "string") return foldOutput(value, limit)
+  if (depth > 6) return "[nested output omitted]"
   if (Array.isArray(value)) {
     const capped = value.slice(0, 200).map((v) => truncateDeep(v, limit, depth + 1))
     if (value.length > 200) capped.push(`[... ${value.length - 200} more items truncated ...]`)
@@ -205,18 +222,23 @@ export function capToolOutputForModel(value: unknown, limit = MODEL_OUTPUT_CHAR_
   try {
     json = JSON.stringify(value) ?? "null"
   } catch {
-    return value
+    return { error: "Tool output was not serializable" }
   }
+  if (!Number.isFinite(limit) || limit < 128) throw new Error("Output limit must be at least 128 characters")
   if (json.length <= limit) return value
-  const truncated = truncateDeep(value, STRING_FIELD_LIMIT)
+  const truncated = truncateDeep(value, Math.min(STRING_FIELD_LIMIT, Math.floor(limit / 2)))
   const truncatedJson = JSON.stringify(truncated) ?? "null"
   if (truncatedJson.length <= limit) return truncated
-  return {
-    truncated: true,
-    originalChars: json.length,
-    preview: truncateString(truncatedJson, limit),
-    hint: "Output was too large. Narrow the request (line ranges, filters, head/tail) to see the rest.",
+  const envelope = { truncated: true, originalChars: json.length, preview: "" }
+  let low = 0
+  let high = limit
+  while (low < high) {
+    const middle = Math.ceil((low + high) / 2)
+    const preview = foldOutput(truncatedJson, middle)
+    if (JSON.stringify({ ...envelope, preview }).length <= limit) low = middle
+    else high = middle - 1
   }
+  return { ...envelope, preview: foldOutput(truncatedJson, low) }
 }
 
 /** Joins step texts with a paragraph break so "Let me check" + "Done" doesn't read "Let me checkDone". */

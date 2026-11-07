@@ -6,6 +6,7 @@ export interface ExecResult {
   exitCode: number
   durationMs: number
   truncated: boolean
+  timedOut?: boolean
 }
 
 export interface FileEntry {
@@ -13,6 +14,51 @@ export interface FileEntry {
   type: "file" | "directory" | "other"
   size: number
   mtime: string
+}
+
+export interface ReadFileArgs {
+  path: string
+  maxBytes?: number
+  startLine?: number
+  endLine?: number
+  encoding?: "utf8" | "base64"
+  offsetBytes?: number
+}
+
+export interface FilePage {
+  path: string
+  content: string
+  encoding: "utf8" | "base64"
+  size: number
+  bytesReturned: number
+  hash: string
+  truncated: boolean
+  hasMore: boolean
+  totalLines?: number
+  startLine?: number
+  endLine?: number | null
+  linesReturned?: number
+  nextStartLine?: number | null
+  nextOffsetBytes?: number | null
+}
+
+export interface EditFileArgs {
+  path: string
+  oldString: string
+  newString: string
+  expectedHash: string
+  replaceAll?: boolean
+  whitespace?: boolean
+}
+
+export interface CodeIntelligenceArgs {
+  action: "outline" | "definition" | "references" | "diagnostics" | "rename_preview"
+  path: string
+  projectRoot?: string
+  line?: number
+  column?: number
+  newName?: string
+  maxResults?: number
 }
 
 export class ComputerClient {
@@ -43,7 +89,10 @@ export class ComputerClient {
       throw new Error(`Computerd error (${res.status} ${res.statusText}): ${errBody || "Unknown error"}`)
     }
 
-    return res.json() as Promise<T>
+    const data: unknown = await res.json()
+    if (!data || typeof data !== "object" || Array.isArray(data)) throw new Error("Invalid computerd response")
+    if ("error" in data) throw new Error(`Computerd error: ${String(data.error)}`)
+    return data as T
   }
 
   async ensure(agentId: string, orgId: string, profile: "standard" | "browser"): Promise<{ status: string; ip?: string }> {
@@ -86,55 +135,63 @@ export class ComputerClient {
     const reader = res.body?.getReader()
     if (!reader) throw new Error("No response body available from computerd exec")
 
-    const decoder = new TextDecoder()
+    const decoder = new TextDecoder("utf-8", { fatal: true })
     let buffer = ""
     let stdout = ""
     let stderr = ""
-    let exitCode = 0
+    let exitCode: number | undefined
     let durationMs = 0
     let truncated = false
-
-    while (true) {
-      const { done, value } = await reader.read()
-      if (done) break
-      buffer += decoder.decode(value, { stream: true })
-      const lines = buffer.split("\n")
-      buffer = lines.pop() || ""
-
-      for (const line of lines) {
-        if (!line.trim()) continue
-        try {
-          const frame = JSON.parse(line) as {
-            t: "out" | "err" | "exit"
-            d?: string
-            code?: number
-            durationMs?: number
-            truncated?: boolean
-          }
-          if (frame.t === "out" && frame.d) {
-            stdout += frame.d
-            args.onChunk?.(frame.d)
-          } else if (frame.t === "err" && frame.d) {
-            stderr += frame.d
-            args.onChunk?.(frame.d)
-          } else if (frame.t === "exit") {
-            exitCode = frame.code ?? 0
-            durationMs = frame.durationMs ?? 0
-            truncated = Boolean(frame.truncated)
-          }
-        } catch {
-          // ignore unparseable frame
-        }
-      }
+    let timedOut = false
+    let received = 0
+    const consume = (line: string) => {
+      if (!line.trim()) return
+      const frame = JSON.parse(line)
+      if (!frame || typeof frame !== "object" || Array.isArray(frame)) throw new Error("Invalid exec frame")
+      if ("error" in frame) throw new Error(`Execution failed: ${String(frame.error)}`)
+      if (exitCode !== undefined) throw new Error("Unexpected frame after exec exit")
+      if (frame.t === "out" || frame.t === "err") {
+        if (typeof frame.d !== "string") throw new Error("Invalid exec output frame")
+        if (frame.t === "out") stdout += frame.d
+        else stderr += frame.d
+        args.onChunk?.(frame.d)
+      } else if (frame.t === "exit") {
+        if (!Number.isInteger(frame.code) || frame.code < 0 || frame.code > 255) throw new Error("Invalid exec exit code")
+        if (frame.durationMs !== undefined && (!Number.isFinite(frame.durationMs) || frame.durationMs < 0)) throw new Error("Invalid exec duration")
+        if (frame.truncated !== undefined && typeof frame.truncated !== "boolean") throw new Error("Invalid exec truncation flag")
+        exitCode = frame.code
+        durationMs = frame.durationMs ?? 0
+        truncated = frame.truncated ?? false
+        timedOut = frame.timedOut === true
+      } else throw new Error("Unknown exec frame")
     }
-
-    return { stdout, stderr, exitCode, durationMs, truncated }
+    try {
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+        received += value.byteLength
+        if (received > 8 * 1024 * 1024) throw new Error("Exec response exceeds byte limit")
+        buffer += decoder.decode(value, { stream: true })
+        const lines = buffer.split("\n")
+        buffer = lines.pop() || ""
+        for (const line of lines) consume(line)
+      }
+      buffer += decoder.decode()
+      consume(buffer)
+      if (exitCode === undefined) throw new Error("Execution ended without an exit frame")
+      return { stdout, stderr, exitCode, durationMs, truncated, timedOut }
+    } catch (error) {
+      await reader.cancel().catch(() => {})
+      throw error
+    } finally {
+      reader.releaseLock()
+    }
   }
 
   async readFile(
     agentId: string,
-    args: { path: string; maxBytes?: number; encoding?: "utf8" | "base64" },
-  ): Promise<{ content: string; size: number; truncated: boolean }> {
+    args: ReadFileArgs,
+  ): Promise<FilePage> {
     return this.request(`/v1/computers/${agentId}/files/read`, {
       method: "POST",
       body: JSON.stringify(args),
@@ -149,6 +206,14 @@ export class ComputerClient {
       method: "POST",
       body: JSON.stringify(args),
     })
+  }
+
+  async editFile(agentId: string, args: EditFileArgs): Promise<{ ok: boolean; path: string; bytes: number; hash: string; previousHash: string; replacements: number; matchMode: string }> {
+    return this.request(`/v1/computers/${agentId}/files/edit`, { method: "POST", body: JSON.stringify(args) })
+  }
+
+  async codeIntelligence(agentId: string, args: CodeIntelligenceArgs): Promise<Record<string, unknown>> {
+    return this.request(`/v1/computers/${agentId}/code`, { method: "POST", body: JSON.stringify(args) })
   }
 
   async listFiles(

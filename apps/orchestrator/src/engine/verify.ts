@@ -37,6 +37,8 @@ export interface CriticReviewArgs {
   proposedOutput: string
   availableToolSpecs?: ToolSpec[]
   cycle: number
+  signal?: AbortSignal
+  scrub?: (value: string) => string
 }
 
 export interface CriticReviewResult {
@@ -52,14 +54,14 @@ const criticResponseSchema = z.object({
 })
 
 export async function runCriticVerification(args: CriticReviewArgs): Promise<CriticReviewResult> {
-  // If beyond 2 revise cycles, auto-pass to prevent infinite loop
   if (args.cycle >= 2) {
     return {
-      pass: true,
-      reasons: ["Maximum revision cycles reached (2)"],
+      pass: false,
+      reasons: ["Verification remains unresolved after the revision limit (2). Human review is required."],
     }
   }
 
+  try {
   const resolved = await resolveAgentCheapModel(args.agent)
   const allowedSpecs = (args.availableToolSpecs ?? []).filter((s) => READ_ONLY_TOOL_NAMES.has(s.name))
 
@@ -69,9 +71,9 @@ export async function runCriticVerification(args: CriticReviewArgs): Promise<Cri
     agentId: args.agent.id,
     runId: null,
     messageId: null,
+    scrub: args.scrub,
   })
 
-  try {
     const result = await generateText({
       model: resolved.model,
       system: [
@@ -90,6 +92,8 @@ export async function runCriticVerification(args: CriticReviewArgs): Promise<Cri
       ].join("\n"),
       tools: criticTools,
       stopWhen: stepCountIs(6),
+      abortSignal: args.signal,
+      maxOutputTokens: 2048,
     })
 
     const cleaned = result.text.trim().replace(/^```json\s*/, "").replace(/\s*```$/, "")
@@ -101,10 +105,9 @@ export async function runCriticVerification(args: CriticReviewArgs): Promise<Cri
       feedback: validated.feedback,
     }
   } catch (err) {
-    // If parsing fails or critic throws, treat as soft pass with warning
     return {
-      pass: true,
-      reasons: [`Critic evaluation completed with parse fallback: ${err instanceof Error ? err.message : String(err)}`],
+      pass: false,
+      reasons: [`Critic could not verify the work: ${err instanceof Error ? err.message : String(err)}`],
     }
   }
 }

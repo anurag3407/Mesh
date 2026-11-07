@@ -71,7 +71,7 @@ describe("Engine Dispatcher (E4)", () => {
     step: 1,
   }
 
-  it("dispatches to runLlmTurn when engine is v1 or undefined", async () => {
+  it("dispatches to runLlmTurn only when engine is explicitly v1", async () => {
     const mockLlmResult: TurnResult = {
       messageId: "m-v1",
       runId: "r-v1",
@@ -85,6 +85,14 @@ describe("Engine Dispatcher (E4)", () => {
     expect(res).toEqual(mockLlmResult)
     expect(runLlmSpy).toHaveBeenCalledWith(dummyArgs)
     runLlmSpy.mockRestore()
+  })
+
+  it("uses v2 for existing bots without an explicit engine and rejects unsupported drivers", async () => {
+    const spy = vi.spyOn(engineRun, "runEngineTurn").mockResolvedValue({ messageId: "m", runId: "r", content: "", error: null, aborted: false })
+    await startAgentTurn({ ...dummyArgs, agent: { ...dummyAgent, params: {} } })
+    expect(spy).toHaveBeenCalledTimes(1)
+    await expect(startAgentTurn({ ...dummyArgs, agent: { ...dummyAgent, params: { engine: "cli" } } })).rejects.toThrow("Unsupported agent engine")
+    spy.mockRestore()
   })
 
   it("dispatches to runEngineTurn when engine is v2", async () => {

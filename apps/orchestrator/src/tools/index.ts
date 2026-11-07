@@ -7,6 +7,7 @@ import { z } from "zod"
 import { canvasPatchTool, canvasReadTool, canvasWriteTool } from "../canvas/tools"
 import { getDb } from "../db"
 import { getEnv } from "../env"
+import { RunEvidence, type VerificationEvidence } from "../engine/evidence"
 import { updatePlanTool } from "../engine/plan-tool"
 import { skillTools } from "../engine/skills"
 import { spawnSubagentTool } from "../engine/subagents"
@@ -20,6 +21,8 @@ import { sandboxTool } from "./builtins/sandbox"
 import { taskTools } from "./builtins/tasks"
 import { useSecretTool } from "./builtins/use-secret"
 import { webSearchTool } from "./builtins/web-search"
+import { verificationTools } from "./builtins/verification"
+import { workspaceTools } from "./builtins/workspace"
 
 export interface BuildToolsArgs {
   roomId: string
@@ -35,6 +38,7 @@ export interface BuiltTools {
   /** Tool names to expose on the next step; undefined means all of them. */
   activeToolNames: () => string[] | undefined
   warnings: string[]
+  verification: () => VerificationEvidence
   close: () => Promise<void>
 }
 
@@ -83,6 +87,8 @@ async function loadMcpConfigs(args: BuildToolsArgs) {
 export async function buildTools(args: BuildToolsArgs): Promise<BuiltTools> {
   const warnings: string[] = []
   const caps = parseCapabilities(args.agent.capabilities)
+  const isV2 = ((args.agent.params as Record<string, unknown> | null)?.engine ?? "v2") === "v2"
+  const evidence = new RunEvidence()
   // Filled in once every spec is known; subagents read it at call time.
   let allSpecs: ToolSpec[] = []
 
@@ -114,6 +120,12 @@ export async function buildTools(args: BuildToolsArgs): Promise<BuiltTools> {
           profile: caps.computer.profile,
         })
       : []),
+    ...(caps.computer && isV2
+      ? [
+          ...verificationTools({ agentId: args.agent.id, orgId: args.orgId, profile: caps.computer.profile }),
+          ...workspaceTools({ agentId: args.agent.id, orgId: args.orgId, roomId: args.roomId, profile: caps.computer.profile }),
+        ]
+      : []),
     ...(caps.secrets ? [useSecretTool({ agentId: args.agent.id, orgId: args.orgId })] : []),
     ...(caps.memory
       ? memoryTools({
@@ -122,13 +134,13 @@ export async function buildTools(args: BuildToolsArgs): Promise<BuiltTools> {
           roomId: args.roomId,
         })
       : []),
-    ...((args.agent.params as Record<string, unknown> | null)?.engine === "v2" && args.runtime.runId
+    ...(isV2 && args.runtime.runId
       ? [
           updatePlanTool({ runId: args.runtime.runId, roomId: args.roomId }),
           ...skillTools({ orgId: args.orgId, agentId: args.agent.id }),
         ]
       : []),
-    ...((args.agent.params as Record<string, unknown> | null)?.engine === "v2" &&
+    ...(isV2 &&
     caps.subagents &&
     args.runtime.runId
       ? [
@@ -167,7 +179,8 @@ export async function buildTools(args: BuildToolsArgs): Promise<BuiltTools> {
           ((definition as { description?: string }).description ?? "") ||
           `MCP tool ${meta.originalName} from ${meta.serverName}`,
         schema: (definition as { inputSchema?: z.ZodType }).inputSchema ?? z.record(z.string(), z.unknown()),
-        dangerous: meta.dangerous,
+        // Server hints may add an approval gate, never remove one.
+        dangerous: meta.dangerous || meta.annotations?.destructiveHint === true,
         execute: async (input: Record<string, unknown>, signal?: AbortSignal) => {
           if (signal?.aborted) throw new Error("run aborted")
           return mcp.call(meta.serverId, meta.originalName, input)
@@ -176,8 +189,7 @@ export async function buildTools(args: BuildToolsArgs): Promise<BuiltTools> {
     }
   }
 
-  allSpecs = [...specs, ...extraSpecs]
-  const isV2 = (args.agent.params as Record<string, unknown> | null)?.engine === "v2"
+  allSpecs = [...specs, ...extraSpecs].sort((a, b) => a.name.localeCompare(b.name)).map((spec) => evidence.wrap(spec))
   const partition = isV2 ? partitionToolsForSearch(allSpecs) : undefined
   const registered = partition ? partition.all : allSpecs
   const tools = toAuditedTools(registered, args.runtime)
@@ -187,6 +199,7 @@ export async function buildTools(args: BuildToolsArgs): Promise<BuiltTools> {
     specs: registered,
     activeToolNames: partition ? partition.activeToolNames : () => undefined,
     warnings,
+    verification: () => evidence.snapshot(),
     close: closeMcp,
   }
 }

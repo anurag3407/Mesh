@@ -1,11 +1,13 @@
 import { serve } from "@hono/node-server"
 import { Hono } from "hono"
 import { timingSafeEqual } from "node:crypto"
-import { z } from "zod"
+import { pathToFileURL } from "node:url"
+import { bodyLimit } from "hono/body-limit"
 import { ComputerLifecycle } from "./lifecycle"
 
+export function createApp(lifecycle: Pick<ComputerLifecycle, "ensure" | "execAgentd" | "stop" | "remove"> = new ComputerLifecycle()) {
 const app = new Hono()
-const lifecycle = new ComputerLifecycle()
+app.use("*", bodyLimit({ maxSize: 16 * 1024 * 1024 }))
 
 const INTERNAL_SECRET = process.env.ORCHESTRATOR_INTERNAL_SECRET || ""
 
@@ -51,6 +53,9 @@ app.post("/v1/computers/:agentId/exec", async (c) => {
     cmd: body.cmd,
     cwd: body.cwd,
     timeoutMs: body.timeoutMs,
+    env: body.env,
+    stdin: body.stdin,
+    background: body.background,
   })
 
   // Return NDJSON
@@ -60,33 +65,16 @@ app.post("/v1/computers/:agentId/exec", async (c) => {
   })
 })
 
-app.post("/v1/computers/:agentId/files/read", async (c) => {
-  const agentId = c.req.param("agentId")
-  const body = await c.req.json()
-  const frames = await lifecycle.execAgentd(agentId, { op: "read", ...body })
-  return c.json(frames[0] ?? {})
-})
-
-app.post("/v1/computers/:agentId/files/write", async (c) => {
-  const agentId = c.req.param("agentId")
-  const body = await c.req.json()
-  const frames = await lifecycle.execAgentd(agentId, { op: "write", ...body })
-  return c.json(frames[0] ?? {})
-})
-
-app.post("/v1/computers/:agentId/files/list", async (c) => {
-  const agentId = c.req.param("agentId")
-  const body = await c.req.json().catch(() => ({}))
-  const frames = await lifecycle.execAgentd(agentId, { op: "list", ...body })
-  return c.json(frames[0] ?? { entries: [] })
-})
-
-app.post("/v1/computers/:agentId/browser", async (c) => {
-  const agentId = c.req.param("agentId")
-  const body = await c.req.json()
-  const frames = await lifecycle.execAgentd(agentId, { op: "browser", ...body })
-  return c.json(frames[0] ?? { ok: true })
-})
+for (const [route, op] of [["files/read", "read"], ["files/write", "write"], ["files/edit", "edit"], ["files/list", "list"], ["code", "code"], ["browser", "browser"]] as const) {
+  app.post(`/v1/computers/:agentId/${route}`, async (c) => {
+    const body = await c.req.json()
+    if (!body || typeof body !== "object" || Array.isArray(body)) return c.json({ error: "Expected an object" }, 400)
+    const frames = await lifecycle.execAgentd(c.req.param("agentId"), { ...body, op })
+    if (!Array.isArray(frames) || frames.length !== 1 || !frames[0] || typeof frames[0] !== "object") return c.json({ error: "Missing or invalid agentd response" }, 502)
+    if ("error" in frames[0]) return c.json(frames[0], 422)
+    return c.json(frames[0])
+  })
+}
 
 app.post("/v1/computers/:agentId/stop", async (c) => {
   const agentId = c.req.param("agentId")
@@ -101,6 +89,11 @@ app.delete("/v1/computers/:agentId", async (c) => {
   return c.json({ ok: true })
 })
 
-const port = Number(process.env.PORT || 4100)
-console.log(`[computerd] starting on port ${port}...`)
-serve({ fetch: app.fetch, port })
+return app
+}
+
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  const port = Number(process.env.PORT || 4100)
+  console.log(`[computerd] starting on port ${port}...`)
+  serve({ fetch: createApp().fetch, port })
+}

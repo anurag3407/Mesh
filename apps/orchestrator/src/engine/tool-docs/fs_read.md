@@ -1,24 +1,20 @@
 # fs_read
 
-Read text content from files in your persistent container environment.
-
 ## When to Use
 - Inspecting source code, config files, logs, or documentation.
-- Reading specific sections of large files with `startLine` and `endLine`.
+- Before every `fs_edit`: the returned `hash` is the `expectedHash` that edit requires.
+- Large files: read a page, then continue from `nextStartLine` while `hasMore` is true.
 
 ## When NOT to Use
-- Do NOT use for binary files (images, archives, compiled binaries).
-- Do NOT use if you only need to check if a file exists (prefer `fs_glob`).
+- Binary files (images, archives, compiled binaries) are refused.
+- To find files, use `fs_glob`; to find text across files, use `fs_grep`.
+- For TypeScript/JavaScript structure, `code_outline` / `code_definition` are cheaper than reading whole files.
 
 ## Example
 ```json
-{
-  "path": "/home/bot/app/src/index.ts",
-  "startLine": 1,
-  "endLine": 50
-}
+{ "path": "/home/bot/app/src/index.ts", "startLine": 1, "endLine": 200 }
 ```
 
 ## Failure Modes
-- Binary file detection will reject reading with an error.
-- Files exceeding 2,000 lines return a continuation hint. Specify `startLine` to paginate.
+- `truncated: true` means you saw only part of the file. Never assume unseen lines.
+- Lines are prefixed `N | ` for display only. Do not include the prefix in `fs_edit` oldString.

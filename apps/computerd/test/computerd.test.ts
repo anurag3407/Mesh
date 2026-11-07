@@ -1,3 +1,5 @@
+import { mkdtempSync, realpathSync, rmSync } from "node:fs"
+import { join } from "node:path"
 import { describe, expect, it } from "vitest"
 import { DockerClient } from "../src/docker"
 
@@ -37,11 +39,21 @@ describe("computerd container specs", () => {
 })
 
 describe("agentd isSafePath", () => {
-  it("allows safe paths in /home/bot and /tmp", async () => {
-    const { isSafePath } = await import("../agentd/agentd")
-    expect(isSafePath("/home/bot")).toBe(true)
-    expect(isSafePath("/home/bot/app/index.js")).toBe(true)
-    expect(isSafePath("/tmp/scratch.txt")).toBe(true)
+  it("allows safe paths in the configured bot home and /tmp", async () => {
+    const home = realpathSync(mkdtempSync(join(realpathSync("/tmp"), "agentd-home-")))
+    const previous = process.env.BOT_HOME
+    process.env.BOT_HOME = home
+    try {
+      const { isSafePath } = await import("../agentd/files")
+      expect(isSafePath(home)).toBe(true)
+      expect(isSafePath(join(home, "app/index.js"))).toBe(true)
+      expect(isSafePath("/tmp/scratch.txt")).toBe(true)
+      expect(isSafePath("/etc/passwd")).toBe(false)
+    } finally {
+      if (previous === undefined) delete process.env.BOT_HOME
+      else process.env.BOT_HOME = previous
+      rmSync(home, { recursive: true, force: true })
+    }
   })
 
   it("blocks directory traversal and paths outside /home/bot or /tmp", async () => {

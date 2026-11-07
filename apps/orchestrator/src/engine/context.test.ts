@@ -207,6 +207,13 @@ describe("Engine Context Builder (E3)", () => {
     expect(selfMsg.content).toBe("I will check apps/orchestrator/src/index.ts now.")
   })
 
+  it("never sends Anthropic-style cache controls to automatic-cache providers", () => {
+    for (const provider of ["google", "openai", "openai-compatible"]) {
+      const context = buildEngineContext({ agent: mockAgent, room: mockRoom, provider, roomHistory: [], volatileTail: { now: "fixed" } })
+      expect(context.prefix.every((message) => message.providerOptions === undefined)).toBe(true)
+    }
+  })
+
   it("sorts tool specs deterministically", () => {
     const specs = [
       { name: "update_task", description: "b" } as any,

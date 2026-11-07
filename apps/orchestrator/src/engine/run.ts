@@ -14,7 +14,7 @@ import {
   usageEvents,
 } from "@sayabot/db"
 import { buildProviderOptions } from "@sayabot/llm"
-import { stepCountIs, streamText, type ModelMessage, type ToolSet } from "ai"
+import { stepCountIs, streamText, type LanguageModelUsage, type ModelMessage, type SystemModelMessage, type ToolSet } from "ai"
 import { and, eq, sql } from "drizzle-orm"
 import { consumeRunInterrupts, registerRun, unregisterRun } from "../active-runs"
 import { ComputerClient } from "../computer/client"
@@ -37,6 +37,9 @@ import {
 import { buildTools } from "../tools"
 import { redactValue, type ToolSpec } from "../tools/audited"
 import { applyRollingCacheBreakpoint, buildEngineContext } from "./context"
+import { CacheMetrics, estimateMessageTokens, estimateToolTokens, resolveContextBudget } from "./budget"
+import type { VerificationEvidence } from "./evidence"
+import { summarizeForBudget } from "./summarize"
 import {
   decidePrepareStep,
   needsStepSeparator,
@@ -85,7 +88,7 @@ export async function runEngineTurn(args: RunLlmTurnArgs): Promise<TurnResult> {
     args.taskId ? loadTaskBriefContext(args.taskId) : Promise.resolve(""),
   ])
 
-  const maxSteps = numericParam(agent.params as Record<string, unknown>, "maxSteps", 60) ?? 60
+  const maxSteps = Math.max(1, Math.min(200, Math.floor(numericParam(agent.params as Record<string, unknown>, "maxSteps", 60) ?? 60)))
 
   const [run] = await db
     .insert(agentRuns)
@@ -155,6 +158,10 @@ export async function runEngineTurn(args: RunLlmTurnArgs): Promise<TurnResult> {
   let activeToolNames: () => string[] | undefined = () => undefined
   let closeTools = async () => {}
   const warnings: string[] = []
+  let verification = (): VerificationEvidence => ({ status: "not_required", mutationRevision: 0, checks: [] })
+  const cacheMetrics = new CacheMetrics()
+  let compactions = 0
+  let peakEstimatedInputTokens = 0
 
   let buffer = ""
   let seq = 0
@@ -177,6 +184,14 @@ export async function runEngineTurn(args: RunLlmTurnArgs): Promise<TurnResult> {
     cacheReadTokens: 0,
     cacheWriteTokens: 0,
   }
+  const recordUsage = (usage: LanguageModelUsage) => {
+    cacheMetrics.record(usage)
+    usageTotals.inputTokens += usage.inputTokens ?? 0
+    usageTotals.outputTokens += usage.outputTokens ?? 0
+    usageTotals.cacheReadTokens += usage.inputTokenDetails?.cacheReadTokens ?? 0
+    usageTotals.cacheWriteTokens += usage.inputTokenDetails?.cacheWriteTokens ?? 0
+    usageTotals.seen = true
+  }
   let ttftMs: number | null = null
   let latencyMs = 0
   let error: string | null = null
@@ -198,6 +213,7 @@ export async function runEngineTurn(args: RunLlmTurnArgs): Promise<TurnResult> {
       ...(safeError ? { error: safeError } : {}),
       ...(aborted ? { stopped: true } : {}),
       ...(safeWarnings.length ? { warnings: safeWarnings } : {}),
+      harness: redactValue({ cache: cacheMetrics.snapshot(), verification: verification(), compactions, peakEstimatedInputTokens }, runScrubber),
     }
 
     await db
@@ -303,6 +319,7 @@ export async function runEngineTurn(args: RunLlmTurnArgs): Promise<TurnResult> {
       tools = built.tools
       toolSpecs = built.specs
       activeToolNames = built.activeToolNames
+      verification = built.verification
       closeTools = built.close
       warnings.push(...built.warnings)
     } catch (toolError) {
@@ -370,7 +387,7 @@ export async function runEngineTurn(args: RunLlmTurnArgs): Promise<TurnResult> {
 
     const params = (agent.params ?? {}) as Record<string, unknown>
     const verifyMode = getVerifyMode(params)
-    const contextBudgetTokens = numericParam(params, "contextBudgetTokens", 120_000) ?? 120_000
+    const modelBudget = resolveContextBudget(resolved.provider, params)
 
     // Build structured context
     const initialContext = buildEngineContext({
@@ -390,10 +407,17 @@ export async function runEngineTurn(args: RunLlmTurnArgs): Promise<TurnResult> {
           !taskBrief && taskContext ? `Open Tasks in Room:\n${taskContext}` : "",
         ],
         currentTrigger: args.trigger.content,
+        // Only where there is something to verify: a task, or a workspace with checks.
         closingInstructions:
-          verifyMode === "self" && taskBrief ? buildSelfVerificationPrompt() : undefined,
+          verifyMode !== "off" && (taskBrief || "verify_workspace" in tools)
+            ? buildSelfVerificationPrompt()
+            : undefined,
       },
     })
+
+    const instructions = initialContext.messages.filter((message): message is SystemModelMessage => message.role === "system")
+    const initialMessages = initialContext.messages.filter((message) => message.role !== "system")
+    const instructionTokens = estimateMessageTokens(instructions)
 
     const configuredEffort = params.effort as string | undefined
     const effort = resolveEffortLevel({
@@ -404,6 +428,8 @@ export async function runEngineTurn(args: RunLlmTurnArgs): Promise<TurnResult> {
       provider: resolved.provider as any,
       effort,
     })
+    const thinking = providerOptions.anthropic?.thinking as { budgetTokens?: number } | undefined
+    if (thinking?.budgetTokens) thinking.budgetTokens = Math.min(thinking.budgetTokens, modelBudget.outputTokens - 1024)
 
     send({ type: "run.status", runId: run.id, status: "thinking" })
 
@@ -434,7 +460,7 @@ export async function runEngineTurn(args: RunLlmTurnArgs): Promise<TurnResult> {
       const passStartSteps = stepsCompleted
       const passStartRunMessages = runMessages.length
       const errorBox: { error: unknown } = { error: null }
-      const passInput: ModelMessage[] = [...initialContext.messages, ...runMessages]
+      const passInput: ModelMessage[] = [...initialMessages, ...runMessages]
       // The last prompt prepareStep produced (includes steering, reminders and
       // compaction, plus every earlier step's output).
       let lastPrepared: ModelMessage[] = passInput
@@ -450,6 +476,7 @@ export async function runEngineTurn(args: RunLlmTurnArgs): Promise<TurnResult> {
       const activeTools = activeToolNames()
       const streamResult = streamText({
         model: resolved.model,
+        instructions,
         messages: passInput,
         tools,
         ...(activeTools ? { activeTools } : {}),
@@ -461,20 +488,23 @@ export async function runEngineTurn(args: RunLlmTurnArgs): Promise<TurnResult> {
           ? { temperature: numericParam(params, "temperature") }
           : {}),
         ...(numericParam(params, "topP") !== undefined ? { topP: numericParam(params, "topP") } : {}),
-        ...(numericParam(params, "maxOutputTokens") !== undefined
-          ? { maxOutputTokens: numericParam(params, "maxOutputTokens") }
-          : {}),
+        maxOutputTokens: modelBudget.outputTokens,
         onError: ({ error: streamErr }) => {
           errorBox.error = streamErr
         },
-        prepareStep: ({ messages: stepMessages, steps, stepNumber }) => {
+        prepareStep: async ({ messages: stepMessages, steps, stepNumber }) => {
+          const nextActive = activeToolNames()
+          const activeSpecs = nextActive ? toolSpecs.filter((spec) => nextActive.includes(spec.name)) : toolSpecs
+          const budget = resolveContextBudget(resolved.provider, params, estimateToolTokens(activeSpecs))
+          const workingMessages = stepMessages
+          const messageBudget = budget.messageTokens - instructionTokens
           const decision = decidePrepareStep({
-            messages: stepMessages,
+            messages: workingMessages,
             steps: steps as unknown as StepLike[],
             stepNumber: passStartSteps + stepNumber,
             maxSteps,
             interrupts: consumeRunInterrupts(run.id),
-            contextBudgetTokens,
+            contextBudgetTokens: messageBudget,
             planToolAvailable,
             sentReminders,
           })
@@ -496,8 +526,24 @@ export async function runEngineTurn(args: RunLlmTurnArgs): Promise<TurnResult> {
               label: `Compacted context (${decision.elidedCount} old tool results elided)`,
             })
           }
-          const nextActive = activeToolNames()
-          const prepared = applyRollingCacheBreakpoint(decision.messages ?? stepMessages, resolved.provider)
+          const compacted = await summarizeForBudget({
+            messages: decision.messages ?? workingMessages,
+            protectedPrefixCount: initialMessages.length,
+            messageBudget,
+            summarizerInputBudget: modelBudget.inputTokens,
+            outputTokens: modelBudget.outputTokens,
+            model: resolved.model,
+            signal: controller.signal,
+            onUsage: recordUsage,
+          })
+          if (compacted.compacted > 0) {
+            compactions++
+            send({ type: "run.step", runId: run.id, step: stepsCompleted, kind: "model", label: `Summarized ${compacted.compacted} earlier messages; preserved current task and recent tool pairs` })
+          }
+          const estimatedTokens = estimateMessageTokens(compacted.messages)
+          peakEstimatedInputTokens = Math.max(peakEstimatedInputTokens, estimatedTokens + budget.toolTokens + instructionTokens)
+          if (estimatedTokens > messageBudget) throw new Error("Context budget exhausted without safely discardable history. Narrow the task or configure this model's contextWindowTokens.")
+          const prepared = applyRollingCacheBreakpoint(compacted.messages, resolved.provider)
           lastPrepared = prepared
           return {
             messages: prepared,
@@ -506,6 +552,7 @@ export async function runEngineTurn(args: RunLlmTurnArgs): Promise<TurnResult> {
         },
         onStepEnd: async (step) => {
           stepsCompleted += 1
+          recordUsage(step.usage)
           const stepIdx = stepsCompleted
           const isToolStep = step.toolCalls && step.toolCalls.length > 0
           const kind = isToolStep ? "tool" : "model"
@@ -595,23 +642,17 @@ export async function runEngineTurn(args: RunLlmTurnArgs): Promise<TurnResult> {
 
       if (errorBox.error) throw errorBox.error
 
-      const [passUsage, passReason, response] = await Promise.all([
-        streamResult.totalUsage,
+      const [passReason, response] = await Promise.all([
         streamResult.finishReason,
         streamResult.response,
       ])
-      usageTotals.inputTokens += passUsage.inputTokens ?? 0
-      usageTotals.outputTokens += passUsage.outputTokens ?? 0
-      usageTotals.cacheReadTokens += passUsage.inputTokenDetails?.cacheReadTokens ?? 0
-      usageTotals.cacheWriteTokens += passUsage.inputTokenDetails?.cacheWriteTokens ?? 0
-      usageTotals.seen = true
       finishReason = passReason
       // In AI SDK 7, response.messages holds only the final step's output.
       const finalStepOutput = response.messages as ModelMessage[]
       runMessages.splice(
         0,
         runMessages.length,
-        ...lastPrepared.slice(initialContext.messages.length),
+        ...lastPrepared.slice(initialMessages.length),
         ...finalStepOutput,
       )
 
@@ -632,9 +673,20 @@ export async function runEngineTurn(args: RunLlmTurnArgs): Promise<TurnResult> {
         continue
       }
 
-      // Critic verification: on failure, feed the reviewer's findings back and
-      // let the agent revise (bounded by runCriticVerification's cycle cap).
-      if (verifyMode === "critic" && taskBrief && passText.trim()) {
+      const evidence = verification()
+      if (verifyMode !== "off" && (evidence.status === "pending" || evidence.status === "failed")) {
+        if (pass + 1 >= MAX_PASSES || stepsCompleted >= maxSteps || sentReminders.has("verify")) {
+          // Surface it, but don't fail the turn: the agent may honestly report
+          // that checks are unavailable or that failures pre-date its change.
+          warnings.push(`Work remains unverified: ${evidence.reason}`)
+          break
+        }
+        sentReminders.add("verify")
+        runMessages.push(systemReminder(`${evidence.reason} Inspect the project's checks, call verify_workspace, fix any failures and report only what the execution evidence supports. If checks are unavailable, say so explicitly.`))
+        continue
+      }
+
+      if (verifyMode === "critic" && passText.trim()) {
         send({ type: "run.status", runId: run.id, status: "thinking" })
         send({
           type: "run.step",
@@ -647,13 +699,19 @@ export async function runEngineTurn(args: RunLlmTurnArgs): Promise<TurnResult> {
           agent,
           orgId: room.orgId,
           roomId: room.id,
-          taskBrief,
-          proposedOutput: fullRaw,
+          taskBrief: taskBrief || args.trigger.content,
+          proposedOutput: `${fullRaw}\n\nExecution evidence: ${JSON.stringify(verification())}`, 
+          signal: controller.signal,
+          scrub: runScrubber,
           availableToolSpecs: toolSpecs,
           cycle: criticCycle++,
         })
-        if (!review.pass && (review.feedback || review.reasons.length > 0)) {
-          const findings = review.feedback || review.reasons.map((r) => `- ${r}`).join("\n")
+        if (!review.pass) {
+          const findings = review.feedback || review.reasons.map((r) => `- ${r}`).join("\n") || "The critic did not verify the work."
+          if (pass + 1 >= MAX_PASSES || stepsCompleted >= maxSteps || criticCycle >= 2) {
+            warnings.push(`Critic verification unresolved: ${findings}`)
+            break
+          }
           warnings.push(`Critic feedback: ${findings}`)
           runMessages.push(
             systemReminder(
@@ -674,8 +732,20 @@ export async function runEngineTurn(args: RunLlmTurnArgs): Promise<TurnResult> {
       break
     }
 
-    if (!fullRaw.trim() && !controller.signal.aborted && stepsCompleted >= maxSteps) {
-      warnings.push(`Stopped after reaching the step limit (${maxSteps}) without a final reply.`)
+    aborted = controller.signal.aborted
+    if (!aborted && finishReason === "tool-calls" && stepsCompleted >= maxSteps) {
+      error ??= `Step limit (${maxSteps}) reached before a final response; work is incomplete.`
+    }
+    if (!aborted && consumeRunInterrupts(run.id).length > 0) {
+      error ??= "A new instruction arrived after the execution budget was exhausted. A follow-up turn is required."
+    }
+    if (
+      !aborted &&
+      verifyMode !== "off" &&
+      ["pending", "failed"].includes(verification().status) &&
+      !warnings.some((w) => w.startsWith("Work remains unverified"))
+    ) {
+      warnings.push(`Work remains unverified: ${verification().reason}`)
     }
     try {
       await persistTranscript(runMessages)

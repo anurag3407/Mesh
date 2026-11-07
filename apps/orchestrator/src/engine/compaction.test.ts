@@ -1,8 +1,30 @@
 import { describe, expect, it } from "vitest"
 import type { ModelMessage, ToolModelMessage } from "ai"
-import { compactTranscript, elideOldToolResults } from "./compaction"
+import { compactTranscript, compactionBoundary, elideOldToolResults } from "./compaction"
 
 describe("Compaction (E7)", () => {
+  it("keeps tool calls paired with retained results and preserves system rules", () => {
+    const messages: ModelMessage[] = [
+      { role: "system", content: "trusted rules" },
+      { role: "user", content: "original task" },
+      { role: "assistant", content: "old progress" },
+      { role: "assistant", content: [{ type: "tool-call", toolCallId: "a", toolName: "read", input: {} }] },
+      { role: "tool", content: [{ type: "tool-result", toolCallId: "a", toolName: "read", output: { type: "text", value: "source" } }] },
+      { role: "assistant", content: "latest" },
+    ]
+    expect(compactionBoundary(messages, 2, 2)).toBe(3)
+    const result = compactTranscript({ messages, protectedPrefixCount: 2, keepLastMessages: 2, summary: { goal: "task", decisions: [], filesTouched: [], openQuestions: [], planStatus: "", factsLearned: [] } })
+    expect(result.messages.slice(0, 2)).toEqual(messages.slice(0, 2))
+    expect(result.messages.slice(-3)).toEqual(messages.slice(-3))
+  })
+
+  it("never rewrites a failed tool result as a successful completion", () => {
+    const messages: ModelMessage[] = [{ role: "tool", content: [{ type: "tool-result", toolCallId: "a", toolName: "test", output: { type: "json", value: { exit_code: 1, error: "assertion failed" } } }] }]
+    const result = elideOldToolResults(messages, 0)
+    expect(JSON.stringify(result.messages)).toContain("failed")
+    expect(JSON.stringify(result.messages)).not.toContain("completed")
+  })
+
   it("elides older tool results while keeping the last K=6 verbatim", () => {
     const messages: ModelMessage[] = []
 
@@ -30,7 +52,7 @@ describe("Compaction (E7)", () => {
       const part = msg.content[0] as any
       expect(part.output.type).toBe("text")
       expect(part.output.value).toContain("[result elided:")
-      expect(part.output.value).toContain(`tool_calls/call-${i + 1}`)
+      expect(part.output.value).toContain(`call-${i + 1}`)
     }
 
     // The last 6 should remain verbatim

@@ -1,10 +1,32 @@
-import { describe, expect, it } from "vitest"
+import { describe, expect, it, vi } from "vitest"
+
+const mocks = vi.hoisted(() => ({ generate: vi.fn(), resolve: vi.fn() }))
+vi.mock("ai", async (original) => ({ ...await original<typeof import("ai")>(), generateText: mocks.generate }))
+vi.mock("../runner/llm", () => ({ resolveAgentCheapModel: mocks.resolve }))
 import {
   buildSelfVerificationPrompt,
   getVerifyMode,
+  runCriticVerification,
 } from "./verify"
 
 describe("verify", () => {
+  const args = { agent: {} as any, orgId: "org", roomId: "room", taskBrief: "Fix auth", proposedOutput: "Done", cycle: 0 }
+
+  it("never turns a revision limit into a successful verification", async () => {
+    expect((await runCriticVerification({ ...args, cycle: 2 })).pass).toBe(false)
+  })
+
+  it("rejects malformed critic output", async () => {
+    mocks.resolve.mockResolvedValue({ model: {} })
+    mocks.generate.mockResolvedValue({ text: "looks fine" })
+    expect((await runCriticVerification(args)).pass).toBe(false)
+  })
+
+  it("reports unavailable reviewer without claiming success or throwing", async () => {
+    mocks.resolve.mockRejectedValue(new Error("provider unavailable"))
+    await expect(runCriticVerification(args)).resolves.toMatchObject({ pass: false })
+  })
+
   it("defaults to self verification when engine is v2 or verify is unset", () => {
     expect(getVerifyMode(null)).toBe("self")
     expect(getVerifyMode({})).toBe("self")

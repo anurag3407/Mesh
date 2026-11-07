@@ -34,6 +34,8 @@ RUN mkdir -p /opt/agentd /run /home/bot/.saaya \
 
 # Bundle agentd and entrypoint
 COPY apps/computerd/agentd/ /opt/agentd/
+# Keep this compiler version aligned with apps/computerd/package.json.
+RUN npm install --prefix /opt/agentd --no-save --package-lock=false --ignore-scripts --no-audit --no-fund typescript@5.9.3
 
 RUN cat << 'EOF' > /opt/agentd/agentd-cli
 #!/bin/bash

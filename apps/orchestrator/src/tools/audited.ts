@@ -86,6 +86,7 @@ export function toAuditedTools(specs: ToolSpec[], runtime: ToolRuntime): ToolSet
       inputSchema: spec.schema,
       execute: async (args: unknown, options) => {
         const input = (args ?? {}) as Record<string, unknown>
+        if (options.abortSignal?.aborted) return { ok: false, error: "Run stopped before tool execution" }
         const dangerous = isDangerous(spec, input)
         const storedArgs = forStorage(input, runtime.scrub)
         const [row] = await getDb()
@@ -164,6 +165,7 @@ export function toAuditedTools(specs: ToolSpec[], runtime: ToolRuntime): ToolSet
         }
 
         try {
+          options.abortSignal?.throwIfAborted()
           const ctx: ToolContext = {
             toolCallId: row.id,
             signal: options.abortSignal,
@@ -183,7 +185,7 @@ export function toAuditedTools(specs: ToolSpec[], runtime: ToolRuntime): ToolSet
             status: "done",
             durationMs: Date.now() - startedAt,
           })
-          return capToolOutputForModel(result)
+          return capToolOutputForModel(redactValue(result, runtime.scrub))
         } catch (error) {
           const message = error instanceof Error ? error.message : String(error)
           const scrubbedError = runtime.scrub ? runtime.scrub(message) : message
@@ -197,7 +199,7 @@ export function toAuditedTools(specs: ToolSpec[], runtime: ToolRuntime): ToolSet
             status: "error",
             durationMs: Date.now() - startedAt,
           })
-          return { ok: false, error: message }
+          return { ok: false, error: redactSecrets(scrubbedError).text }
         }
       },
     })
