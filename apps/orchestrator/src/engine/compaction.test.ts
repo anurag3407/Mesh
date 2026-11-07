@@ -28,8 +28,9 @@ describe("Compaction (E7)", () => {
     for (let i = 0; i < 4; i++) {
       const msg = result[i] as ToolModelMessage
       const part = msg.content[0] as any
-      expect(part.output).toContain("[result elided:")
-      expect(part.output).toContain(`tool_calls/call-${i + 1}`)
+      expect(part.output.type).toBe("text")
+      expect(part.output.value).toContain("[result elided:")
+      expect(part.output.value).toContain(`tool_calls/call-${i + 1}`)
     }
 
     // The last 6 should remain verbatim

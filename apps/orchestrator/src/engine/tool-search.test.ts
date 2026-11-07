@@ -61,3 +61,20 @@ describe("tool-search (BM25 and partitioning)", () => {
     expect(partitioned.exposed.some((t) => t.name === "fs_read")).toBe(true)
   })
 })
+
+describe("tool-search activation", () => {
+  it("registers every tool and widens activeToolNames after find_tools runs", async () => {
+    const specs = Array.from({ length: TOOL_SEARCH_THRESHOLD + 5 }, (_, i) => ({
+      name: i === 0 ? "stripe_create_charge" : `mcp_tool_${i}`,
+      description: i === 0 ? "Create a stripe payment charge" : `generic tool ${i}`,
+      schema: z.object({}),
+      dangerous: false,
+      execute: async () => ({}),
+    }))
+    const partitioned = partitionToolsForSearch(specs)
+    expect(partitioned.all.length).toBe(specs.length + 1)
+    expect(partitioned.activeToolNames()).toEqual(["find_tools"])
+    await partitioned.searchTool!.execute({ query: "stripe charge" })
+    expect(partitioned.activeToolNames()).toContain("stripe_create_charge")
+  })
+})

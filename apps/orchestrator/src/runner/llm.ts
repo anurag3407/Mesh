@@ -50,7 +50,7 @@ export function getCheapModelName(provider: string, customCheap?: string): strin
   if (customCheap) return customCheap
   switch (provider) {
     case "anthropic":
-      return "claude-3-5-haiku-latest"
+      return "claude-haiku-5-5"
     case "openai":
       return "gpt-4o-mini"
     case "google":

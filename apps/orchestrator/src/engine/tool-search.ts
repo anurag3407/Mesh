@@ -154,16 +154,25 @@ export function buildFindToolsSpec(args: {
 }
 
 /**
- * Splits tools into exposed tools and indexed tools if total exceeds TOOL_SEARCH_THRESHOLD.
+ * Splits tools into an always-exposed core and a searchable catalog when the
+ * total exceeds TOOL_SEARCH_THRESHOLD.
+ *
+ * `all` holds every spec (core, catalog and find_tools) so each one can be
+ * registered with the model call; `activeToolNames()` returns the subset to
+ * expose on the next step (core + find_tools + whatever find_tools has
+ * activated so far). When no partitioning happens, `activeToolNames()`
+ * returns undefined, meaning every tool is active.
  */
 export function partitionToolsForSearch(
   specs: ToolSpec[],
 ): {
   exposed: ToolSpec[]
+  all: ToolSpec[]
   searchTool?: ToolSpec
+  activeToolNames: () => string[] | undefined
 } {
   if (specs.length <= TOOL_SEARCH_THRESHOLD) {
-    return { exposed: specs }
+    return { exposed: specs, all: specs, activeToolNames: () => undefined }
   }
 
   const core: ToolSpec[] = []
@@ -177,18 +186,19 @@ export function partitionToolsForSearch(
     }
   }
 
-  const activatedNonCore = new Map<string, ToolSpec>()
+  const activated = new Set<string>()
   const searchTool = buildFindToolsSpec({
     allSpecs: nonCore,
     onToolsFound: (found) => {
-      for (const t of found) {
-        activatedNonCore.set(t.name, t)
-      }
+      for (const t of found) activated.add(t.name)
     },
   })
 
+  const exposed = [...core, searchTool]
   return {
-    exposed: [...core, searchTool],
+    exposed,
+    all: [...exposed, ...nonCore],
     searchTool,
+    activeToolNames: () => [...exposed.map((s) => s.name), ...activated],
   }
 }

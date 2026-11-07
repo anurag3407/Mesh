@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs"
 import { isDestructiveCommand, redactSecrets } from "@sayabot/core"
 import { canvases, canvasVersions } from "@sayabot/db"
 import { z } from "zod"
@@ -11,6 +12,36 @@ export interface ComputerToolsArgs {
   orgId: string
   roomId: string
   profile: "standard" | "browser"
+}
+
+/** Single-quotes a value for POSIX sh. */
+export function shellQuote(value: string): string {
+  return `'${value.replace(/'/g, `'\\''`)}'`
+}
+
+/** Literal (non-regex, no `$` patterns) string replacement. */
+export function replaceLiteral(content: string, search: string, replacement: string, all: boolean): string {
+  if (all) return content.split(search).join(replacement)
+  const idx = content.indexOf(search)
+  if (idx === -1) return content
+  return content.slice(0, idx) + replacement + content.slice(idx + search.length)
+}
+
+const toolDocCache = new Map<string, string>()
+
+/** Short summary plus the full usage doc from engine/tool-docs, so the model actually sees it. */
+function describeWithDoc(name: string, summary: string): string {
+  if (!toolDocCache.has(name)) {
+    let doc = ""
+    try {
+      doc = readFileSync(new URL(`../../engine/tool-docs/${name}.md`, import.meta.url), "utf8")
+        .replace(/^# .*\n+/, "")
+        .trim()
+    } catch {}
+    toolDocCache.set(name, doc)
+  }
+  const doc = toolDocCache.get(name)
+  return doc ? `${summary}\n\n${doc}` : summary
 }
 
 export function computerTools(args: ComputerToolsArgs): ToolSpec[] {
@@ -68,7 +99,10 @@ export function computerTools(args: ComputerToolsArgs): ToolSpec[] {
   const fsReadTool: ToolSpec = {
     name: "fs_read",
     description:
-      "Read a text file from the persistent container environment with numbered lines. Supports line ranges and refuses binaries. (See engine/tool-docs/fs_read.md)",
+      describeWithDoc(
+      "fs_read",
+      "Read a text file from the persistent container environment with numbered lines. Supports line ranges and refuses binaries.",
+    ),
     schema: z.object({
       path: z.string().min(1),
       startLine: z.number().int().positive().optional(),
@@ -104,7 +138,10 @@ export function computerTools(args: ComputerToolsArgs): ToolSpec[] {
   const fsEditTool: ToolSpec = {
     name: "fs_edit",
     description:
-      "Exact string replacement in a file. Fails if oldString is not found or ambiguous. Returns unified diff. (See engine/tool-docs/fs_edit.md)",
+      describeWithDoc(
+      "fs_edit",
+      "Exact string replacement in a file. Fails if oldString is not found or ambiguous. Returns a diff of the change.",
+    ),
     schema: z.object({
       path: z.string().min(1),
       oldString: z.string().min(1),
@@ -129,9 +166,12 @@ export function computerTools(args: ComputerToolsArgs): ToolSpec[] {
           `Found ${occurrences} occurrences of oldString in ${input.path}. Pass replaceAll: true or provide more surrounding context.`,
         )
       }
-      const newContent = input.replaceAll
-        ? file.content.replaceAll(input.oldString, input.newString)
-        : file.content.replace(input.oldString, input.newString)
+      const newContent = replaceLiteral(
+        file.content,
+        input.oldString,
+        input.newString,
+        Boolean(input.replaceAll),
+      )
 
       await client.writeFile(agentId, { path: input.path, content: newContent })
       const diff = `--- ${input.path}\n+++ ${input.path}\n- ${input.oldString}\n+ ${input.newString}`
@@ -147,7 +187,7 @@ export function computerTools(args: ComputerToolsArgs): ToolSpec[] {
   const fsWriteTool: ToolSpec = {
     name: "fs_write",
     description:
-      "Create or overwrite a file in your container environment. (See engine/tool-docs/fs_write.md)",
+      describeWithDoc("fs_write", "Create or overwrite a file in your container environment."),
     schema: z.object({
       path: z.string().min(1),
       content: z.string().max(2_000_000),
@@ -173,7 +213,10 @@ export function computerTools(args: ComputerToolsArgs): ToolSpec[] {
   const fsGlobTool: ToolSpec = {
     name: "fs_glob",
     description:
-      "Find files matching glob pattern(s) in container filesystem, mtime-sorted. (See engine/tool-docs/fs_glob.md)",
+      describeWithDoc(
+      "fs_glob",
+      "Find files matching a glob pattern in the container filesystem, newest first. Patterns containing '/' match against the full path (e.g. '*/src/*.ts').",
+    ),
     schema: z.object({
       pattern: z.string().min(1),
       path: z.string().optional().default("/home/bot"),
@@ -183,7 +226,7 @@ export function computerTools(args: ComputerToolsArgs): ToolSpec[] {
       await client.ensure(agentId, orgId, profile)
       const base = input.path || "/home/bot"
       const res = await client.exec(agentId, {
-        cmd: `find ${base} -name "${input.pattern}" -type f -printf "%T@ %p\\n" 2>/dev/null | sort -nr | head -n 100 | cut -d' ' -f2-`,
+        cmd: `find ${shellQuote(base)} ${input.pattern.includes("/") ? "-path" : "-name"} ${shellQuote(input.pattern)} -type f -not -path '*/node_modules/*' -not -path '*/.git/*' -printf "%T@ %p\\n" 2>/dev/null | sort -nr | head -n 100 | cut -d' ' -f2-`,
       })
       const files = res.stdout.trim().split("\n").filter(Boolean)
       return {
@@ -198,7 +241,10 @@ export function computerTools(args: ComputerToolsArgs): ToolSpec[] {
   const fsGrepTool: ToolSpec = {
     name: "fs_grep",
     description:
-      "Search for regex/string pattern across files using ripgrep with line numbers. (See engine/tool-docs/fs_grep.md)",
+      describeWithDoc(
+      "fs_grep",
+      "Search for a regex pattern across files using ripgrep, with line numbers.",
+    ),
     schema: z.object({
       query: z.string().min(1),
       path: z.string().optional().default("/home/bot"),
@@ -208,14 +254,19 @@ export function computerTools(args: ComputerToolsArgs): ToolSpec[] {
     execute: async (input: { query: string; path?: string; fileType?: string }) => {
       await client.ensure(agentId, orgId, profile)
       const base = input.path || "/home/bot"
-      const typeFilter = input.fileType ? `-t ${input.fileType}` : ""
+      const typeFilter = input.fileType ? `-t ${shellQuote(input.fileType)}` : ""
       const res = await client.exec(agentId, {
-        cmd: `rg -n --no-heading --color never -m 100 ${typeFilter} -- "${input.query}" ${base}`,
+        cmd: `rg -n --no-heading --color never --max-columns 400 -m 50 ${typeFilter} -- ${shellQuote(input.query)} ${shellQuote(base)} | head -n 400`,
       })
+      if (!res.stdout && res.stderr.trim()) {
+        throw new Error(`rg failed: ${res.stderr.slice(0, 2000)}`)
+      }
+      const lines = res.stdout ? res.stdout.split("\n").filter(Boolean).length : 0
       return {
         query: input.query,
         path: base,
         output: res.stdout || "(no matches found)",
+        ...(lines >= 400 ? { note: "Output capped at 400 lines. Narrow the path or pattern." } : {}),
       }
     },
   }

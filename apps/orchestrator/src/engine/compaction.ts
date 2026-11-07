@@ -22,6 +22,17 @@ export interface CompactTranscriptResult {
   extractedFacts: string[]
 }
 
+export const ELIDED_PREFIX = "[result elided:"
+
+function isElided(output: unknown): boolean {
+  return (
+    typeof output === "object" &&
+    output !== null &&
+    (output as { type?: unknown }).type === "text" &&
+    String((output as { value?: unknown }).value ?? "").startsWith(ELIDED_PREFIX)
+  )
+}
+
 /**
  * Strategy 1: Clear old tool results.
  * Keeps the most recent K=6 tool results verbatim and elides older ones.
@@ -54,10 +65,14 @@ export function elideOldToolResults(
     const updatedContent = msg.content.map((part) => {
       if (part.type === "tool-result" && resultsToElide > 0) {
         resultsToElide--
+        if (isElided(part.output)) return part
         elidedCount++
         return {
           ...part,
-          output: `[result elided: completed; full record in tool_calls/${part.toolCallId}]`,
+          output: {
+            type: "text" as const,
+            value: `${ELIDED_PREFIX} completed; full record in tool_calls/${part.toolCallId}]`,
+          },
         }
       }
       return part

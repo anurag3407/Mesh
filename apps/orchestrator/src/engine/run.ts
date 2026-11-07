@@ -14,12 +14,7 @@ import {
   usageEvents,
 } from "@sayabot/db"
 import { buildProviderOptions } from "@sayabot/llm"
-import {
-  stepCountIs,
-  streamText,
-  type LanguageModelUsage,
-  type ToolSet,
-} from "ai"
+import { stepCountIs, streamText, type ModelMessage, type ToolSet } from "ai"
 import { and, eq, sql } from "drizzle-orm"
 import { consumeRunInterrupts, registerRun, unregisterRun } from "../active-runs"
 import { ComputerClient } from "../computer/client"
@@ -40,9 +35,21 @@ import {
   type TurnResult,
 } from "../runner/llm"
 import { buildTools } from "../tools"
-import { buildEngineContext } from "./context"
+import { redactValue, type ToolSpec } from "../tools/audited"
+import { applyRollingCacheBreakpoint, buildEngineContext } from "./context"
+import {
+  decidePrepareStep,
+  needsStepSeparator,
+  steeringMessage,
+  systemReminder,
+  type StepLike,
+} from "./loop-control"
+import { classifyEngineError } from "./recovery"
 import { getAvailableSkills } from "./skills"
-import { getVerifyMode, runCriticVerification } from "./verify"
+import { buildSelfVerificationPrompt, getVerifyMode, runCriticVerification } from "./verify"
+
+/** Model-call passes per turn: the main loop plus late steering / critic revisions. */
+const MAX_PASSES = 3
 
 function numericParam(
   params: Record<string, unknown> | null | undefined,
@@ -72,7 +79,7 @@ export async function runEngineTurn(args: RunLlmTurnArgs): Promise<TurnResult> {
     threadRootId: args.threadRootId,
   })
 
-  const [_canvasContext, _taskContext, taskBrief] = await Promise.all([
+  const [canvasContext, taskContext, taskBrief] = await Promise.all([
     loadCanvasContext(room.id),
     loadTaskContext(room.id),
     args.taskId ? loadTaskBriefContext(args.taskId) : Promise.resolve(""),
@@ -144,6 +151,8 @@ export async function runEngineTurn(args: RunLlmTurnArgs): Promise<TurnResult> {
   const runScrubber = createRunScrubber(scrubPlaintexts)
 
   let tools: ToolSet = {}
+  let toolSpecs: ToolSpec[] = []
+  let activeToolNames: () => string[] | undefined = () => undefined
   let closeTools = async () => {}
   const warnings: string[] = []
 
@@ -161,7 +170,13 @@ export async function runEngineTurn(args: RunLlmTurnArgs): Promise<TurnResult> {
     if (text) send({ type: "message.delta", messageId: message.id, seq: seq++, delta: text })
   }
 
-  let usage: LanguageModelUsage | null = null
+  const usageTotals = {
+    seen: false,
+    inputTokens: 0,
+    outputTokens: 0,
+    cacheReadTokens: 0,
+    cacheWriteTokens: 0,
+  }
   let ttftMs: number | null = null
   let latencyMs = 0
   let error: string | null = null
@@ -191,7 +206,7 @@ export async function runEngineTurn(args: RunLlmTurnArgs): Promise<TurnResult> {
       .where(eq(messages.id, message.id))
 
     let cost = 0
-    if (usage) {
+    if (usageTotals.seen) {
       const [price] = await db
         .select()
         .from(modelPricing)
@@ -204,7 +219,7 @@ export async function runEngineTurn(args: RunLlmTurnArgs): Promise<TurnResult> {
         .limit(1)
 
       cost = computeCostUsd(
-        { inputTokens: usage.inputTokens, outputTokens: usage.outputTokens },
+        { inputTokens: usageTotals.inputTokens, outputTokens: usageTotals.outputTokens },
         price,
       )
 
@@ -214,9 +229,9 @@ export async function runEngineTurn(args: RunLlmTurnArgs): Promise<TurnResult> {
         agentId: agent.id,
         provider: resolved.provider,
         model: resolved.modelName,
-        inputTokens: usage.inputTokens ?? 0,
-        outputTokens: usage.outputTokens ?? 0,
-        cachedInputTokens: (usage as Record<string, unknown>).cachedInputTokens as number | undefined ?? 0,
+        inputTokens: usageTotals.inputTokens,
+        outputTokens: usageTotals.outputTokens,
+        cachedInputTokens: usageTotals.cacheReadTokens,
         costUsd: cost,
         ttftMs,
         latencyMs,
@@ -231,8 +246,8 @@ export async function runEngineTurn(args: RunLlmTurnArgs): Promise<TurnResult> {
         steps: stepsCompleted,
         engine: "v2",
         heartbeatAt: new Date(),
-        inputTokens: usage?.inputTokens ?? null,
-        outputTokens: usage?.outputTokens ?? null,
+        inputTokens: usageTotals.seen ? usageTotals.inputTokens : null,
+        outputTokens: usageTotals.seen ? usageTotals.outputTokens : null,
         costUsd: cost,
         ttftMs,
         latencyMs,
@@ -286,6 +301,8 @@ export async function runEngineTurn(args: RunLlmTurnArgs): Promise<TurnResult> {
         },
       })
       tools = built.tools
+      toolSpecs = built.specs
+      activeToolNames = built.activeToolNames
       closeTools = built.close
       warnings.push(...built.warnings)
     } catch (toolError) {
@@ -351,6 +368,10 @@ export async function runEngineTurn(args: RunLlmTurnArgs): Promise<TurnResult> {
       skillsIndex = await getAvailableSkills(room.orgId)
     } catch {}
 
+    const params = (agent.params ?? {}) as Record<string, unknown>
+    const verifyMode = getVerifyMode(params)
+    const contextBudgetTokens = numericParam(params, "contextBudgetTokens", 120_000) ?? 120_000
+
     // Build structured context
     const initialContext = buildEngineContext({
       agent,
@@ -364,11 +385,17 @@ export async function runEngineTurn(args: RunLlmTurnArgs): Promise<TurnResult> {
         now: new Date(),
         recalledMemories,
         activeTaskBrief: taskBrief || undefined,
+        contextBlocks: [
+          canvasContext ? `Room Canvases:\n${canvasContext}` : "",
+          !taskBrief && taskContext ? `Open Tasks in Room:\n${taskContext}` : "",
+        ],
         currentTrigger: args.trigger.content,
+        closingInstructions:
+          verifyMode === "self" && taskBrief ? buildSelfVerificationPrompt() : undefined,
       },
     })
 
-    const configuredEffort = (agent.params as Record<string, unknown>)?.effort as string | undefined
+    const configuredEffort = params.effort as string | undefined
     const effort = resolveEffortLevel({
       configuredEffort,
       hasTask: Boolean(args.taskId),
@@ -380,152 +407,289 @@ export async function runEngineTurn(args: RunLlmTurnArgs): Promise<TurnResult> {
 
     send({ type: "run.status", runId: run.id, status: "thinking" })
 
-    let stepIdx = 0
+    // Messages produced during this run (model responses, steering, reviewer
+    // feedback). Persisted to run_transcripts so a run can be inspected/resumed.
+    const runMessages: ModelMessage[] = []
+    const sentReminders = new Set<string>()
+    const planToolAvailable = "update_plan" in tools
     let stepStartTime = Date.now()
+    let criticCycle = 0
+    let lastBroadcast = 0
+    let lastPersist = 0
 
-    const streamResult = streamText({
-      model: resolved.model,
-      messages: initialContext.messages,
-      tools,
-      abortSignal: controller.signal,
-      stopWhen: stepCountIs(maxSteps),
-      ...(Object.keys(providerOptions).length > 0 ? { providerOptions: providerOptions as any } : {}),
-      ...(numericParam(agent.params as Record<string, unknown>, "temperature") !== undefined
-        ? { temperature: numericParam(agent.params as Record<string, unknown>, "temperature") }
-        : {}),
-      ...(numericParam(agent.params as Record<string, unknown>, "topP") !== undefined
-        ? { topP: numericParam(agent.params as Record<string, unknown>, "topP") }
-        : {}),
-      ...(numericParam(agent.params as Record<string, unknown>, "maxOutputTokens") !== undefined
-        ? { maxOutputTokens: numericParam(agent.params as Record<string, unknown>, "maxOutputTokens") }
-        : {}),
-      onStepEnd: async (step) => {
-        stepIdx += 1
-        stepsCompleted = stepIdx
-        const isToolStep = step.toolCalls && step.toolCalls.length > 0
-        const kind = isToolStep ? "tool" : "model"
-
-        // Persist to run_steps
-        try {
-          await db.insert(runSteps).values({
-            runId: run.id,
-            idx: stepIdx,
-            kind,
-            inputRef: null,
-            output: {
-              text: step.text,
-              toolCalls: step.toolCalls,
-              toolResults: step.toolResults,
-              finishReason: step.finishReason,
-            },
-            usage: step.usage,
-            startedAt: new Date(stepStartTime),
-            finishedAt: new Date(),
-          })
-
-          // Append to run_transcripts
-          await db
-            .update(runTranscripts)
-            .set({
-              updatedAt: new Date(),
-              version: sql`version + 1`,
-            })
-            .where(eq(runTranscripts.runId, run.id))
-
-          await db
-            .update(agentRuns)
-            .set({
-              steps: stepIdx,
-              heartbeatAt: new Date(),
-            })
-            .where(eq(agentRuns.id, run.id))
-        } catch {}
-
-        send({
-          type: "run.step",
-          runId: run.id,
-          step: stepIdx,
-          kind,
-          label: isToolStep
-            ? `Running ${step.toolCalls.map((t) => t.toolName).join(", ")}`
-            : "Generating response",
+    const persistTranscript = async (messagesToStore: ModelMessage[]) => {
+      await db
+        .update(runTranscripts)
+        .set({
+          messages: redactValue(messagesToStore, runScrubber) as unknown[],
+          updatedAt: new Date(),
+          version: sql`version + 1`,
         })
+        .where(eq(runTranscripts.runId, run.id))
+    }
 
-        if (isToolStep) {
-          send({ type: "run.status", runId: run.id, status: "tool" })
-        } else {
-          send({ type: "run.status", runId: run.id, status: "thinking" })
-        }
+    for (let pass = 0; pass < MAX_PASSES; pass++) {
+      const passBudget = maxSteps - stepsCompleted
+      if (passBudget <= 0 || controller.signal.aborted) break
+      const passStartSteps = stepsCompleted
+      const passStartRunMessages = runMessages.length
+      const errorBox: { error: unknown } = { error: null }
+      const passInput: ModelMessage[] = [...initialContext.messages, ...runMessages]
+      // The last prompt prepareStep produced (includes steering, reminders and
+      // compaction, plus every earlier step's output).
+      let lastPrepared: ModelMessage[] = passInput
+      // Per-step outputs of this pass, for incremental transcript persistence.
+      const passStepMessages: ModelMessage[] = []
 
-        // Mid-run steering: check if human messages arrived targeting this agent
-        const pending = consumeRunInterrupts(run.id)
-        if (pending.length > 0) {
-          for (const item of pending) {
+      if (pass > 0 && fullRaw && !/\s$/.test(fullRaw)) {
+        buffer += "\n\n"
+        fullRaw += "\n\n"
+      }
+      let passText = ""
+
+      const activeTools = activeToolNames()
+      const streamResult = streamText({
+        model: resolved.model,
+        messages: passInput,
+        tools,
+        ...(activeTools ? { activeTools } : {}),
+        abortSignal: controller.signal,
+        maxRetries: 4,
+        stopWhen: stepCountIs(passBudget),
+        ...(Object.keys(providerOptions).length > 0 ? { providerOptions: providerOptions as any } : {}),
+        ...(numericParam(params, "temperature") !== undefined
+          ? { temperature: numericParam(params, "temperature") }
+          : {}),
+        ...(numericParam(params, "topP") !== undefined ? { topP: numericParam(params, "topP") } : {}),
+        ...(numericParam(params, "maxOutputTokens") !== undefined
+          ? { maxOutputTokens: numericParam(params, "maxOutputTokens") }
+          : {}),
+        onError: ({ error: streamErr }) => {
+          errorBox.error = streamErr
+        },
+        prepareStep: ({ messages: stepMessages, steps, stepNumber }) => {
+          const decision = decidePrepareStep({
+            messages: stepMessages,
+            steps: steps as unknown as StepLike[],
+            stepNumber: passStartSteps + stepNumber,
+            maxSteps,
+            interrupts: consumeRunInterrupts(run.id),
+            contextBudgetTokens,
+            planToolAvailable,
+            sentReminders,
+          })
+          if (decision.steered) {
             send({
               type: "run.step",
               runId: run.id,
-              step: stepIdx,
+              step: stepsCompleted,
               kind: "model",
-              label: `Steered: "${item.content.slice(0, 45)}"`,
+              label: "Steered by a new message from the room",
             })
           }
+          if (decision.elidedCount > 0) {
+            send({
+              type: "run.step",
+              runId: run.id,
+              step: stepsCompleted,
+              kind: "model",
+              label: `Compacted context (${decision.elidedCount} old tool results elided)`,
+            })
+          }
+          const nextActive = activeToolNames()
+          const prepared = applyRollingCacheBreakpoint(decision.messages ?? stepMessages, resolved.provider)
+          lastPrepared = prepared
+          return {
+            messages: prepared,
+            ...(nextActive ? { activeTools: nextActive } : {}),
+          }
+        },
+        onStepEnd: async (step) => {
+          stepsCompleted += 1
+          const stepIdx = stepsCompleted
+          const isToolStep = step.toolCalls && step.toolCalls.length > 0
+          const kind = isToolStep ? "tool" : "model"
+
+          try {
+            await db.insert(runSteps).values({
+              runId: run.id,
+              idx: stepIdx,
+              kind,
+              inputRef: null,
+              output: redactValue(
+                {
+                  text: step.text,
+                  toolCalls: step.toolCalls,
+                  toolResults: step.toolResults,
+                  finishReason: step.finishReason,
+                },
+                runScrubber,
+              ) as Record<string, unknown>,
+              usage: step.usage,
+              startedAt: new Date(stepStartTime),
+              finishedAt: new Date(),
+            })
+
+            passStepMessages.push(...(step.response.messages as ModelMessage[]))
+            await persistTranscript([
+              ...runMessages.slice(0, passStartRunMessages),
+              ...passStepMessages,
+            ])
+
+            await db
+              .update(agentRuns)
+              .set({ steps: stepIdx, heartbeatAt: new Date() })
+              .where(eq(agentRuns.id, run.id))
+          } catch {}
+
+          send({
+            type: "run.step",
+            runId: run.id,
+            step: stepIdx,
+            kind,
+            label: isToolStep
+              ? `Running ${step.toolCalls.map((t) => t.toolName).join(", ")}`
+              : "Generating response",
+          })
+          send({ type: "run.status", runId: run.id, status: isToolStep ? "tool" : "thinking" })
+
+          stepStartTime = Date.now()
+        },
+      })
+
+      let newStep = false
+      for await (const part of streamResult.fullStream) {
+        if (part.type === "start-step") {
+          newStep = true
+          continue
         }
-
-        stepStartTime = Date.now()
-      },
-    })
-
-    for await (const delta of streamResult.textStream) {
-      if (ttftMs === null) ttftMs = Date.now() - startedAt
-      buffer += delta
-      fullRaw += delta
-      if (buffer.length > 80 || Date.now() - startedAt > 200) {
-        flush()
+        if (part.type !== "text-delta" || !part.text) continue
+        const delta = part.text
+        if (ttftMs === null) ttftMs = Date.now() - startedAt
+        if (newStep) {
+          newStep = false
+          // Separate prose from consecutive steps ("Let me check." + "Found it.").
+          if (needsStepSeparator(passText, delta)) {
+            buffer += "\n\n"
+            fullRaw += "\n\n"
+            passText += "\n\n"
+          }
+        }
+        buffer += delta
+        fullRaw += delta
+        passText += delta
+        const now = Date.now()
+        if (now - lastBroadcast >= 40) {
+          lastBroadcast = now
+          flush()
+        }
+        if (now - lastPersist >= 1_000) {
+          lastPersist = now
+          db.update(messages)
+            .set({ content: redactSecrets(runScrubber(fullRaw)).text })
+            .where(eq(messages.id, message.id))
+            .catch(() => {})
+        }
       }
+      flush()
+
+      if (errorBox.error) throw errorBox.error
+
+      const [passUsage, passReason, response] = await Promise.all([
+        streamResult.totalUsage,
+        streamResult.finishReason,
+        streamResult.response,
+      ])
+      usageTotals.inputTokens += passUsage.inputTokens ?? 0
+      usageTotals.outputTokens += passUsage.outputTokens ?? 0
+      usageTotals.cacheReadTokens += passUsage.inputTokenDetails?.cacheReadTokens ?? 0
+      usageTotals.cacheWriteTokens += passUsage.inputTokenDetails?.cacheWriteTokens ?? 0
+      usageTotals.seen = true
+      finishReason = passReason
+      // In AI SDK 7, response.messages holds only the final step's output.
+      const finalStepOutput = response.messages as ModelMessage[]
+      runMessages.splice(
+        0,
+        runMessages.length,
+        ...lastPrepared.slice(initialContext.messages.length),
+        ...finalStepOutput,
+      )
+
+      if (controller.signal.aborted) break
+
+      // A human message that arrived during the final step would otherwise be
+      // dropped: continue the run so the agent addresses it.
+      const late = consumeRunInterrupts(run.id)
+      if (late.length > 0) {
+        runMessages.push(steeringMessage(late))
+        send({
+          type: "run.step",
+          runId: run.id,
+          step: stepsCompleted,
+          kind: "model",
+          label: "Steered by a new message from the room",
+        })
+        continue
+      }
+
+      // Critic verification: on failure, feed the reviewer's findings back and
+      // let the agent revise (bounded by runCriticVerification's cycle cap).
+      if (verifyMode === "critic" && taskBrief && passText.trim()) {
+        send({ type: "run.status", runId: run.id, status: "thinking" })
+        send({
+          type: "run.step",
+          runId: run.id,
+          step: stepsCompleted + 1,
+          kind: "tool",
+          label: "Running critic verification against task requirements",
+        })
+        const review = await runCriticVerification({
+          agent,
+          orgId: room.orgId,
+          roomId: room.id,
+          taskBrief,
+          proposedOutput: fullRaw,
+          availableToolSpecs: toolSpecs,
+          cycle: criticCycle++,
+        })
+        if (!review.pass && (review.feedback || review.reasons.length > 0)) {
+          const findings = review.feedback || review.reasons.map((r) => `- ${r}`).join("\n")
+          warnings.push(`Critic feedback: ${findings}`)
+          runMessages.push(
+            systemReminder(
+              `An independent reviewer checked your work against the task requirements and found problems:\n\n${findings}\n\n` +
+                "Fix these now with your tools, then write a short final reply stating what you changed.",
+            ),
+          )
+          send({
+            type: "run.step",
+            runId: run.id,
+            step: stepsCompleted,
+            kind: "model",
+            label: "Revising after critic feedback",
+          })
+          continue
+        }
+      }
+      break
     }
 
-    const [finalUsage, finalReason] = await Promise.all([
-      streamResult.usage,
-      streamResult.finishReason,
-    ])
-    usage = finalUsage
-    finishReason = finalReason
+    if (!fullRaw.trim() && !controller.signal.aborted && stepsCompleted >= maxSteps) {
+      warnings.push(`Stopped after reaching the step limit (${maxSteps}) without a final reply.`)
+    }
+    try {
+      await persistTranscript(runMessages)
+    } catch {}
     latencyMs = Date.now() - startedAt
-
-    // Verification step (WS1 E10): critic verification if configured and not aborted
-    const verifyMode = getVerifyMode(agent.params as Record<string, unknown> | null)
-    if (
-      verifyMode === "critic" &&
-      taskBrief &&
-      fullRaw &&
-      !controller.signal.aborted
-    ) {
-      send({ type: "run.status", runId: run.id, status: "thinking" })
-      send({
-        type: "run.step",
-        runId: run.id,
-        step: stepIdx + 1,
-        kind: "tool",
-        label: "Running critic verification against task requirements",
-      })
-      const review = await runCriticVerification({
-        agent,
-        orgId: room.orgId,
-        roomId: room.id,
-        taskBrief,
-        proposedOutput: fullRaw,
-        cycle: 0,
-      })
-      if (!review.pass && review.feedback) {
-        warnings.push(`Critic feedback: ${review.feedback}`)
-      }
-    }
   } catch (err) {
     if (controller.signal.aborted || (err instanceof Error && err.name === "AbortError")) {
       aborted = true
     } else {
-      error = err instanceof Error ? err.message : String(err)
+      const raw = err instanceof Error ? err.message : String(err)
+      const classified = classifyEngineError(err)
+      error = classified.category === "unknown" ? raw : `${classified.message} (${raw})`
     }
+    latencyMs = Date.now() - startedAt
   } finally {
     try {
       await closeTools()

@@ -4,6 +4,7 @@ import { tool, type ToolSet } from "ai"
 import { eq } from "drizzle-orm"
 import { z } from "zod"
 import { getDb } from "../db"
+import { capToolOutputForModel } from "../engine/loop-control"
 import { notifyHumansNeeded } from "../push"
 import { broadcast } from "../realtime"
 import { resolveApprovalWaiter, waitForApproval } from "./approvals"
@@ -182,7 +183,7 @@ export function toAuditedTools(specs: ToolSpec[], runtime: ToolRuntime): ToolSet
             status: "done",
             durationMs: Date.now() - startedAt,
           })
-          return result
+          return capToolOutputForModel(result)
         } catch (error) {
           const message = error instanceof Error ? error.message : String(error)
           const scrubbedError = runtime.scrub ? runtime.scrub(message) : message

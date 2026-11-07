@@ -30,6 +30,10 @@ export interface BuildToolsArgs {
 
 export interface BuiltTools {
   tools: ToolSet
+  /** Every spec behind `tools`, for building scoped tool sets (subagents, critic). */
+  specs: ToolSpec[]
+  /** Tool names to expose on the next step; undefined means all of them. */
+  activeToolNames: () => string[] | undefined
   warnings: string[]
   close: () => Promise<void>
 }
@@ -79,6 +83,8 @@ async function loadMcpConfigs(args: BuildToolsArgs) {
 export async function buildTools(args: BuildToolsArgs): Promise<BuiltTools> {
   const warnings: string[] = []
   const caps = parseCapabilities(args.agent.capabilities)
+  // Filled in once every spec is known; subagents read it at call time.
+  let allSpecs: ToolSpec[] = []
 
   const specs: ToolSpec[] = [
     ...(caps.canvas
@@ -131,6 +137,7 @@ export async function buildTools(args: BuildToolsArgs): Promise<BuiltTools> {
             roomId: args.roomId,
             orgId: args.orgId,
             agent: args.agent,
+            getAvailableToolSpecs: () => allSpecs,
             scrub: args.runtime.scrub,
           }),
         ]
@@ -169,13 +176,16 @@ export async function buildTools(args: BuildToolsArgs): Promise<BuiltTools> {
     }
   }
 
-  const allSpecs = [...specs, ...extraSpecs]
+  allSpecs = [...specs, ...extraSpecs]
   const isV2 = (args.agent.params as Record<string, unknown> | null)?.engine === "v2"
-  const finalSpecs = isV2 ? partitionToolsForSearch(allSpecs).exposed : allSpecs
-  const tools = toAuditedTools(finalSpecs, args.runtime)
+  const partition = isV2 ? partitionToolsForSearch(allSpecs) : undefined
+  const registered = partition ? partition.all : allSpecs
+  const tools = toAuditedTools(registered, args.runtime)
 
   return {
     tools,
+    specs: registered,
+    activeToolNames: partition ? partition.activeToolNames : () => undefined,
     warnings,
     close: closeMcp,
   }

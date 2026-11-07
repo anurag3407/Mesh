@@ -44,12 +44,16 @@ export const READ_ONLY_TOOL_NAMES = new Set([
   "recall",
 ])
 
+const SUBAGENT_EXCLUDED_TOOLS = new Set(["spawn_subagent", "update_plan", "propose_skill", "find_tools"])
+
 export interface SpawnSubagentToolArgs {
   parentRunId: string
   roomId: string
   orgId: string
   agent: AgentRow
   availableToolSpecs?: ToolSpec[]
+  /** Resolved at call time, so it can see tools registered after this one. */
+  getAvailableToolSpecs?: () => ToolSpec[]
   scrub?: (s: string) => string
 }
 
@@ -130,8 +134,10 @@ export function spawnSubagentTool(args: SpawnSubagentToolArgs): ToolSpec {
           : await resolveAgentCheapModel(args.agent)
 
       // 5. Filter available tools
-      const allowedSpecs = (args.availableToolSpecs ?? []).filter((spec) => {
-        if (spec.name === "spawn_subagent") return false // Prevent recursive spawn
+      const available = args.getAvailableToolSpecs?.() ?? args.availableToolSpecs ?? []
+      const allowedSpecs = available.filter((spec) => {
+        // No recursive spawns, no planning/skill-authoring side effects, no tool search.
+        if (SUBAGENT_EXCLUDED_TOOLS.has(spec.name)) return false
         if (input.tools === "read_only") {
           return READ_ONLY_TOOL_NAMES.has(spec.name)
         }
@@ -154,10 +160,15 @@ export function spawnSubagentTool(args: SpawnSubagentToolArgs): ToolSpec {
         const result = await generateText({
           model: resolved.model,
           system: [
-            `You are a focused subagent assisting agent @${args.agent.handle}.`,
-            `Role: Complete this specific delegated subtask and return a clear, concise summary of findings/results.`,
-            `Task: ${input.task}`,
-          ].join("\n"),
+            `You are a focused subagent working for agent @${args.agent.handle}. Nobody else reads your output: @${args.agent.handle} will use your final message as the result of this subtask.`,
+            "Work autonomously with your tools. Do not ask questions; make reasonable assumptions and state them.",
+            "Your final message must be the complete answer: concrete findings with file paths, line numbers, commands or URLs as evidence. Say plainly what you could not verify.",
+            input.tools === "read_only"
+              ? "You have read-only tools. Do not attempt to modify anything."
+              : "",
+          ]
+            .filter(Boolean)
+            .join("\n"),
           prompt: input.task,
           tools: childTools,
           stopWhen: stepCountIs(maxSteps),
@@ -194,8 +205,8 @@ export function spawnSubagentTool(args: SpawnSubagentToolArgs): ToolSpec {
             status: "complete",
             finishReason: result.finishReason,
             steps: idx,
-            inputTokens: result.usage?.inputTokens ?? null,
-            outputTokens: result.usage?.outputTokens ?? null,
+            inputTokens: result.totalUsage?.inputTokens ?? null,
+            outputTokens: result.totalUsage?.outputTokens ?? null,
             heartbeatAt: new Date(),
           })
           .where(eq(agentRuns.id, childRun.id))
