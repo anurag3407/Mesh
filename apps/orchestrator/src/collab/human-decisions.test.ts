@@ -68,7 +68,7 @@ function createMockDb() {
         },
       }),
     }),
-    insert: (table: any) => ({
+    insert: (_table: any) => ({
       values: (vals: any) => ({
         returning: async () => {
           const row = { id: `req-${tasksTable.length + 1}`, number: tasksTable.length + 1, ...vals }

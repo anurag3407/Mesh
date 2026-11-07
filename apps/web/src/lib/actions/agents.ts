@@ -1,9 +1,10 @@
 "use server"
 
 import { z } from "zod"
-import { redactSecrets } from "@mesh/core"
+import { DEFAULT_CAPABILITIES, parseCapabilities, redactSecrets } from "@mesh/core"
 import { generateWebhookSecret } from "@mesh/core/server"
 import { sealSecret } from "@mesh/llm"
+import { randomBytes } from "node:crypto"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { getKek } from "@/lib/env"
 import { testAgentInOrchestrator } from "@/lib/orchestrator"
@@ -257,4 +258,148 @@ export async function testAgent(orgSlug: string, agentId: string): Promise<Actio
   return ok(`@${agent.handle} replied in ${result.latencyMs} ms via ${result.model}`, {
     reply: redactSecrets(result.text).text,
   })
+}
+
+export async function createBotFromTemplate(
+  _prev: ActionResult | null,
+  formData: FormData,
+): Promise<ActionResult> {
+  const orgSlug = field(formData, "orgSlug")
+  const check = await adminOrgAccess(orgSlug)
+  if ("error" in check) return fail(check.error)
+
+  const templateId = field(formData, "templateId")
+  const handle = field(formData, "handle").toLowerCase().trim()
+  const displayName = field(formData, "displayName").trim()
+  const providerKeyId = optionalField(formData, "providerKeyId")
+  const model = optionalField(formData, "model")
+  const roomId = optionalField(formData, "roomId")
+  const rawRoomIds = formData.getAll("roomIds").filter((r): r is string => typeof r === "string" && r.length > 0)
+  const roomIds = roomId ? Array.from(new Set([roomId, ...rawRoomIds])) : rawRoomIds
+
+  if (!handleSchema.safeParse(handle).success) {
+    return fail("Handle must be lowercase letters, numbers and hyphens, starting with a letter")
+  }
+  if (RESERVED_HANDLES.has(handle)) return fail("That handle is reserved")
+  if (!displayName || displayName.length > 60) return fail("Display name must be 1 to 60 characters")
+
+  const admin = createAdminClient()
+
+  // 1. Fetch template
+  let template: any = null
+  if (templateId) {
+    const { data } = await admin
+      .from("agent_templates")
+      .select("*")
+      .or(`id.eq.${templateId},slug.eq.${templateId}`)
+      .maybeSingle()
+    template = data
+  }
+
+  // 2. Parse capabilities
+  const rawCaps = field(formData, "capabilities")
+  let capabilities = template?.default_capabilities ? { ...template.default_capabilities } : { ...DEFAULT_CAPABILITIES }
+  if (rawCaps) {
+    try {
+      capabilities = { ...capabilities, ...JSON.parse(rawCaps) }
+    } catch {}
+  }
+  capabilities = parseCapabilities(capabilities)
+
+  const systemPrompt = field(formData, "systemPrompt") || template?.system_prompt || ""
+  const selectedModel = model || template?.default_model || "anthropic/claude-3-7-sonnet"
+
+  // 3. Insert agent
+  const { data: agent, error: agentError } = await admin
+    .from("agents")
+    .insert({
+      org_id: check.access.org.id,
+      handle,
+      display_name: displayName,
+      kind: "llm",
+      system_prompt: systemPrompt,
+      model: selectedModel,
+      provider_key_id: providerKeyId || null,
+      capabilities,
+      template_id: template?.id || null,
+      owner_user_id: check.access.user.id,
+      visibility: "team",
+      room_ids: roomIds,
+    })
+    .select()
+    .single()
+
+  if (agentError || !agent) {
+    return fail(errorMessage(agentError) || "Failed to create agent")
+  }
+
+  // 4. Link rooms
+  for (const rid of roomIds) {
+    await admin.from("room_agents").insert({
+      room_id: rid,
+      agent_id: agent.id,
+    })
+  }
+
+  // 5. Initialize computer if computer capability is enabled
+  if (capabilities.computer) {
+    await admin.from("agent_computers").insert({
+      agent_id: agent.id,
+      org_id: check.access.org.id,
+      profile: capabilities.browser ? "browser" : "standard",
+      status: "none",
+      volume: `saaya-bot-${agent.id}`,
+    })
+  }
+
+  // 6. Bind secret slots if provided
+  const rawSecretBindings = field(formData, "secretBindings")
+  if (rawSecretBindings && template?.secret_slots) {
+    try {
+      const bindings = JSON.parse(rawSecretBindings) as Record<string, string>
+      for (const slot of template.secret_slots) {
+        const secretId = bindings[slot.name]
+        if (secretId) {
+          const placeholder = `saaya_ph_${randomBytes(16).toString("hex")}`
+          await admin.from("agent_secret_grants").insert({
+            org_id: check.access.org.id,
+            agent_id: agent.id,
+            secret_id: secretId,
+            env_name: slot.name,
+            placeholder,
+            allowed_hosts: slot.allowedHosts ?? [],
+            inject: slot.inject ?? { mode: "header" },
+            requires_approval: false,
+          })
+        }
+      }
+    } catch (e) {
+      console.warn("[createBotFromTemplate] failed to bind secrets", e)
+    }
+  }
+
+  // 7. Starter task if provided
+  const starterTitle = field(formData, "starterTaskTitle").trim()
+  const starterDesc = field(formData, "starterTaskDescription").trim()
+  if (starterTitle && roomIds[0]) {
+    await admin.from("tasks").insert({
+      room_id: roomIds[0],
+      title: starterTitle,
+      description: starterDesc || null,
+      status: "open",
+      assignee_agent_id: agent.id,
+      lead_agent_id: agent.id,
+    })
+  }
+
+  await audit({
+    orgId: check.access.org.id,
+    actorId: check.access.user.id,
+    action: "agent.created_from_template",
+    target: agent.handle,
+    metadata: { templateSlug: template?.slug, agentId: agent.id },
+  })
+
+  revalidateOrg(orgSlug)
+  return ok(`@${agent.handle} created successfully!`, { agent })
 }

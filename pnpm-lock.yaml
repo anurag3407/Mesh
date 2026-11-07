@@ -42,6 +42,62 @@ importers:
         specifier: ^8.72.1
         version: 8.72.1(eslint@9.39.5(jiti@2.7.0))(typescript@5.9.3)
 
+  apps/computerd:
+    dependencies:
+      '@hono/node-server':
+        specifier: ^2.1.5
+        version: 2.1.5(hono@4.13.14)
+      '@mesh/core':
+        specifier: workspace:*
+        version: link:../../packages/core
+      dotenv-cli:
+        specifier: ^11.1.0
+        version: 11.1.0
+      hono:
+        specifier: ^4.13.14
+        version: 4.13.14
+      tsx:
+        specifier: ^4.23.15
+        version: 4.23.15
+      zod:
+        specifier: ^4.6.7
+        version: 4.6.7
+    devDependencies:
+      '@types/node':
+        specifier: ^24.0.0
+        version: 24.19.2
+      vitest:
+        specifier: ^5.0.5
+        version: 5.0.5(@opentelemetry/api@1.10.0)(@types/node@24.19.2)(vite@8.3.5(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15))
+
+  apps/egress:
+    dependencies:
+      '@hono/node-server':
+        specifier: ^2.1.5
+        version: 2.1.5(hono@4.13.14)
+      '@mesh/core':
+        specifier: workspace:*
+        version: link:../../packages/core
+      dotenv-cli:
+        specifier: ^11.1.0
+        version: 11.1.0
+      hono:
+        specifier: ^4.13.14
+        version: 4.13.14
+      tsx:
+        specifier: ^4.23.15
+        version: 4.23.15
+      zod:
+        specifier: ^4.6.7
+        version: 4.6.7
+    devDependencies:
+      '@types/node':
+        specifier: ^24.0.0
+        version: 24.19.2
+      vitest:
+        specifier: ^5.0.5
+        version: 5.0.5(@opentelemetry/api@1.10.0)(@types/node@24.19.2)(vite@8.3.5(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15))
+
   apps/orchestrator:
     dependencies:
       '@ai-sdk/mcp':
@@ -266,6 +322,9 @@ importers:
 
   packages/db:
     dependencies:
+      '@mesh/core':
+        specifier: workspace:*
+        version: link:../core
       dotenv:
         specifier: ^17.2.0
         version: 17.4.2

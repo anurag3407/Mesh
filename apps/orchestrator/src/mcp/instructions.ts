@@ -42,7 +42,7 @@ export function formatInvitationMessage(ctx: {
   clientName?: string
   connectionUrl: string
 }): string {
-  const owner = ctx.roomOwnerName || "the room owner"
+  const _owner = ctx.roomOwnerName || "the room owner"
   const room = ctx.roomName || "my room"
   const tz = ctx.timezone || "Asia/Calcutta"
   const client = ctx.clientName || "your AI bot"

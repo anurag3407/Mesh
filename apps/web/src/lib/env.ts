@@ -34,6 +34,10 @@ export function getCollabUrl(): string {
   return (process.env.NEXT_PUBLIC_COLLAB_URL || "ws://localhost:4000/collab").replace(/\/+$/, "")
 }
 
+export function getAppUrl(): string {
+  return (process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000").replace(/\/+$/, "")
+}
+
 /** True when agents without their own key can use the server's shared model. */
 export function devModelConfigured(): boolean {
   return Boolean(process.env.DEV_OPENAI_COMPAT_BASE_URL && process.env.DEV_OPENAI_COMPAT_MODEL)

@@ -10,6 +10,7 @@ import { ThreadSheet } from "@/components/room/thread-sheet"
 import { useRoomRealtime } from "@/components/room/use-room-realtime"
 import { EnableAlerts, RoomActivity } from "@/components/room/room-activity"
 import { RoomMeetingBar } from "@/components/room/room-meeting-bar"
+import { InviteBotDialog } from "@/components/room/invite-bot-dialog"
 import { AvatarStack, PresenceLine } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { CanvasIcon, SlidersIcon } from "@/components/ui/icons"
@@ -218,6 +219,13 @@ export function RoomWorkspace({
               <CanvasIcon width={13} height={13} />
               Canvas
             </Button>
+          ) : null}
+          {data.canAdmin ? (
+            <InviteBotDialog
+              orgSlug={data.org.slug}
+              roomId={data.room.id}
+              roomName={data.room.name}
+            />
           ) : null}
           {data.canAdmin ? (
             <Link

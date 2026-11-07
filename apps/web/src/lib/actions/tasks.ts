@@ -9,7 +9,7 @@ import { mutateTaskInOrchestrator, queueRoomMessage } from "@/lib/orchestrator"
 import { audit, errorMessage, fail, field, ok } from "@/lib/actions/shared"
 import type { ActionResult } from "@/lib/types"
 
-const TASK_STATUSES = ["open", "in_progress", "stuck", "done"] as const
+type TaskStatus = "open" | "in_progress" | "stuck" | "done"
 const TASK_KINDS = ["task", "request"] as const
 
 async function agentForRoom(orgId: string, roomId: string, agentId: string) {
@@ -105,7 +105,7 @@ export async function createTaskAction(
 export async function updateTaskAction(input: {
   orgSlug: string
   taskId: string
-  status?: (typeof TASK_STATUSES)[number]
+  status?: TaskStatus
   assignee?: string
   dueAt?: string | null
   unblockNeeds?: string | null

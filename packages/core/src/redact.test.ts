@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { redactSecrets } from "./redact"
+import { createRunScrubber, redactSecrets } from "./redact"
 
 // Secret-shaped fixtures are assembled at runtime so the repository never
 // contains a string that a secret scanner could mistake for a live credential.
@@ -20,6 +20,10 @@ const secrets = [
   join("AIz", "aSyA1234567890abcdefghijklmnopqrstuv"),
   join("gs", "k_", "abcdefghijklmnopqrstuvwxyz0123456789ABCD"),
   join("mesh_", "ak_", "abcdefghijklmnopqrstuvwx"),
+  join("saaya_", "ak_", "abcdefghijklmnopqrstuvwx"),
+  join("mesh_", "at_", "abcdefghijklmnopqrstuvwx"),
+  join("mesh_", "rt_", "abcdefghijklmnopqrstuvwx"),
+  join("sinv_", "abcdefghijklmnopqrstuvwx"),
   join(
     "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9",
     ".",
@@ -43,8 +47,11 @@ describe("redactSecrets", () => {
     expect(text).toContain("[REDACTED:google_api_key]")
     expect(text).toContain("[REDACTED:groq_key]")
     expect(text).toContain("[REDACTED:mesh_agent_key]")
+    expect(text).toContain("[REDACTED:oauth_access_token]")
+    expect(text).toContain("[REDACTED:oauth_refresh_token]")
+    expect(text).toContain("[REDACTED:invite_code]")
     expect(text).toContain("[REDACTED:jwt]")
-    expect(redactions.length).toBeGreaterThanOrEqual(10)
+    expect(redactions.length).toBeGreaterThanOrEqual(13)
   })
 
   it("redacts PEM private keys across lines", () => {
@@ -59,8 +66,39 @@ describe("redactSecrets", () => {
     expect(text).toBe("key: [REDACTED:private_key]")
   })
 
-  it("leaves ordinary text untouched", () => {
-    const input = "The build passed on Node 24 with pnpm."
-    expect(redactSecrets(input)).toEqual({ text: input, redactions: [] })
+  it("leaves placeholders untouched unless explicitly asked to redact", () => {
+    const ph = "saaya_ph_0123456789abcdef0123456789abcdef"
+    const normal = redactSecrets(`value is ${ph}`)
+    expect(normal.text).toBe(`value is ${ph}`)
+
+    const redacted = redactSecrets(`value is ${ph}`, { redactPlaceholders: true })
+    expect(redacted.text).toBe("value is [REDACTED:placeholder]")
+  })
+
+  it("leaves innocent text unchanged", () => {
+    const input = "Normal chat message with @ada discussing task #42"
+    const { text, redactions } = redactSecrets(input)
+    expect(text).toBe(input)
+    expect(redactions).toHaveLength(0)
+  })
+})
+
+describe("createRunScrubber", () => {
+  it("scrubs exact plaintexts, base64 and URL-encoded variants", () => {
+    const secretValue = "super-secret-token-xyz-12345"
+    const scrubber = createRunScrubber([secretValue])
+
+    const text = `The raw is ${secretValue}, b64 is ${Buffer.from(secretValue).toString("base64")}, url is ${encodeURIComponent(secretValue)}`
+    const scrubbed = scrubber(text)
+
+    expect(scrubbed).not.toContain(secretValue)
+    expect(scrubbed).not.toContain(Buffer.from(secretValue).toString("base64"))
+    expect(scrubbed).not.toContain(encodeURIComponent(secretValue))
+    expect(scrubbed).toBe("The raw is [REDACTED:secret], b64 is [REDACTED:secret], url is [REDACTED:secret]")
+  })
+
+  it("safely ignores short or empty values", () => {
+    const scrubber = createRunScrubber(["", "hi", "test"])
+    expect(scrubber("normal hi text")).toBe("normal hi text")
   })
 })

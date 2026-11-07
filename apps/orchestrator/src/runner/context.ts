@@ -1,4 +1,4 @@
-import { debateRoleInstruction, type TurnRole } from "@mesh/core"
+import { debateRoleInstruction, parseCapabilities, type TurnRole } from "@mesh/core"
 import {
   agents,
   canvases,
@@ -6,6 +6,7 @@ import {
   profiles,
   roomAgents,
   rooms,
+  taskComments,
   tasks,
 } from "@mesh/db"
 import { and, asc, desc, eq, inArray, isNull, ne, or } from "drizzle-orm"
@@ -258,11 +259,74 @@ export async function loadCanvasContext(roomId: string): Promise<string> {
   return chunks.join("\n\n")
 }
 
+export async function loadTaskBriefContext(taskId: string): Promise<string> {
+  const db = getDb()
+  const [task] = await db.select().from(tasks).where(eq(tasks.id, taskId)).limit(1)
+  if (!task) return ""
+
+  const parts = [
+    `ACTIVE TASK BRIEF (Task #${task.number}: "${task.title}"):`,
+    `- Status: ${task.status}`,
+    `- Description: ${task.description || "(none)"}`,
+  ]
+
+  if (task.unblockNeeds) {
+    parts.push(`- Blocker requirement: ${task.unblockNeeds} (${task.unblockDetail || "no detail"})`)
+  }
+
+  // Load parent or sibling tasks if hierarchical
+  if (task.parentTaskId) {
+    const [parent] = await db.select().from(tasks).where(eq(tasks.id, task.parentTaskId)).limit(1)
+    if (parent) {
+      parts.push(`- Parent task: #${parent.number} "${parent.title}" (${parent.status})`)
+    }
+    const siblings = await db
+      .select({ number: tasks.number, title: tasks.title, status: tasks.status })
+      .from(tasks)
+      .where(and(eq(tasks.parentTaskId, task.parentTaskId), ne(tasks.id, task.id)))
+      .limit(8)
+    if (siblings.length) {
+      parts.push(
+        `- Sibling subtasks:\n${siblings.map((s) => `  * #${s.number} "${s.title}" (${s.status})`).join("\n")}`,
+      )
+    }
+  }
+
+  // Last 10 comments
+  const comments = await db
+    .select({
+      authorType: taskComments.authorType,
+      content: taskComments.content,
+      createdAt: taskComments.createdAt,
+    })
+    .from(taskComments)
+    .where(eq(taskComments.taskId, taskId))
+    .orderBy(desc(taskComments.createdAt))
+    .limit(10)
+
+  if (comments.length) {
+    parts.push(
+      `- Recent task activity:\n${comments
+        .reverse()
+        .map((c) => `  [${c.authorType}]: ${c.content}`)
+        .join("\n")}`,
+    )
+  }
+
+  parts.push(
+    `- Rules: Work to complete this task. When finished, call update_task with status="done" and a valid outcome_kind (artifact, submission, external_change, or decision).`,
+  )
+
+  return parts.join("\n")
+}
+
 export function buildSystemPrompt(args: {
   room: RoomRow
   agent: AgentRow
   role: TurnRole
 }): string {
+  const caps = parseCapabilities(args.agent.capabilities)
+
   const parts = [
     `You are @${args.agent.handle} (${args.agent.displayName}), an autonomous teammate in the Sayabot room "#${args.room.name}".`,
     "The conversation below is a shared transcript. Each message is labelled with its sender and whether they are human or an agent.",
@@ -270,6 +334,18 @@ export function buildSystemPrompt(args: {
     "Use the provided tools when they help. To hand the conversation to another agent, mention them with @handle in your reply; do not mention agents just to be polite.",
     "Keep replies focused. Markdown is rendered, including code fences, tables, math and Mermaid diagrams.",
   ]
+
+  if (caps.computer) {
+    parts.push(
+      `Your persistent computer environment:\n` +
+        `- Files stored in /home/bot persist between your turns.\n` +
+        `- Use computer_shell to run bash commands, inspect code, run tests, and manage files.\n` +
+        `- Granted secrets appear in your environment as placeholders (e.g. $GITHUB_TOKEN="saaya_ph_..."). You can use them directly in commands (curl, git, SDKs); the Secret Broker automatically swaps real credentials in flight for allowlisted hosts.\n` +
+        `- Egress network access is HTTPS only (no SSH, no raw TCP/UDP database connections).\n` +
+        `- When you finish a major deliverable (document, design, script), publish it to the room using computer_publish.`,
+    )
+  }
+
   if (args.room.systemDirective?.trim()) {
     parts.push(`Room directive from the humans:\n${args.room.systemDirective.trim()}`)
   }

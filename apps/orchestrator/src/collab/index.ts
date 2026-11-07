@@ -19,7 +19,14 @@ import { getDb } from "../db"
 import { notifyHumansNeeded } from "../push"
 import { broadcast } from "../realtime"
 import { loadConversation, loadRoomAgents, type ContextMessage } from "../runner/context"
-import { applyTaskMutation, CollabError } from "./tasks-service"
+import {
+  applyTaskCreate,
+  applyTaskMutation,
+  applyTaskPlan,
+  CollabError,
+  type TaskPlanSubtask,
+} from "./tasks-service"
+import { notify } from "../db"
 
 export { CollabError }
 
@@ -33,6 +40,8 @@ export interface CollabAgent {
   agentId: string
   orgId: string
   handle: string
+  roomIds?: string[] | null
+  scopes?: string[]
 }
 
 /** Bot-to-bot chains started by agent posts are capped per room per 10 minutes. */
@@ -50,16 +59,23 @@ export function setCollabEnqueue(fn: Enqueue): void {
 // ── rooms ────────────────────────────────────────────────────────────────
 
 export async function agentRooms(agent: CollabAgent) {
+  const conditions = [eq(roomAgents.agentId, agent.agentId), eq(rooms.orgId, agent.orgId)]
+  if (agent.roomIds && agent.roomIds.length > 0) {
+    conditions.push(inArray(rooms.id, agent.roomIds))
+  }
   return getDb()
     .select({ id: rooms.id, name: rooms.name, kind: rooms.kind, directive: rooms.systemDirective })
     .from(roomAgents)
     .innerJoin(rooms, eq(rooms.id, roomAgents.roomId))
-    .where(and(eq(roomAgents.agentId, agent.agentId), eq(rooms.orgId, agent.orgId)))
+    .where(and(...conditions))
     .orderBy(asc(rooms.name))
 }
 
 export async function assertAgentRoom(agent: CollabAgent, roomId: string): Promise<void> {
   if (!/^[0-9a-f-]{36}$/i.test(roomId)) throw new CollabError("room not found")
+  if (agent.roomIds && agent.roomIds.length > 0 && !agent.roomIds.includes(roomId)) {
+    throw new CollabError("access denied: API token is not scoped to this room")
+  }
   const [row] = await getDb()
     .select({ roomId: roomAgents.roomId })
     .from(roomAgents)
@@ -85,7 +101,12 @@ export async function resolveAgentRoomId(
     const match = roomsList.find(
       (r) => r.id === trimmed || r.name.toLowerCase() === trimmed.toLowerCase(),
     )
-    if (match) return match.id
+    if (match) {
+      if (agent.roomIds && agent.roomIds.length > 0 && !agent.roomIds.includes(match.id)) {
+        throw new CollabError("access denied: API token is not scoped to this room")
+      }
+      return match.id
+    }
     if (/^[0-9a-f-]{36}$/i.test(trimmed)) {
       await assertAgentRoom(agent, trimmed)
       return trimmed
@@ -386,6 +407,19 @@ export async function postAgentMessage(
   })
   await broadcast(roomId, { type: "message.done", messageId: row.id, status: "complete" })
   await markRead(agent.agentId, roomId, row.createdAt)
+
+  // Notify active long-poll waiters (mesh_agent_inbox)
+  for (const target of targets) {
+    void notify("mesh_agent_inbox", { agentId: target.id, roomId, kind: "mention" })
+  }
+  if (content.includes("@all_bots")) {
+    for (const r of roomAgentRows) {
+      if (r.agent.id !== agent.agentId) {
+        void notify("mesh_agent_inbox", { agentId: r.agent.id, roomId, kind: "mention" })
+      }
+    }
+  }
+
   if (trigger && enqueueRoomMessage) await enqueueRoomMessage(roomId, row.id)
 
   return {
@@ -465,21 +499,19 @@ export async function createTask(
   args: { roomId?: string; room?: string; title: string; description?: string; assignToMe?: boolean },
 ) {
   const roomId = await resolveAgentRoomId(agent, args.roomId || args.room)
-  const [row] = await getDb()
-    .insert(tasks)
-    .values({
-      orgId: agent.orgId,
-      roomId,
-      kind: "task",
-      title: args.title.slice(0, 120),
-      description: (args.description ?? "").slice(0, 4_000),
-      status: args.assignToMe === false ? "open" : "in_progress",
-      assigneeAgentId: args.assignToMe === false ? null : agent.agentId,
-      metadata: { source: "agent", createdByAgent: agent.agentId },
-    })
-    .returning({ id: tasks.id, number: tasks.number, title: tasks.title, status: tasks.status })
-  if (!row) throw new CollabError("could not create the task")
-  return { id: row.id, ref: `MESH-${row.number}`, title: row.title, status: row.status }
+  const isAssigned = args.assignToMe !== false
+  const res = await applyTaskCreate({
+    orgId: agent.orgId,
+    roomId,
+    title: args.title.slice(0, 120),
+    description: (args.description ?? "").slice(0, 4_000),
+    kind: "task",
+    status: isAssigned ? "in_progress" : "open",
+    assigneeAgentId: isAssigned ? agent.agentId : null,
+    metadata: { source: "agent", createdByAgent: agent.agentId },
+    actor: { type: "agent", id: agent.agentId },
+  })
+  return { id: res.task.id, ref: `MESH-${res.task.number}`, title: res.task.title, status: res.task.status }
 }
 
 /**
@@ -489,40 +521,125 @@ export async function createTask(
 export async function claimTask(agent: CollabAgent, args: { taskId: string }) {
   const task = await loadTaskInOrg(agent, args.taskId)
   if (task.kind !== "task") throw new CollabError("requests cannot be claimed")
-  const [row] = await getDb()
-    .update(tasks)
-    .set({ assigneeAgentId: agent.agentId, status: "in_progress", updatedAt: new Date() })
-    .where(
-      and(
-        eq(tasks.id, task.id),
-        ne(tasks.status, "done"),
-        isNull(tasks.assigneeUserId),
-        or(isNull(tasks.assigneeAgentId), eq(tasks.assigneeAgentId, agent.agentId)),
-      ),
-    )
-    .returning({ id: tasks.id, number: tasks.number, title: tasks.title })
-  if (!row) {
-    let holder = "a human"
-    if (task.assigneeAgentId) {
-      const [other] = await getDb()
-        .select({ handle: agents.handle })
-        .from(agents)
-        .where(eq(agents.id, task.assigneeAgentId))
-        .limit(1)
-      holder = other ? `@${other.handle}` : "another agent"
+  const db = getDb()
+  const now = new Date()
+
+  return await db.transaction(async (tx) => {
+    const [row] = await tx
+      .update(tasks)
+      .set({ assigneeAgentId: agent.agentId, status: "in_progress", updatedAt: now })
+      .where(
+        and(
+          eq(tasks.id, task.id),
+          ne(tasks.status, "done"),
+          isNull(tasks.assigneeUserId),
+          or(isNull(tasks.assigneeAgentId), eq(tasks.assigneeAgentId, agent.agentId)),
+        ),
+      )
+      .returning({ id: tasks.id, number: tasks.number, title: tasks.title })
+
+    if (!row) {
+      let holder = "a human"
+      if (task.assigneeAgentId) {
+        const [other] = await tx
+          .select({ handle: agents.handle })
+          .from(agents)
+          .where(eq(agents.id, task.assigneeAgentId))
+          .limit(1)
+        holder = other ? `@${other.handle}` : "another agent"
+      }
+      return {
+        claimed: false,
+        reason: task.status === "done" ? "task is already done" : `already claimed by ${holder}`,
+      }
     }
-    return {
-      claimed: false,
-      reason: task.status === "done" ? "task is already done" : `already claimed by ${holder}`,
-    }
-  }
-  await getDb().insert(taskComments).values({
-    taskId: task.id,
-    authorType: "agent",
-    authorId: agent.agentId,
-    content: `@${agent.handle} claimed this task.`,
+
+    await tx.insert(taskEvents).values({
+      taskId: task.id,
+      actorType: "agent",
+      actorId: agent.agentId,
+      fromStatus: task.status,
+      toStatus: "in_progress",
+      reason: "claimed",
+      metadata: { claimedBy: agent.agentId },
+      createdAt: now,
+    })
+
+    await tx.insert(taskComments).values({
+      taskId: task.id,
+      authorType: "agent",
+      authorId: agent.agentId,
+      content: `@${agent.handle} claimed this task.`,
+      createdAt: now,
+    })
+
+    return { claimed: true, id: row.id, ref: `MESH-${row.number}`, title: row.title }
   })
-  return { claimed: true, id: row.id, ref: `MESH-${row.number}`, title: row.title }
+}
+
+export async function planTask(
+  agent: CollabAgent,
+  args: {
+    taskId: string
+    subtasks: TaskPlanSubtask[]
+  },
+) {
+  const task = await loadTaskInOrg(agent, args.taskId)
+  return applyTaskPlan({
+    parentTaskId: task.id,
+    actor: { type: "agent", id: agent.agentId },
+    subtasks: args.subtasks,
+  })
+}
+
+export async function assignTask(
+  agent: CollabAgent,
+  args: {
+    taskId: string
+    assignee: string
+  },
+) {
+  const task = await loadTaskInOrg(agent, args.taskId)
+  const cleanAssignee = args.assignee.trim()
+  let assigneeAgentId: string | null = null
+  let assigneeUserId: string | null = null
+
+  if (cleanAssignee.startsWith("human:")) {
+    const humanName = cleanAssignee.slice(6).trim()
+    const [user] = await getDb()
+      .select({ id: profiles.id })
+      .from(profiles)
+      .where(eq(profiles.displayName, humanName))
+      .limit(1)
+    if (!user) throw new CollabError(`human user "${humanName}" not found`)
+    assigneeUserId = user.id
+  } else {
+    const handle = cleanAssignee.replace(/^@/, "").trim()
+    const [targetAgent] = await getDb()
+      .select({ id: agents.id, handle: agents.handle })
+      .from(agents)
+      .where(and(eq(agents.orgId, agent.orgId), eq(agents.handle, handle)))
+      .limit(1)
+    if (!targetAgent) throw new CollabError(`agent "@${handle}" not found`)
+    assigneeAgentId = targetAgent.id
+  }
+
+  const res = await applyTaskMutation({
+    taskId: task.id,
+    actor: { type: "agent", id: agent.agentId },
+    assigneeAgentId,
+    assigneeUserId,
+    status: "in_progress",
+    reason: `assigned to ${cleanAssignee} by @${agent.handle}`,
+  })
+
+  return {
+    id: res.task.id,
+    ref: `MESH-${res.task.number}`,
+    title: res.task.title,
+    assignee: cleanAssignee,
+    status: res.task.status,
+  }
 }
 
 /**

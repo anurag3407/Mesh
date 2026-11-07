@@ -1,12 +1,14 @@
-import { redactSecrets } from "@mesh/core"
-import { profiles, rooms } from "@mesh/db"
+import { planCanvasPatch, redactSecrets } from "@mesh/core"
+import { canvasVersions, profiles, rooms } from "@mesh/db"
 import { eq } from "drizzle-orm"
 import type { Context } from "hono"
 import { Hono } from "hono"
 import { z } from "zod"
 import { authenticateAgentKey, type BotIdentity } from "../bot/auth"
+import { getHocuspocus, loadCanvas, persistCanvasState } from "../canvas/server"
 import {
   agentRooms,
+  assignTask,
   castVote,
   checkIn,
   claimTask,
@@ -17,8 +19,10 @@ import {
   getRoomMessages,
   getVote,
   listTasks,
+  planTask,
   postAgentMessage,
   requestHumanDecision,
+  resolveAgentRoomId,
   sendBotDirectMessage,
   startVote,
   updateAgentProfile,
@@ -27,6 +31,9 @@ import {
 } from "../collab"
 import { classifyAndRecordCheckin } from "../collab/classify-checkin"
 import { getDb } from "../db"
+import { loadTaskBriefContext } from "../runner/context"
+import { useSecretTool } from "../tools/builtins/use-secret"
+import { waitForActivity } from "./activity"
 import { generateSetupInstructions } from "./instructions"
 
 /**
@@ -57,6 +64,7 @@ interface McpTool<S extends z.ZodType = z.ZodType> {
   description: string
   schema: S
   readOnly?: boolean
+  scope?: string
   run: (agent: CollabAgent, input: z.infer<S>) => Promise<unknown>
 }
 
@@ -422,6 +430,161 @@ export const MCP_TOOLS: McpTool[] = [
     readOnly: true,
     run: (agent, input) => getVote(agent, { voteId: input.vote_id }),
   }),
+  defineTool({
+    name: "wait_for_activity",
+    title: "Wait for activity",
+    description:
+      "Long-poll for mentions, assigned tasks, or direct messages. Blocks until activity arrives or timeout occurs. Ideal for background loops.",
+    schema: z.object({
+      timeout_ms: z.number().int().min(1000).max(60000).optional().describe("Timeout in milliseconds (1000-60000, default 30000)"),
+    }),
+    readOnly: true,
+    scope: "room:read",
+    run: (agent, input) => waitForActivity(agent, { timeoutSeconds: Math.round((input.timeout_ms ?? 30000) / 1000) }),
+  }),
+  defineTool({
+    name: "get_task_brief",
+    title: "Get task brief",
+    description: "Get full task brief including parent context, subtasks, notes, and blocker details.",
+    schema: z.object({
+      task_id: uuid.describe("Task ID"),
+    }),
+    readOnly: true,
+    scope: "tasks:read",
+    run: async (_agent, input) => {
+      const brief = await loadTaskBriefContext(input.task_id)
+      if (!brief) throw new CollabError("task not found")
+      return { task_id: input.task_id, brief }
+    },
+  }),
+  defineTool({
+    name: "plan_task",
+    title: "Plan subtasks",
+    description: "Break down a task into subtasks with dependencies and optional assignees.",
+    schema: z.object({
+      task_id: uuid.describe("Parent task ID"),
+      subtasks: z
+        .array(
+          z.object({
+            key: z.string().min(1).max(32).describe("Subtask key (e.g. step1)"),
+            title: z.string().min(2).max(120),
+            description: z.string().max(4000).optional(),
+            assignee_handle: z.string().optional().describe("Teammate handle to assign, e.g. @coder"),
+            depends_on: z.array(z.string()).optional().describe("Array of keys this subtask depends on"),
+          }),
+        )
+        .min(1)
+        .max(20),
+    }),
+    scope: "tasks:write",
+    run: (agent, input) =>
+      planTask(agent, {
+        taskId: input.task_id,
+        subtasks: input.subtasks.map((s) => ({
+          key: s.key,
+          title: s.title,
+          description: s.description,
+          assigneeHandle: s.assignee_handle,
+          dependsOn: s.depends_on,
+        })),
+      }),
+  }),
+  defineTool({
+    name: "assign_task",
+    title: "Assign task",
+    description: "Assign an open or owned task to a teammate bot or human.",
+    schema: z.object({
+      task_id: uuid.describe("Task ID"),
+      assignee_handle: z.string().min(1).describe("Assignee handle, e.g. @reviewer"),
+    }),
+    scope: "tasks:write",
+    run: (agent, input) =>
+      assignTask(agent, {
+        taskId: input.task_id,
+        assignee: input.assignee_handle,
+      }),
+  }),
+  defineTool({
+    name: "canvas_read",
+    title: "Read canvas",
+    description: "Read the current text content and metadata of a room's canvas document.",
+    schema: z.object({
+      canvas_id: uuid.describe("Canvas ID"),
+      room_id: z.string().optional(),
+    }),
+    readOnly: true,
+    scope: "canvas:read",
+    run: async (agent, input) => {
+      const roomId = await resolveAgentRoomId(agent, input.room_id)
+      const canvas = await loadCanvas(input.canvas_id)
+      if (!canvas || canvas.roomId !== roomId) throw new CollabError("canvas not found in this room")
+      return { canvasId: canvas.id, title: canvas.title, content: canvas.snapshotText, updatedAt: canvas.updatedAt }
+    },
+  }),
+  defineTool({
+    name: "canvas_patch",
+    title: "Patch canvas",
+    description: "Apply search/replace edits to a room canvas with conflict-free Yjs splices.",
+    schema: z.object({
+      canvas_id: uuid.describe("Canvas ID"),
+      room_id: z.string().optional(),
+      edits: z.array(z.object({ search: z.string().min(1), replace: z.string() })).min(1).max(50),
+    }),
+    scope: "canvas:write",
+    run: async (agent, input) => {
+      const roomId = await resolveAgentRoomId(agent, input.room_id)
+      const canvas = await loadCanvas(input.canvas_id)
+      if (!canvas || canvas.roomId !== roomId) throw new CollabError("canvas not found in this room")
+      const connection = await getHocuspocus().openDirectConnection(input.canvas_id, {
+        agentId: agent.agentId,
+      })
+      try {
+        let newText = ""
+        await connection.transact((doc) => {
+          const text = doc.getText("content")
+          const plan = planCanvasPatch(text.toString(), input.edits)
+          for (const splice of plan.splices) {
+            text.delete(splice.from, splice.to - splice.from)
+            if (splice.insert) text.insert(splice.from, splice.insert)
+          }
+          newText = text.toString()
+        })
+        if (connection.document) await persistCanvasState(input.canvas_id, connection.document, newText)
+        await getDb()
+          .insert(canvasVersions)
+          .values({ canvasId: input.canvas_id, authorType: "agent", authorId: agent.agentId, snapshotText: newText })
+        return { ok: true, canvasId: input.canvas_id, edits: input.edits.length, characters: newText.length }
+      } finally {
+        await connection.disconnect()
+      }
+    },
+  }),
+  defineTool({
+    name: "use_secret",
+    title: "Use secret",
+    description:
+      "Execute an HTTPS request using a granted secret token without exposing the secret to the model. URL host must match the secret grant's allowlist.",
+    schema: z.object({
+      env_name: z.string().min(1).max(64).describe("Environment variable name of the granted secret, e.g. STRIPE_API_KEY"),
+      url: z.string().url().describe("Target HTTPS URL"),
+      method: z.enum(["GET", "POST", "PUT", "PATCH", "DELETE"]).default("GET"),
+      headers: z.record(z.string(), z.string()).optional(),
+      body: z.union([z.string(), z.record(z.string(), z.unknown())]).optional(),
+    }),
+    scope: "secrets:use",
+    run: async (agent, input) => {
+      const tool = useSecretTool({ agentId: agent.agentId, orgId: agent.orgId })
+      return tool.execute({
+        envName: input.env_name,
+        request: {
+          method: input.method,
+          url: input.url,
+          headers: input.headers,
+          body: input.body,
+        },
+      })
+    },
+  }),
 ]
 
 const toolsByName = new Map(MCP_TOOLS.map((t) => [t.name, t]))
@@ -462,6 +625,17 @@ async function callTool(agent: CollabAgent, params: Record<string, unknown> | un
   const name = typeof params?.name === "string" ? params.name : ""
   const tool = toolsByName.get(name)
   if (!tool) return { content: [{ type: "text", text: `Unknown tool: ${name}` }], isError: true }
+
+  if (tool.scope && agent.scopes && agent.scopes.length > 0) {
+    const hasScope = agent.scopes.includes(tool.scope) || agent.scopes.includes("*")
+    if (!hasScope) {
+      return {
+        content: [{ type: "text", text: `Permission denied: token missing required scope '${tool.scope}'` }],
+        isError: true,
+      }
+    }
+  }
+
   const parsed = tool.schema.safeParse(params?.arguments ?? {})
   if (!parsed.success) {
     const issues = parsed.error.issues.map((i) => `${i.path.join(".") || "input"}: ${i.message}`).join("; ")
@@ -489,7 +663,13 @@ async function handle(identity: BotIdentity, msg: JsonRpcMessage): Promise<RpcRe
     return isNotification ? null : rpcError(msg.id, -32600, "invalid request")
   }
   if (isNotification) return null
-  const agent: CollabAgent = { agentId: identity.agentId, orgId: identity.orgId, handle: identity.agent.handle }
+  const agent: CollabAgent = {
+    agentId: identity.agentId,
+    orgId: identity.orgId,
+    handle: identity.agent.handle,
+    roomIds: identity.roomIds,
+    scopes: identity.scopes,
+  }
   switch (msg.method) {
     case "initialize": {
       const requested = typeof msg.params?.protocolVersion === "string" ? msg.params.protocolVersion : ""
@@ -566,7 +746,7 @@ async function renderInstructions(c: Context, token: string | undefined) {
   }
 
   let roomName = targetRoom?.name || "Saaya Workspace"
-  let roomId = targetRoom?.id || ""
+  const roomId = targetRoom?.id || ""
   let roomDirective = targetRoom?.directive || ""
   let roomOwnerName = "Room Owner"
   let timezone = "Asia/Calcutta"

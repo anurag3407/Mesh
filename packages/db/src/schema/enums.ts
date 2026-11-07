@@ -80,3 +80,24 @@ export const outcomeKindEnum = pgEnum("outcome_kind", [
   "legacy",
 ])
 export const checkinModeEnum = pgEnum("checkin_mode", ["stream", "digest"])
+
+export const vaultSecretKindEnum = pgEnum("vault_secret_kind", [
+  "api_token",
+  "basic_auth",
+  "password",
+  "header_set",
+  "github_app",
+])
+export const secretInjectEnum = pgEnum("secret_inject", ["header", "basic", "query", "body"])
+export const computerStatusEnum = pgEnum("computer_status", [
+  "none",
+  "stopped",
+  "starting",
+  "running",
+  "stopping",
+  "error",
+  "over_quota",
+])
+export const computerProfileEnum = pgEnum("computer_profile", ["standard", "browser"])
+export const agentVisibilityEnum = pgEnum("agent_visibility", ["private", "org"])
+

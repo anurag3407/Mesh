@@ -1,10 +1,12 @@
 import { z } from "zod"
 import {
+  assignTask,
   castVote,
   claimTask,
   CollabError,
   createTask,
   listTasks,
+  planTask,
   requestHumanDecision,
   startVote,
   updateTask,
@@ -234,6 +236,41 @@ export function taskTools(args: {
       dangerous: false,
       execute: (input: { vote_id: string; option: string; reason?: string }) =>
         friendly(() => castVote(agent, { voteId: input.vote_id, option: input.option, reason: input.reason })),
+    },
+    {
+      name: "plan_task",
+      description:
+        "Break down a parent task into up to 12 coordinated subtasks with dependencies and assignees. Automatically detects cycles and wakes unblocked assignees.",
+      schema: z.object({
+        task_id: z.string().uuid(),
+        subtasks: z
+          .array(
+            z.object({
+              key: z.string().min(1).max(32),
+              title: z.string().min(1).max(200),
+              description: z.string().max(4_000).optional(),
+              assignee: z.string().optional(),
+              blockedBy: z.array(z.string()).optional(),
+              budgetTurns: z.number().int().min(1).max(20).optional(),
+            }),
+          )
+          .min(1)
+          .max(12),
+      }),
+      dangerous: false,
+      execute: (input: { task_id: string; subtasks: any[] }) =>
+        friendly(() => planTask(agent, { taskId: input.task_id, subtasks: input.subtasks })),
+    },
+    {
+      name: "assign_task",
+      description: "Assign a task to an agent (@handle) or human (human:<name>).",
+      schema: z.object({
+        task_id: z.string().uuid(),
+        assignee: z.string().min(1),
+      }),
+      dangerous: false,
+      execute: (input: { task_id: string; assignee: string }) =>
+        friendly(() => assignTask(agent, { taskId: input.task_id, assignee: input.assignee })),
     },
   ]
 }

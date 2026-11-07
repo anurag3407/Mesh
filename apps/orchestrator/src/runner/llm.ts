@@ -1,8 +1,8 @@
-import { computeCostUsd, redactSecrets, type TurnRole } from "@mesh/core"
-import { agentRuns, messages, modelPricing, providerKeys, usageEvents } from "@mesh/db"
+import { computeCostUsd, createRunScrubber, redactSecrets, type TurnRole } from "@mesh/core"
+import { agentRuns, messages, modelPricing, providerKeys, tasks, usageEvents } from "@mesh/db"
 import { createLanguageModel, devModelConfig, providerKeyToApiKey } from "@mesh/llm"
 import type { LanguageModel, LanguageModelUsage, ToolSet } from "ai"
-import { and, eq } from "drizzle-orm"
+import { and, eq, sql } from "drizzle-orm"
 import { registerRun, unregisterRun } from "../active-runs"
 import { getDb } from "../db"
 import { getEnv } from "../env"
@@ -14,6 +14,7 @@ import {
   buildUserPrompt,
   loadCanvasContext,
   loadConversation,
+  loadTaskBriefContext,
   loadTaskContext,
   renderTranscript,
 } from "./context"
@@ -27,6 +28,7 @@ export interface RunLlmTurnArgs {
   trigger: MessageRow
   role: TurnRole
   step: number
+  taskId?: string | null
 }
 
 export interface TurnResult {
@@ -41,6 +43,7 @@ interface ResolvedModel {
   model: LanguageModel
   provider: string
   modelName: string
+  apiKey?: string
 }
 
 export async function resolveAgentModel(agent: AgentRow): Promise<ResolvedModel> {
@@ -53,15 +56,17 @@ export async function resolveAgentModel(agent: AgentRow): Promise<ResolvedModel>
       .limit(1)
     if (!key) throw new Error(`Provider key for @${agent.handle} was deleted`)
     if (!agent.model) throw new Error(`@${agent.handle} has no model configured`)
+    const apiKey = providerKeyToApiKey(key, getEnv().MESH_KEK)
     return {
       model: createLanguageModel({
         provider: key.provider,
-        apiKey: providerKeyToApiKey(key, getEnv().MESH_KEK),
+        apiKey,
         model: agent.model,
         baseUrl: key.baseUrl,
       }),
       provider: key.provider,
       modelName: agent.model,
+      apiKey,
     }
   }
   const dev = devModelConfig()
@@ -97,9 +102,10 @@ export async function runLlmTurn(args: RunLlmTurnArgs): Promise<TurnResult> {
     threadRootId: args.threadRootId,
   })
   const transcript = renderTranscript(conversation)
-  const [canvasContext, taskContext] = await Promise.all([
+  const [canvasContext, taskContext, taskBrief] = await Promise.all([
     loadCanvasContext(room.id),
     loadTaskContext(room.id),
+    args.taskId ? loadTaskBriefContext(args.taskId) : Promise.resolve(""),
   ])
   const system = buildSystemPrompt({ room, agent, role: args.role })
   const prompt = buildUserPrompt({
@@ -107,6 +113,7 @@ export async function runLlmTurn(args: RunLlmTurnArgs): Promise<TurnResult> {
     canvases: canvasContext,
     tasks: taskContext,
     agent,
+    extra: taskBrief || undefined,
   })
 
   const [run] = await db
@@ -118,6 +125,7 @@ export async function runLlmTurn(args: RunLlmTurnArgs): Promise<TurnResult> {
       step: args.step,
       role: args.role,
       status: "running",
+      taskId: args.taskId ?? null,
     })
     .returning()
   if (!run) throw new Error("failed to create agent run")
@@ -141,6 +149,9 @@ export async function runLlmTurn(args: RunLlmTurnArgs): Promise<TurnResult> {
 
   const controller = registerRun(run.id, room.id)
 
+  const scrubPlaintexts = [resolved.apiKey].filter(Boolean) as string[]
+  const runScrubber = createRunScrubber(scrubPlaintexts)
+
   let tools: ToolSet = {}
   let closeTools = async () => {}
   const warnings: string[] = []
@@ -156,7 +167,7 @@ export async function runLlmTurn(args: RunLlmTurnArgs): Promise<TurnResult> {
   }
   const flush = () => {
     if (!buffer) return
-    const { text } = redactSecrets(buffer)
+    const { text } = redactSecrets(runScrubber(buffer))
     buffer = ""
     if (text) send({ type: "message.delta", messageId: message.id, seq: seq++, delta: text })
   }
@@ -170,10 +181,10 @@ export async function runLlmTurn(args: RunLlmTurnArgs): Promise<TurnResult> {
 
   const finalize = async () => {
     flush()
-    const redacted = redactSecrets(fullRaw).text
+    const redacted = redactSecrets(runScrubber(fullRaw)).text
     const status = aborted ? "halted" : error ? "error" : "complete"
-    const safeError = error ? redactSecrets(error).text : null
-    const safeWarnings = warnings.map((warning) => redactSecrets(warning).text)
+    const safeError = error ? redactSecrets(runScrubber(error)).text : null
+    const safeWarnings = warnings.map((warning) => redactSecrets(runScrubber(warning)).text)
     const metadata = {
       ...(message.metadata as Record<string, unknown>),
       ...(safeError ? { error: safeError } : {}),
@@ -228,6 +239,16 @@ export async function runLlmTurn(args: RunLlmTurnArgs): Promise<TurnResult> {
       })
       .where(eq(agentRuns.id, run.id))
 
+    if (args.taskId) {
+      await db
+        .update(tasks)
+        .set({
+          turnsUsed: sql`turns_used + 1`,
+          costUsd: sql`cost_usd + ${cost}`,
+        })
+        .where(eq(tasks.id, args.taskId))
+    }
+
     send({ type: "message.done", messageId: message.id, status })
     await chain
     return redacted
@@ -245,6 +266,7 @@ export async function runLlmTurn(args: RunLlmTurnArgs): Promise<TurnResult> {
           agentId: agent.id,
           runId: run.id,
           messageId: message.id,
+          scrub: runScrubber,
         },
       })
       tools = built.tools

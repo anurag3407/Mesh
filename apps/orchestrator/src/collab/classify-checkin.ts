@@ -1,14 +1,12 @@
-import { and, desc, eq, gt, inArray } from "drizzle-orm"
+import { and, eq, gt, inArray } from "drizzle-orm"
 import {
   agentReads,
-  messages,
   roomSchedules,
   taskEvents,
-  tasks,
   type Db,
 } from "@mesh/db"
 import { getDb } from "../db"
-import { type CollabAgent, CollabError, postAgentMessage, resolveAgentRoomId } from "./index"
+import { type CollabAgent, postAgentMessage, resolveAgentRoomId } from "./index"
 import { autoCloseMootRequests } from "./tasks-service"
 
 export interface CheckinReportInput {

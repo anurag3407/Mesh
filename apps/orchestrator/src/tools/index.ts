@@ -1,3 +1,4 @@
+import { parseCapabilities } from "@mesh/core"
 import { agents, mcpServers } from "@mesh/db"
 import { connectMcpServers, openSecret } from "@mesh/llm"
 import type { ToolSet } from "ai"
@@ -7,10 +8,12 @@ import { canvasPatchTool, canvasWriteTool } from "../canvas/tools"
 import { getDb } from "../db"
 import { getEnv } from "../env"
 import { toAuditedTools, type ToolRuntime, type ToolSpec } from "./audited"
+import { computerTools } from "./builtins/computer"
 import { githubTool } from "./builtins/github"
 import { postgresInspectorTool } from "./builtins/postgres"
 import { sandboxTool } from "./builtins/sandbox"
 import { taskTools } from "./builtins/tasks"
+import { useSecretTool } from "./builtins/use-secret"
 import { webSearchTool } from "./builtins/web-search"
 
 export interface BuildToolsArgs {
@@ -70,24 +73,49 @@ async function loadMcpConfigs(args: BuildToolsArgs) {
  */
 export async function buildTools(args: BuildToolsArgs): Promise<BuiltTools> {
   const warnings: string[] = []
-  const { configs, warnings: configWarnings } = await loadMcpConfigs(args)
-  warnings.push(...configWarnings)
+  const caps = parseCapabilities(args.agent.capabilities)
 
   const specs: ToolSpec[] = [
-    canvasWriteTool({ roomId: args.roomId, agentId: args.agent.id }),
-    canvasPatchTool({ roomId: args.roomId, agentId: args.agent.id }),
-    sandboxTool(),
-    webSearchTool(),
-    githubTool(args.orgId),
-    postgresInspectorTool(args.orgId),
-    ...taskTools({
-      roomId: args.roomId,
-      orgId: args.orgId,
-      agentId: args.agent.id,
-      handle: args.agent.handle,
-    }),
+    ...(caps.canvas
+      ? [
+          canvasWriteTool({ roomId: args.roomId, agentId: args.agent.id }),
+          canvasPatchTool({ roomId: args.roomId, agentId: args.agent.id }),
+        ]
+      : []),
+    ...(caps.sandbox && !caps.computer ? [sandboxTool()] : []),
+    ...(caps.webSearch ? [webSearchTool()] : []),
+    ...(caps.github ? [githubTool(args.orgId, args.agent.id)] : []),
+    ...(caps.postgres ? [postgresInspectorTool(args.orgId, args.agent.id)] : []),
+    ...(caps.tasks
+      ? taskTools({
+          roomId: args.roomId,
+          orgId: args.orgId,
+          agentId: args.agent.id,
+          handle: args.agent.handle,
+        })
+      : []),
+    ...(caps.computer
+      ? computerTools({
+          agentId: args.agent.id,
+          orgId: args.orgId,
+          roomId: args.roomId,
+          profile: caps.computer.profile,
+        })
+      : []),
+    ...(caps.secrets ? [useSecretTool({ agentId: args.agent.id, orgId: args.orgId })] : []),
   ]
   const tools = toAuditedTools(specs, args.runtime)
+
+  if (!caps.mcp) {
+    return {
+      tools,
+      warnings,
+      close: async () => {},
+    }
+  }
+
+  const { configs, warnings: configWarnings } = await loadMcpConfigs(args)
+  warnings.push(...configWarnings)
 
   const mcp = await connectMcpServers(configs)
   warnings.push(...mcp.errors.map((e) => `MCP server "${e.serverName}" unavailable: ${e.message}`))

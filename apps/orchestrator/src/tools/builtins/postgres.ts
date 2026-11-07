@@ -1,12 +1,12 @@
 import pg from "pg"
 import { z } from "zod"
 import type { ToolSpec } from "../audited"
-import { loadOrgToolConfig, type OrgToolConfig } from "./github"
+import { resolveToolCredential } from "../secrets"
 
 const MAX_ROWS = 100
 const MAX_RESULT_CHARS = 120_000
 
-export function postgresInspectorTool(orgId: string): ToolSpec {
+export function postgresInspectorTool(orgId: string, agentId?: string): ToolSpec {
   return {
     name: "postgres_inspector",
     description:
@@ -16,7 +16,7 @@ export function postgresInspectorTool(orgId: string): ToolSpec {
     }),
     dangerous: false,
     execute: async (input: { query: string }, signal?: AbortSignal) => {
-      const config = await loadOrgToolConfig<OrgToolConfig>(orgId, "postgres_inspector")
+      const config = await resolveToolCredential({ orgId, agentId, tool: "postgres_inspector" })
       if (!config?.connectionString) {
         throw new Error(
           "postgres_inspector is not configured. Add a connection string in Settings → Tools.",

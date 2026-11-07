@@ -84,24 +84,57 @@ export const roomEventSchema = z.discriminatedUnion("type", [
     toolCallId: z.string(),
     status: z.enum(["approved", "rejected"]),
   }),
+  z.object({
+    type: z.literal("tool.output"),
+    toolCallId: z.string(),
+    seq: z.number().int(),
+    chunk: z.string(),
+  }),
+  z.object({
+    type: z.literal("agent.connected"),
+    agentId: z.string(),
+    handle: z.string(),
+    client: z.string().optional(),
+  }),
+  z.object({
+    type: z.literal("computer.state"),
+    agentId: z.string(),
+    status: z.string(),
+  }),
+  z.object({
+    type: z.literal("room.notice"),
+    level: z.enum(["info", "warn", "error"]),
+    message: z.string(),
+  }),
 ])
 export type RoomEvent = z.infer<typeof roomEventSchema>
 
 /** Webhook payload sent to external bots (PRD §4.8). */
-export const webhookPayloadSchema = z.object({
-  event: z.literal("message.created"),
-  room_id: z.string(),
-  thread_id: z.string().nullable(),
-  message_id: z.string(),
-  sender: z.object({
-    id: z.string(),
-    name: z.string(),
-    type: z.enum(SENDER_TYPES),
+export const webhookPayloadSchema = z.union([
+  z.object({
+    event: z.literal("message.created"),
+    room_id: z.string(),
+    thread_id: z.string().nullable(),
+    message_id: z.string(),
+    sender: z.object({
+      id: z.string(),
+      name: z.string(),
+      type: z.enum(SENDER_TYPES),
+    }),
+    content: z.string(),
+    mentions: z.array(z.string()),
+    context_snapshot: z.array(z.object({ sender: z.string(), content: z.string() })),
   }),
-  content: z.string(),
-  mentions: z.array(z.string()),
-  context_snapshot: z.array(z.object({ sender: z.string(), content: z.string() })),
-})
+  z.object({
+    event: z.literal("task.assigned"),
+    room_id: z.string(),
+    task_id: z.string(),
+    task_number: z.number().int(),
+    title: z.string(),
+    description: z.string(),
+    reason: z.string().optional(),
+  }),
+])
 export type WebhookPayload = z.infer<typeof webhookPayloadSchema>
 
 /** Body accepted by POST /v1/rooms/:roomId/messages from external bots. */

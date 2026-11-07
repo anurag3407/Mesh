@@ -19,6 +19,7 @@ import {
   agents,
   messages,
   modelPricing,
+  tasks,
   turnSessions,
   usageEvents,
 } from "@mesh/db"
@@ -150,7 +151,7 @@ async function halt(
   await broadcastTurn(sessionId, roomId, threadRootId, null, queue)
 }
 
-async function breakerTrip(room: RoomRow, botTurnsUsed: number) {
+async function breakerTrip(room: RoomRow, botTurnsUsed: number, taskId?: string | null) {
   const db = getDb()
   const [rpm] = await db
     .select({ count: sql<number>`count(*)::int` })
@@ -164,9 +165,20 @@ async function breakerTrip(room: RoomRow, botTurnsUsed: number) {
     .select({ total: sql<string>`coalesce(sum(${usageEvents.costUsd}), 0)::text` })
     .from(usageEvents)
     .where(and(eq(usageEvents.roomId, room.id), gte(usageEvents.createdAt, startOfDay)))
+
+  let effectiveTurnCap = room.turnCap
+  if (taskId) {
+    const [t] = await db
+      .select({ budgetTurns: tasks.budgetTurns })
+      .from(tasks)
+      .where(eq(tasks.id, taskId))
+      .limit(1)
+    effectiveTurnCap = t?.budgetTurns ?? 12
+  }
+
   return checkPreTurnBreakers({
     botTurnsUsed,
-    turnCap: room.turnCap,
+    turnCap: effectiveTurnCap,
     rpmUsed: rpm?.count ?? 0,
     rpmLimit: room.rpmLimit,
     spentUsd: Number(spent?.total ?? 0),
@@ -355,7 +367,15 @@ export async function processRoomMessage(
     // (MCP bots, webhook bots posting later). collab/postAgentMessage sets the flag.
     const agentTriggered =
       trigger.senderType === "agent" && trigger.metadata?.agentTrigger === true && room.kind !== "dm"
-    if (trigger.senderType !== "human" && !agentTriggered) return
+    const taskWakeMeta =
+      trigger.senderType === "system" && trigger.metadata?.taskWake
+        ? (trigger.metadata.taskWake as { taskId: string; agentIds: string[]; reason: string })
+        : null
+    const taskWakeTriggered = Boolean(taskWakeMeta)
+
+    if (trigger.senderType !== "human" && !agentTriggered && !taskWakeTriggered) return
+
+    const taskId = taskWakeMeta?.taskId ?? null
 
     const [session] = await db
       .insert(turnSessions)
@@ -363,6 +383,7 @@ export async function processRoomMessage(
         roomId,
         threadRootId: trigger.threadRootId,
         triggerMessageId: trigger.id,
+        taskId,
         botTurnsUsed: 0,
         state: "active",
         queue: [],
@@ -385,23 +406,31 @@ export async function processRoomMessage(
     const dmAgent = room.kind === "dm" && room.agentDmAgentId
       ? roomAgentRows.find(({ agent }) => agent.id === room.agentDmAgentId)?.agent
       : undefined
-    let queue: PlannedTurn[] = agentTriggered
-      ? planMentionsTurn({
-          text: trigger.content,
-          roomAgents: agentRefs,
-          excludeAgentIds: trigger.senderId ? [trigger.senderId] : [],
-        })
-      : dmAgent
-      ? [{ agentId: dmAgent.id, role: "responder" }]
-      : room.turnMode === "mentions"
-        ? planMentionsTurn({ text: trigger.content, roomAgents: agentRefs })
-        : room.turnMode === "debate"
-          ? planDebateTurns({
-              roomAgents: agentRefs,
-              debateOrder: room.debateOrder,
-              text: trigger.content,
-            })
-          : planModeratedMentions({ text: trigger.content, roomAgents: agentRefs })
+    let queue: PlannedTurn[]
+    if (taskWakeTriggered && taskWakeMeta) {
+      const allowedAgentIds = new Set(agentRefs.map((a) => a.id))
+      queue = (taskWakeMeta.agentIds || [])
+        .filter((id) => allowedAgentIds.has(id))
+        .map((id) => ({ agentId: id, role: "responder" as const }))
+    } else if (agentTriggered) {
+      queue = planMentionsTurn({
+        text: trigger.content,
+        roomAgents: agentRefs,
+        excludeAgentIds: trigger.senderId ? [trigger.senderId] : [],
+      })
+    } else if (dmAgent) {
+      queue = [{ agentId: dmAgent.id, role: "responder" }]
+    } else if (room.turnMode === "mentions") {
+      queue = planMentionsTurn({ text: trigger.content, roomAgents: agentRefs })
+    } else if (room.turnMode === "debate") {
+      queue = planDebateTurns({
+        roomAgents: agentRefs,
+        debateOrder: room.debateOrder,
+        text: trigger.content,
+      })
+    } else {
+      queue = planModeratedMentions({ text: trigger.content, roomAgents: agentRefs })
+    }
     const explicitModeratedMentions =
       agentTriggered || (room.turnMode === "moderated" && queue.length > 0)
     let botTurnsUsed = 0
@@ -424,8 +453,19 @@ export async function processRoomMessage(
         break
       }
 
-      const trip = await breakerTrip(room, botTurnsUsed)
+      const trip = await breakerTrip(room, botTurnsUsed, session.taskId)
       if (trip) {
+        if (session.taskId && trip.reason === "turn_cap") {
+          await db
+            .update(tasks)
+            .set({
+              status: "stuck",
+              unblockNeeds: "human_answer",
+              unblockDetail: `Budget used up (${botTurnsUsed} turns). Approve more?`,
+              updatedAt: new Date(),
+            })
+            .where(eq(tasks.id, session.taskId))
+        }
         await halt(session.id, roomId, trigger.threadRootId, trip.message, trip.reason)
         state = "halted"
         break
@@ -503,6 +543,7 @@ export async function processRoomMessage(
             trigger: lastTrigger,
             role: next.role,
             step: botTurnsUsed + 1,
+            taskId: session.taskId,
           })
         }
       } catch (error) {

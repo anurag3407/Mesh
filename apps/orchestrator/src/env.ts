@@ -7,6 +7,13 @@ const envSchema = z.object({
   SUPABASE_SERVICE_ROLE_KEY: z.string().min(1),
   ORCHESTRATOR_INTERNAL_SECRET: z.string().min(16),
   PORT: z.coerce.number().int().positive().default(4000),
+  COMPUTERD_URL: z.string().default("http://localhost:4100"),
+  EGRESS_URL: z.string().default("http://localhost:8081"),
+  EGRESS_PROXY_URL: z.string().default("http://localhost:8080"),
+  COMPUTE_ENABLED: z
+    .string()
+    .optional()
+    .transform((v) => v === "true"),
   E2B_API_KEY: z.string().optional(),
   BRAVE_SEARCH_API_KEY: z.string().optional(),
   MESH_ALLOW_PRIVATE_WEBHOOKS: z

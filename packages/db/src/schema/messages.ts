@@ -58,6 +58,7 @@ export const turnSessions = pgTable(
       .references(() => rooms.id, { onDelete: "cascade" }),
     threadRootId: uuid("thread_root_id"),
     triggerMessageId: uuid("trigger_message_id"),
+    taskId: uuid("task_id").references(() => tasks.id, { onDelete: "set null" }),
     botTurnsUsed: integer("bot_turns_used").notNull().default(0),
     state: turnSessionStateEnum("state").notNull().default("active"),
     queue: jsonb("queue").$type<TurnQueueItem[]>().notNull().default([]),

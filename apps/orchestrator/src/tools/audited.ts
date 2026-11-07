@@ -15,6 +15,7 @@ export interface ToolRuntime {
   runId: string
   messageId: string
   approvalTimeoutMs?: number
+  scrub?: (s: string) => string
 }
 
 export interface ToolSpec {
@@ -27,20 +28,23 @@ export interface ToolSpec {
 
 const STORED_RESULT_LIMIT = 120_000
 
-export function redactValue(value: unknown, depth = 0): unknown {
+export function redactValue(value: unknown, scrub?: (s: string) => string, depth = 0): unknown {
   if (depth > 8) return "[truncated]"
-  if (typeof value === "string") return redactSecrets(value).text
-  if (Array.isArray(value)) return value.map((v) => redactValue(v, depth + 1))
+  if (typeof value === "string") {
+    const scrubbed = scrub ? scrub(value) : value
+    return redactSecrets(scrubbed).text
+  }
+  if (Array.isArray(value)) return value.map((v) => redactValue(v, scrub, depth + 1))
   if (value && typeof value === "object") {
     return Object.fromEntries(
-      Object.entries(value as Record<string, unknown>).map(([k, v]) => [k, redactValue(v, depth + 1)]),
+      Object.entries(value as Record<string, unknown>).map(([k, v]) => [k, redactValue(v, scrub, depth + 1)]),
     )
   }
   return value
 }
 
-function forStorage(value: unknown): unknown {
-  const redacted = redactValue(value)
+function forStorage(value: unknown, scrub?: (s: string) => string): unknown {
+  const redacted = redactValue(value, scrub)
   let json: string
   try {
     json = JSON.stringify(redacted) ?? "null"
@@ -69,7 +73,7 @@ export function toAuditedTools(specs: ToolSpec[], runtime: ToolRuntime): ToolSet
       execute: async (args: unknown, options) => {
         const input = (args ?? {}) as Record<string, unknown>
         const dangerous = isDangerous(spec, input)
-        const storedArgs = forStorage(input)
+        const storedArgs = forStorage(input, runtime.scrub)
         const [row] = await getDb()
           .insert(toolCalls)
           .values({
@@ -136,16 +140,17 @@ export function toAuditedTools(specs: ToolSpec[], runtime: ToolRuntime): ToolSet
             .update(toolCalls)
             .set({
               status: "done",
-              result: forStorage(result) as unknown,
+              result: forStorage(result, runtime.scrub) as unknown,
               resolvedAt: new Date(),
             })
             .where(eq(toolCalls.id, row.id))
           return result
         } catch (error) {
           const message = error instanceof Error ? error.message : String(error)
+          const scrubbedError = runtime.scrub ? runtime.scrub(message) : message
           await getDb()
             .update(toolCalls)
-            .set({ status: "error", error: redactSecrets(message).text, resolvedAt: new Date() })
+            .set({ status: "error", error: redactSecrets(scrubbedError).text, resolvedAt: new Date() })
             .where(eq(toolCalls.id, row.id))
           return { ok: false, error: message }
         }

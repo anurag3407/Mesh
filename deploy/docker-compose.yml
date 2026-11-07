@@ -144,6 +144,46 @@ services:
       - ./certbot/www:/var/www/certbot
     entrypoint: ["/bin/sh", "-c", "trap exit TERM; while :; do certbot renew --webroot -w /var/www/certbot --quiet; sleep 12h & wait $${!}; done"]
 
+  computerd:
+    <<: *hardening
+    image: ${MESH_IMAGE_PREFIX:-mesh}/computerd:${MESH_TAG:-latest}
+    build:
+      context: ..
+      dockerfile: deploy/docker/computerd.Dockerfile
+    env_file: .env.production
+    environment:
+      NODE_ENV: production
+      PORT: "4100"
+      ORCHESTRATOR_URL: http://orchestrator:4000
+    read_only: true
+    tmpfs:
+      - /tmp
+    depends_on:
+      orchestrator:
+        condition: service_healthy
+
+  egress:
+    <<: *hardening
+    image: ${MESH_IMAGE_PREFIX:-mesh}/egress:${MESH_TAG:-latest}
+    build:
+      context: ..
+      dockerfile: deploy/docker/egress.Dockerfile
+    env_file: .env.production
+    environment:
+      NODE_ENV: production
+      PROXY_PORT: "8080"
+      ADMIN_PORT: "8081"
+      ORCHESTRATOR_URL: http://orchestrator:4000
+    networks:
+      - mesh
+      - botnet
+    read_only: true
+    tmpfs:
+      - /tmp
+
 networks:
   mesh:
     driver: bridge
+  botnet:
+    driver: bridge
+    internal: true

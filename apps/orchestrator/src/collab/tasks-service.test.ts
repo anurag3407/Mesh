@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { applyTaskMutation, autoCloseMootRequests, CollabError } from "./tasks-service"
+import { applyTaskMutation, autoCloseMootRequests } from "./tasks-service"
 
 interface MockTask {
   id: string

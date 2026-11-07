@@ -8,8 +8,11 @@ import {
   uniqueIndex,
   uuid,
 } from "drizzle-orm/pg-core"
-import { agentKindEnum, providerEnum } from "./enums"
+import type { AgentCapabilities } from "@mesh/core"
+import { DEFAULT_CAPABILITIES } from "@mesh/core"
+import { agentKindEnum, agentVisibilityEnum, providerEnum } from "./enums"
 import { orgs, profiles } from "./identity"
+import { agentTemplates } from "./templates"
 
 export const providerKeys = pgTable(
   "provider_keys",
@@ -50,6 +53,12 @@ export const agents = pgTable(
     toolIds: uuid("tool_ids").array().notNull().default([]),
     webhookUrl: text("webhook_url"),
     webhookSecretEnc: text("webhook_secret_enc"),
+    templateId: uuid("template_id").references(() => agentTemplates.id, { onDelete: "set null" }),
+    ownerUserId: uuid("owner_user_id").references(() => profiles.id, { onDelete: "set null" }),
+    visibility: agentVisibilityEnum("visibility").notNull().default("org"),
+    avatar: text("avatar"),
+    bio: text("bio"),
+    capabilities: jsonb("capabilities").$type<AgentCapabilities>().notNull().default(DEFAULT_CAPABILITIES),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
@@ -70,6 +79,9 @@ export const agentApiKeys = pgTable(
     keyHash: text("key_hash").notNull(),
     scopes: text("scopes").array().notNull().default(["messages:write"]),
     label: text("label").notNull().default("default"),
+    roomIds: uuid("room_ids").array(),
+    oauthClientId: uuid("oauth_client_id"),
+    expiresAt: timestamp("expires_at", { withTimezone: true }),
     revokedAt: timestamp("revoked_at", { withTimezone: true }),
     lastUsedAt: timestamp("last_used_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),

@@ -1,10 +1,12 @@
 import { PgBoss } from "pg-boss"
+import { handleTaskWake, type TaskWakeData } from "../collab/task-wake"
 import { processRoomMessage } from "../coordinator"
 import { getEnv } from "../env"
 import { deliverWebhook, type WebhookJobData } from "./webhook"
 
 export const ROOM_MESSAGE_QUEUE = "room.message"
 export const WEBHOOK_QUEUE = "webhook.deliver"
+export const TASK_WAKE_QUEUE = "task.wake"
 
 let boss: PgBoss | null = null
 
@@ -28,6 +30,11 @@ export async function startJobs(): Promise<PgBoss> {
     retryBackoff: true,
     expireInSeconds: 120,
     deleteAfterSeconds: 604_800,
+  })
+  await instance.createQueue(TASK_WAKE_QUEUE, {
+    retryLimit: 2,
+    expireInSeconds: 60,
+    deleteAfterSeconds: 86_400,
   })
 
   await instance.work<{ roomId: string; messageId: string }>(
@@ -56,6 +63,20 @@ export async function startJobs(): Promise<PgBoss> {
     },
   )
 
+  await instance.work<TaskWakeData>(
+    TASK_WAKE_QUEUE,
+    { batchSize: 1, localConcurrency: 4, pollingIntervalSeconds: 1 },
+    async (jobs) => {
+      for (const job of jobs) {
+        try {
+          await handleTaskWake(job.data)
+        } catch (error) {
+          console.error(`[task.wake] failed for task ${job.data.taskId}`, error)
+        }
+      }
+    },
+  )
+
   boss = instance
   console.log("[pg-boss] workers online")
   return instance
@@ -69,6 +90,22 @@ export async function enqueueRoomMessage(roomId: string, messageId: string): Pro
 export async function enqueueWebhook(data: WebhookJobData): Promise<void> {
   if (!boss) throw new Error("job queue is not started")
   await boss.send(WEBHOOK_QUEUE, data)
+}
+
+export async function enqueueTaskWake(data: TaskWakeData): Promise<void> {
+  if (!boss) {
+    try {
+      await handleTaskWake(data)
+    } catch (e) {
+      console.error("[task.wake] direct invoke error", e)
+    }
+    return
+  }
+  await boss.send(TASK_WAKE_QUEUE, data, {
+    retryLimit: 2,
+    singletonKey: `${data.taskId}:${data.agentId}`,
+    singletonSeconds: 30,
+  })
 }
 
 export async function stopJobs(): Promise<void> {

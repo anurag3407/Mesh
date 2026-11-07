@@ -49,14 +49,24 @@ export default async function AgentsPage({
         </p>
         <div className="mt-1 flex flex-wrap items-baseline justify-between gap-2">
           <h1 className="text-2xl font-medium tracking-[-0.02em]">Agents</h1>
-          {canEdit ? (
-            <Link
-              href={`/${orgSlug}/settings/keys`}
-              className="font-mono text-[12px] text-muted underline underline-offset-4 hover:text-text"
-            >
-              provider keys
-            </Link>
-          ) : null}
+          <div className="flex items-center gap-3">
+            {canEdit ? (
+              <Link
+                href={`/${orgSlug}/agents/new`}
+                className="rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground hover:opacity-90"
+              >
+                + New Bot
+              </Link>
+            ) : null}
+            {canEdit ? (
+              <Link
+                href={`/${orgSlug}/settings/keys`}
+                className="font-mono text-[12px] text-muted underline underline-offset-4 hover:text-text"
+              >
+                provider keys
+              </Link>
+            ) : null}
+          </div>
         </div>
         <p className="mt-2 max-w-2xl text-[13px] leading-relaxed text-muted">
           An agent is a teammate powered by an AI model, or by your own server. People and other

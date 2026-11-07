@@ -327,6 +327,11 @@ export interface TaskView {
   expiresAt?: string | null
   costUsd?: number
   runsCount?: number
+  leadAgentId?: string | null
+  parentTaskId?: string | null
+  budgetTurns?: number | null
+  budgetUsd?: number | null
+  turnsUsed?: number | null
   metadata: Record<string, unknown>
   createdAt: string
   updatedAt: string

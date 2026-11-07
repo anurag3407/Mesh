@@ -2,6 +2,7 @@ import {
   index,
   integer,
   jsonb,
+  numeric,
   pgTable,
   serial,
   text,
@@ -50,6 +51,12 @@ export const tasks = pgTable(
     assigneeAgentId: uuid("assignee_agent_id").references(() => agents.id, {
       onDelete: "set null",
     }),
+    leadAgentId: uuid("lead_agent_id").references(() => agents.id, { onDelete: "set null" }),
+    parentTaskId: uuid("parent_task_id"),
+    budgetTurns: integer("budget_turns"),
+    budgetUsd: numeric("budget_usd", { precision: 10, scale: 4 }),
+    turnsUsed: integer("turns_used").notNull().default(0),
+    costUsd: numeric("cost_usd", { precision: 10, scale: 4 }).notNull().default("0"),
     requestedByAgentId: uuid("requested_by_agent_id").references(() => agents.id, {
       onDelete: "set null",
     }),
@@ -78,6 +85,8 @@ export const tasks = pgTable(
     index("tasks_room_status_idx").on(t.roomId, t.status),
     index("tasks_org_status_idx").on(t.orgId, t.status),
     index("tasks_assignee_agent_idx").on(t.assigneeAgentId),
+    index("tasks_lead_agent_idx").on(t.leadAgentId),
+    index("tasks_parent_task_idx").on(t.parentTaskId),
   ],
 )
 

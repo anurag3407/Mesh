@@ -1,34 +1,8 @@
-import { orgToolConfigs } from "@mesh/db"
-import { openSecret } from "@mesh/llm"
-import { and, eq } from "drizzle-orm"
 import { z } from "zod"
-import { getDb } from "../../db"
-import { getEnv } from "../../env"
 import type { ToolSpec } from "../audited"
+import { loadOrgToolConfig, resolveToolCredential, type OrgToolConfig } from "../secrets"
 
-export interface OrgToolConfig {
-  token?: string
-  connectionString?: string
-}
-
-export async function loadOrgToolConfig<T extends OrgToolConfig>(
-  orgId: string,
-  tool: "web_search" | "github_bridge" | "postgres_inspector",
-): Promise<T | null> {
-  const [row] = await getDb()
-    .select()
-    .from(orgToolConfigs)
-    .where(
-      and(
-        eq(orgToolConfigs.orgId, orgId),
-        eq(orgToolConfigs.tool, tool),
-        eq(orgToolConfigs.enabled, true),
-      ),
-    )
-    .limit(1)
-  if (!row) return null
-  return JSON.parse(openSecret(row.configEnc, getEnv().MESH_KEK)) as T
-}
+export { loadOrgToolConfig, type OrgToolConfig }
 
 const githubSchema = z.object({
   action: z.enum(["get_file", "list_issues", "commit_file"]),
@@ -74,7 +48,7 @@ async function githubFetch(
 
 const encodePath = (path: string) => path.split("/").map(encodeURIComponent).join("/")
 
-export function githubTool(orgId: string): ToolSpec {
+export function githubTool(orgId: string, agentId?: string): ToolSpec {
   return {
     name: "github_bridge",
     description:
@@ -82,7 +56,7 @@ export function githubTool(orgId: string): ToolSpec {
     schema: githubSchema,
     dangerous: (args) => (args as GithubInput).action === "commit_file",
     execute: async (input: GithubInput) => {
-      const config = await loadOrgToolConfig<OrgToolConfig>(orgId, "github_bridge")
+      const config = await resolveToolCredential({ orgId, agentId, tool: "github_bridge" })
       if (!config?.token) {
         throw new Error("github_bridge is not configured. Add a GitHub token in Settings → Tools.")
       }
